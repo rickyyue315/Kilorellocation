@@ -1,6 +1,6 @@
 """
-庫存調貨建議系統 v1.8 - Streamlit應用程序
-支持雙模式(雙組合)系統：A(保守轉貨)/B(加強轉貨) + C(按OM調配)/D(按港澳調配)
+庫存調貨建議系統 v1.9 - Streamlit應用程序
+簡化為雙模式系統：A(保守轉貨)/B(加強轉貨)
 """
 
 import streamlit as st
@@ -28,26 +28,25 @@ plt.rcParams['axes.unicode_minus'] = False
 
 # 設置頁面配置
 st.set_page_config(
-    page_title="庫存調貨建議系統 v1.8",
+    page_title="庫存調貨建議系統 v1.9",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # 應用程序標題
-st.title("📦 調貨建議生成系統 v1.8")
+st.title("📦 調貨建議生成系統 v1.9")
 st.markdown("---")
 
 # 側邊欄
 st.sidebar.header("系統資訊")
 st.sidebar.info("""
-**版本：v1.8**
+**版本：v1.9**
 **開發者: Ricky**
 
 **核心功能：**  
-- ✅ 雙模式(雙組合)系統
+- ✅ 雙模式系統
 - ✅ A模式(保守轉貨)/B模式(加強轉貨)
-- ✅ C模式(按OM調配)/D模式(按港澳調配)
 - ✅ ND/RF類型智慧識別
 - ✅ 優先順序調貨匹配
 - ✅ RF轉出限制控制
@@ -57,30 +56,25 @@ st.sidebar.info("""
 
 # 模式選擇
 st.sidebar.subheader("模式選擇")
-st.sidebar.markdown("**轉貨模式選擇：**")
-mode_ab = st.sidebar.radio(
-    "",
+mode = st.sidebar.radio(
+    "選擇轉貨模式",
     ["保守轉貨 (A模式)", "加強轉貨 (B模式)"],
-    key="mode_ab"
-)
-
-st.sidebar.markdown("**調配模式選擇：**")
-mode_cd = st.sidebar.radio(
-    "",
-    ["按OM調配 (C模式)", "按港澳調配 (D模式)"],
-    key="mode_cd"
+    key="mode"
 )
 
 # 模式說明
 with st.sidebar.expander("模式說明"):
     st.markdown("""
     **轉貨模式：**
-    - **A模式(保守轉貨)**：RF過剩轉出限制為庫存的20%，最少2件
-    - **B模式(加強轉貨)**：RF加強轉出限制為庫存的50%，最少2件，基於MOQ+1計算
+    - **A模式(保守轉貨)**：轉出後剩餘庫存不低於安全庫存，轉出類型為RF過剩轉出
+    - **B模式(加強轉貨)**：轉出後剩餘庫存可能低於安全庫存，轉出類型為RF加強轉出
     
-    **調配模式：**
-    - **C模式(按OM調配)**：僅允許相同產品編號且OM代號完全匹配的調撥
-    - **D模式(按港澳調配)**：允許相同產品跨OM調撥，HA*/HB*/HC*可互相互補
+    **轉出類型判斷：**
+    - 如果轉出店鋪轉出後, 剩餘庫存不會低過Safety stock, 轉出類型定位為RF過剩轉出
+    - 如果轉出店鋪轉出後, 剩餘庫存會低過Safety stock, 轉出類型定位為RF加強轉出
+    
+    **接收條件：**
+    - SaSa Net Stock + Pending Received < Safety Stock，便需要進行調撥接收
     """)
 
 # 文件上傳區域
@@ -140,7 +134,7 @@ if uploaded_file is not None:
         
         # 生成調貨建議
         st.header("3. 生成調貨建議")
-        st.info(f"當前模式：{mode_ab} + {mode_cd}")
+        st.info(f"當前模式：{mode}")
         
         if st.button("生成調貨建議", type="primary"):
             with st.spinner("正在生成調貨建議，請稍候..."):
@@ -148,11 +142,10 @@ if uploaded_file is not None:
                 transfer_logic = TransferLogic()
                 
                 # 轉換模式名稱
-                mode_ab_name = "保守轉貨" if mode_ab == "保守轉貨 (A模式)" else "加強轉貨"
-                mode_cd_name = "按OM調配" if mode_cd == "按OM調配 (C模式)" else "按港澳調配"
+                mode_name = "保守轉貨" if mode == "保守轉貨 (A模式)" else "加強轉貨"
                 
                 # 生成調貨建議
-                recommendations = transfer_logic.generate_transfer_recommendations(df, mode_ab_name, mode_cd_name)
+                recommendations = transfer_logic.generate_transfer_recommendations(df, mode_name)
                 
                 # 執行質量檢查
                 quality_passed = transfer_logic.perform_quality_checks(df)
@@ -238,57 +231,63 @@ if uploaded_file is not None:
                     # 創建橫條圖
                     y_pos = np.arange(len(om_names))
                     
-                    if mode_ab_name == "保守轉貨":
+                    if mode_name == "保守轉貨":
                         # A模式圖表
                         source_type_stats = statistics.get('source_type_stats', {})
                         nd_qtys = []
-                        rf_qtys = []
+                        rf_excess_qtys = []
                         
                         for om in om_names:
                             # 計算每個OM的ND和RF轉出數量
                             nd_qty = 0
-                            rf_qty = 0
+                            rf_excess_qty = 0
                             
                             for rec in recommendations:
                                 if rec['Transfer OM'] == om:
                                     if rec.get('Source Type') == 'ND轉出':
                                         nd_qty += rec['Transfer Qty']
                                     elif rec.get('Source Type') == 'RF過剩轉出':
-                                        rf_qty += rec['Transfer Qty']
+                                        rf_excess_qty += rec['Transfer Qty']
                             
                             nd_qtys.append(nd_qty)
-                            rf_qtys.append(rf_qty)
+                            rf_excess_qtys.append(rf_excess_qty)
                         
                         # 繪製四條形圖
                         width = 0.2
                         ax.barh(y_pos + width*1.5, nd_qtys, width, label='ND Transfer Out', color='skyblue')
-                        ax.barh(y_pos + width*0.5, rf_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
+                        ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
                         
                     else:
                         # B模式圖表
                         source_type_stats = statistics.get('source_type_stats', {})
                         nd_qtys = []
-                        rf_qtys = []
+                        rf_excess_qtys = []
+                        rf_enhanced_qtys = []
                         
                         for om in om_names:
                             # 計算每個OM的ND和RF轉出數量
                             nd_qty = 0
-                            rf_qty = 0
+                            rf_excess_qty = 0
+                            rf_enhanced_qty = 0
                             
                             for rec in recommendations:
                                 if rec['Transfer OM'] == om:
                                     if rec.get('Source Type') == 'ND轉出':
                                         nd_qty += rec['Transfer Qty']
+                                    elif rec.get('Source Type') == 'RF過剩轉出':
+                                        rf_excess_qty += rec['Transfer Qty']
                                     elif rec.get('Source Type') == 'RF加強轉出':
-                                        rf_qty += rec['Transfer Qty']
+                                        rf_enhanced_qty += rec['Transfer Qty']
                             
                             nd_qtys.append(nd_qty)
-                            rf_qtys.append(rf_qty)
+                            rf_excess_qtys.append(rf_excess_qty)
+                            rf_enhanced_qtys.append(rf_enhanced_qty)
                         
-                        # 繪製四條形圖
-                        width = 0.2
+                        # 繪製五條形圖
+                        width = 0.15
                         ax.barh(y_pos + width*1.5, nd_qtys, width, label='ND Transfer Out', color='skyblue')
-                        ax.barh(y_pos + width*0.5, rf_qtys, width, label='RF Enhanced Transfer Out', color='lightgreen')
+                        ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
+                        ax.barh(y_pos - width*0.5, rf_enhanced_qtys, width, label='RF Enhanced Transfer Out', color='orange')
                     
                     # 計算接收類型數據
                     urgent_qtys = []
@@ -310,15 +309,16 @@ if uploaded_file is not None:
                         potential_qtys.append(potential_qty)
                     
                     # 繪製接收類型
-                    ax.barh(y_pos - width*0.5, urgent_qtys, width, label='Urgent Shortage Receive', color='salmon')
-                    ax.barh(y_pos - width*1.5, potential_qtys, width, label='Potential Shortage Receive', color='gold')
+                    width = 0.2 if mode_name == "保守轉貨" else 0.15
+                    ax.barh(y_pos - width*1.5, urgent_qtys, width, label='Urgent Shortage Receive', color='salmon')
+                    ax.barh(y_pos - width*2.5, potential_qtys, width, label='Potential Shortage Receive', color='gold')
                     
                     # 設置圖表標籤和標題
                     ax.set_yticks(y_pos)
                     ax.set_yticklabels(om_names)
                     ax.invert_yaxis()  # 標籤從上到下
                     ax.set_xlabel('Transfer Quantity')
-                    ax.set_title('OM Transfer vs Receive Analysis')
+                    ax.set_title(f'OM Transfer vs Receive Analysis ({mode_name})')
                     ax.legend()
                     
                     # 顯示圖表
@@ -339,22 +339,22 @@ st.sidebar.subheader("使用說明")
 st.sidebar.markdown("""
 1. 上傳包含庫存數據的Excel文件
 2. 選擇轉貨模式（保守轉貨或加強轉貨）
-3. 選擇調配模式（按OM調配或按港澳調配）
-4. 點擊"生成調貨建議"按鈕
-5. 查看調貨建議結果和統計信息
-6. 下載生成的Excel文件
+3. 點擊"生成調貨建議"按鈕
+4. 查看調貨建議結果和統計信息
+5. 下載生成的Excel文件
 
 **注意事項：**
 - 確保Excel文件包含所有必需的欄位
 - Article欄位必須為12位文本格式
 - 系統會自動處理缺失值和異常值
-- 僅允許A+C、A+D、B+C、B+D四種模式組合
+- RF過剩轉出：轉出後剩餘庫存不低於安全庫存
+- RF加強轉出：轉出後剩餘庫存可能低於安全庫存
 """)
 
 # 系統信息
 st.sidebar.markdown("---")
 st.sidebar.subheader("系統信息")
 st.sidebar.markdown(f"""
-版本: v1.8  
+版本: v1.9  
 更新時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """)

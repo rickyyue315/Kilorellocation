@@ -1,7 +1,7 @@
 """
-業務邏輯模組 v1.8
+業務邏輯模組 v1.9
 實現調貨規則、源/目的地識別和匹配算法
-支持雙模式(雙組合)系統：A(保守轉貨)/B(加強轉貨) + C(按OM調配)/D(按港澳調配)
+簡化為雙模式系統：A(保守轉貨)/B(加強轉貨)
 """
 
 import pandas as pd
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v1.8"""
+    """調貨業務邏輯類 v1.9"""
     
     def __init__(self):
         self.transfer_recommendations = []
@@ -22,32 +22,14 @@ class TransferLogic:
         self.quality_errors = []
         self.mode_a = "保守轉貨"  # A模式
         self.mode_b = "加強轉貨"  # B模式
-        self.mode_c = "按OM調配"  # C模式
-        self.mode_d = "按港澳調配"  # D模式
     
-    def get_site_group(self, site: str) -> str:
+    def identify_sources(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
         """
-        根據站點代碼確定分組（用於D模式）
-        
-        Args:
-            site: 站點代碼
-            
-        Returns:
-            分組標識
-        """
-        if site.startswith('HA') or site.startswith('HB') or site.startswith('HC'):
-            return "HABC"  # HA*/HB*/HC*系列站點歸為一組
-        elif site.startswith('HD'):
-            return "HD"  # HD*系列站點獨立分組
-        else:
-            return "OTHER"  # 其他站點
-    
-    def identify_sources_conservative(self, group_df: pd.DataFrame) -> List[Dict]:
-        """
-        識別轉出候選店鋪 - A模式(保守轉貨)
+        識別轉出候選店鋪
         
         Args:
             group_df: 按Article和OM分組的DataFrame
+            mode: 轉貨模式（保守轉貨或加強轉貨）
             
         Returns:
             轉出候選店鋪列表
@@ -69,32 +51,64 @@ class TransferLogic:
                     'source_type': 'ND轉出'
                 })
         
-        # 優先級2：RF類型過剩轉出
+        # 優先級2：RF類型轉出
         rf_sources = group_df[group_df['RP Type'] == 'RF']
         
         # 找出該Article+OM組合中的最高有效銷量
         max_sold_qty = rf_sources['Effective Sold Qty'].max() if not rf_sources.empty else 0
         
         for _, row in rf_sources.iterrows():
-            # 條件1：庫存充足
+            # 條件1：(庫存+在途) > Safety Stock
             total_available = row['SaSa Net Stock'] + row['Pending Received']
-            is_stock_sufficient = total_available > row['Safety Stock']
+            is_stock_above_safety = total_available > row['Safety Stock']
             
             # 條件2：不是最高銷量店鋪
             is_not_highest_sold = row['Effective Sold Qty'] < max_sold_qty
             
-            if is_stock_sufficient and is_not_highest_sold:
-                # 基礎可轉出 = (庫存+在途) - 安全庫存
-                base_transferable = total_available - row['Safety Stock']
-                
-                # 上限控制 = (庫存+在途) × 20%，但最少2件
-                upper_limit = max(total_available * 0.2, 2)
-                
-                # 實際轉出 = min(基礎可轉出, max(上限控制, 2))
-                actual_transferable = min(base_transferable, upper_limit)
-                
-                # 不能超過實際庫存數量
-                actual_transferable = min(actual_transferable, row['SaSa Net Stock'])
+            if is_stock_above_safety and is_not_highest_sold:
+                # 根據模式計算可轉出數量
+                if mode == self.mode_a:
+                    # A模式(保守轉貨)
+                    # 基礎可轉出 = (庫存+在途) - 安全庫存
+                    base_transferable = total_available - row['Safety Stock']
+                    
+                    # 上限控制 = (庫存+在途) × 20%，但最少2件
+                    upper_limit = max(total_available * 0.2, 2)
+                    
+                    # 實際轉出 = min(基礎可轉出, max(上限控制, 2))
+                    actual_transferable = min(base_transferable, upper_limit)
+                    
+                    # 不能超過實際庫存數量
+                    actual_transferable = min(actual_transferable, row['SaSa Net Stock'])
+                    
+                    # 判斷轉出類型
+                    remaining_stock = row['SaSa Net Stock'] - actual_transferable
+                    if remaining_stock >= row['Safety Stock']:
+                        source_type = 'RF過剩轉出'
+                    else:
+                        # A模式下不允許剩餘庫存低於安全庫存
+                        continue
+                        
+                else:
+                    # B模式(加強轉貨)
+                    # 基礎可轉出 = (庫存+在途) – (MOQ數量+1件)
+                    base_transferable = total_available - (row['MOQ'] + 1)
+                    
+                    # 上限控制 = (庫存+在途) × 50%，但最少2件
+                    upper_limit = max(total_available * 0.5, 2)
+                    
+                    # 實際轉出 = min(基礎可轉出, max(上限控制, 2))
+                    actual_transferable = min(base_transferable, upper_limit)
+                    
+                    # 不能超過實際庫存數量
+                    actual_transferable = min(actual_transferable, row['SaSa Net Stock'])
+                    
+                    # 判斷轉出類型
+                    remaining_stock = row['SaSa Net Stock'] - actual_transferable
+                    if remaining_stock >= row['Safety Stock']:
+                        source_type = 'RF過剩轉出'
+                    else:
+                        source_type = 'RF加強轉出'
                 
                 if actual_transferable > 0:  # 只考慮有可轉出庫存的店鋪
                     sources.append({
@@ -105,82 +119,7 @@ class TransferLogic:
                         'priority': 2,
                         'original_stock': row['SaSa Net Stock'],
                         'effective_sold_qty': row['Effective Sold Qty'],
-                        'source_type': 'RF過剩轉出'
-                    })
-        
-        # 按優先級排序
-        sources.sort(key=lambda x: x['priority'])
-        
-        return sources
-    
-    def identify_sources_enhanced(self, group_df: pd.DataFrame) -> List[Dict]:
-        """
-        識別轉出候選店鋪 - B模式(加強轉貨)
-        
-        Args:
-            group_df: 按Article和OM分組的DataFrame
-            
-        Returns:
-            轉出候選店鋪列表
-        """
-        sources = []
-        
-        # 優先級1：ND類型轉出
-        nd_sources = group_df[group_df['RP Type'] == 'ND']
-        for _, row in nd_sources.iterrows():
-            if row['SaSa Net Stock'] > 0:  # 只考慮有庫存的店鋪
-                sources.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'transferable_qty': row['SaSa Net Stock'],
-                    'priority': 1,
-                    'original_stock': row['SaSa Net Stock'],
-                    'effective_sold_qty': row['Effective Sold Qty'],
-                    'source_type': 'ND轉出'
-                })
-        
-        # 優先級2：RF類型加強轉出
-        rf_sources = group_df[group_df['RP Type'] == 'RF']
-        
-        # 找出該Article+OM組合中的最高有效銷量
-        max_sold_qty = rf_sources['Effective Sold Qty'].max() if not rf_sources.empty else 0
-        
-        # 按有效銷量由低至高排序
-        rf_sources = rf_sources.sort_values('Effective Sold Qty')
-        
-        for _, row in rf_sources.iterrows():
-            # 條件1：(庫存+在途) > (MOQ數量+1件)
-            total_available = row['SaSa Net Stock'] + row['Pending Received']
-            moq_plus_one = row['MOQ'] + 1
-            is_stock_above_moq = total_available > moq_plus_one
-            
-            # 條件2：不是最高銷量店鋪
-            is_not_highest_sold = row['Effective Sold Qty'] < max_sold_qty
-            
-            if is_stock_above_moq and is_not_highest_sold:
-                # 基礎可轉出 = (庫存+在途) – (MOQ數量+1件)
-                base_transferable = total_available - moq_plus_one
-                
-                # 上限控制 = (庫存+在途) × 50%，但最少2件
-                upper_limit = max(total_available * 0.5, 2)
-                
-                # 實際轉出 = min(基礎可轉出, max(上限控制, 2))
-                actual_transferable = min(base_transferable, upper_limit)
-                
-                # 不能超過實際庫存數量
-                actual_transferable = min(actual_transferable, row['SaSa Net Stock'])
-                
-                if actual_transferable > 0:  # 只考慮有可轉出庫存的店鋪
-                    sources.append({
-                        'site': row['Site'],
-                        'om': row['OM'],
-                        'rp_type': row['RP Type'],
-                        'transferable_qty': int(actual_transferable),
-                        'priority': 2,
-                        'original_stock': row['SaSa Net Stock'],
-                        'effective_sold_qty': row['Effective Sold Qty'],
-                        'source_type': 'RF加強轉出'
+                        'source_type': source_type
                     })
         
         # 按優先級排序
@@ -252,10 +191,10 @@ class TransferLogic:
         
         return destinations
     
-    def match_transfers_by_om(self, article: str, om: str, sources: List[Dict], 
-                             destinations: List[Dict], product_desc: str) -> List[Dict]:
+    def match_transfers(self, article: str, om: str, sources: List[Dict], 
+                       destinations: List[Dict], product_desc: str) -> List[Dict]:
         """
-        按OM執行轉出與接收的匹配 - C模式
+        執行轉出與接收的匹配
         
         Args:
             article: 商品編號
@@ -282,76 +221,28 @@ class TransferLogic:
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
                                article, om, product_desc, 1, 2)
         
-        # 3. RF轉出 -> 緊急缺貨
+        # 3. RF過剩轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1)
+                               article, om, product_desc, 2, 1, 'RF過剩轉出')
         
-        # 4. RF轉出 -> 潛在缺貨
+        # 4. RF過剩轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2)
+                               article, om, product_desc, 2, 2, 'RF過剩轉出')
         
-        return recommendations
-    
-    def match_transfers_by_hk(self, article: str, sources: List[Dict], 
-                             destinations: List[Dict], product_desc: str) -> List[Dict]:
-        """
-        按港澳地區執行轉出與接收的匹配 - D模式
+        # 5. RF加強轉出 -> 緊急缺貨
+        self._match_by_priority(temp_sources, temp_destinations, recommendations, 
+                               article, om, product_desc, 2, 1, 'RF加強轉出')
         
-        Args:
-            article: 商品編號
-            sources: 轉出候選店鋪列表
-            destinations: 接收候選店鋪列表
-            product_desc: 商品描述
-            
-        Returns:
-            匹配成功的調貨建議列表
-        """
-        recommendations = []
-        
-        # 按站點分組
-        source_groups = {}
-        for source in sources:
-            group = self.get_site_group(source['site'])
-            if group not in source_groups:
-                source_groups[group] = []
-            source_groups[group].append(source)
-        
-        dest_groups = {}
-        for dest in destinations:
-            group = self.get_site_group(dest['site'])
-            if group not in dest_groups:
-                dest_groups[group] = []
-            dest_groups[group].append(dest)
-        
-        # 在同一分組內進行匹配
-        for group in source_groups:
-            if group in dest_groups:
-                # 複製源和目的地列表，避免修改原始數據
-                temp_sources = [s.copy() for s in source_groups[group]]
-                temp_destinations = [d.copy() for d in dest_groups[group]]
-                
-                # 按優先級順序進行匹配
-                # 1. ND轉出 -> 緊急缺貨
-                self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                       article, group, product_desc, 1, 1)
-                
-                # 2. ND轉出 -> 潛在缺貨
-                self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                       article, group, product_desc, 1, 2)
-                
-                # 3. RF轉出 -> 緊急缺貨
-                self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                       article, group, product_desc, 2, 1)
-                
-                # 4. RF轉出 -> 潛在缺貨
-                self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                       article, group, product_desc, 2, 2)
+        # 6. RF加強轉出 -> 潛在缺貨
+        self._match_by_priority(temp_sources, temp_destinations, recommendations, 
+                               article, om, product_desc, 2, 2, 'RF加強轉出')
         
         return recommendations
     
     def _match_by_priority(self, sources: List[Dict], destinations: List[Dict], 
                           recommendations: List[Dict], article: str, group_id: str, 
-                          product_desc: str, source_priority: int, dest_priority: int):
+                          product_desc: str, source_priority: int, dest_priority: int,
+                          source_type_filter: Optional[str] = None):
         """
         按指定優先級進行匹配
         
@@ -360,13 +251,19 @@ class TransferLogic:
             destinations: 接收候選店鋪列表
             recommendations: 調貨建議列表
             article: 商品編號
-            group_id: 分組ID（OM或站點分組）
+            group_id: 分組ID（OM）
             product_desc: 商品描述
             source_priority: 轉出優先級
             dest_priority: 接收優先級
+            source_type_filter: 轉出類型過濾器（可選）
         """
         # 篩選指定優先級的源和目的地
         filtered_sources = [s for s in sources if s['priority'] == source_priority and s['transferable_qty'] > 0]
+        
+        # 如果指定了轉出類型過濾器，則按類型篩選
+        if source_type_filter:
+            filtered_sources = [s for s in filtered_sources if s['source_type'] == source_type_filter]
+        
         filtered_destinations = [d for d in destinations if d['priority'] == dest_priority and d['needed_qty'] > 0]
         
         # 執行匹配
@@ -385,11 +282,11 @@ class TransferLogic:
                 # 調貨數量優化：如果只有1件，嘗試調高到2件
                 if transfer_qty == 1 and source['transferable_qty'] >= 2:
                     # 檢查是否不影響轉出店鋪安全庫存
-                    if source['source_type'] == 'ND轉出':
+                    if source['source_type'] in ['ND轉出', 'RF加強轉出']:
                         # ND類型轉出，不影響安全庫存
                         transfer_qty = 2
                     else:
-                        # RF類型轉出，需要檢查安全庫存
+                        # RF過剩轉出類型，需要檢查安全庫存
                         remaining_stock = source['original_stock'] - 2
                         # 這裡簡化處理，實際應根據業務邏輯檢查
                         transfer_qty = 2
@@ -420,34 +317,25 @@ class TransferLogic:
                 source['transferable_qty'] -= transfer_qty
                 dest['needed_qty'] -= transfer_qty
     
-    def generate_transfer_recommendations(self, df: pd.DataFrame, mode_ab: str, mode_cd: str) -> List[Dict]:
+    def generate_transfer_recommendations(self, df: pd.DataFrame, mode: str) -> List[Dict]:
         """
         生成所有調貨建議
         
         Args:
             df: 預處理後的DataFrame
-            mode_ab: A模式(保守轉貨)或B模式(加強轉貨)
-            mode_cd: C模式(按OM調配)或D模式(按港澳調配)
+            mode: A模式(保守轉貨)或B模式(加強轉貨)
             
         Returns:
             調貨建議列表
         """
-        logger.info(f"開始生成調貨建議 - {mode_ab} + {mode_cd}")
+        logger.info(f"開始生成調貨建議 - {mode}")
         
-        # 驗證模式組合
-        if mode_ab not in [self.mode_a, self.mode_b]:
-            raise ValueError(f"無效的轉貨模式: {mode_ab}")
+        # 驗證模式
+        if mode not in [self.mode_a, self.mode_b]:
+            raise ValueError(f"無效的轉貨模式: {mode}")
         
-        if mode_cd not in [self.mode_c, self.mode_d]:
-            raise ValueError(f"無效的調配模式: {mode_cd}")
-        
-        # 按模式分組數據
-        if mode_cd == self.mode_c:
-            # C模式：按OM分組
-            grouped = df.groupby(['Article', 'OM'])
-        else:
-            # D模式：按Article分組，然後在匹配時按站點分組
-            grouped = df.groupby(['Article'])
+        # 按Article和OM分組數據
+        grouped = df.groupby(['Article', 'OM'])
         
         all_recommendations = []
         
@@ -456,23 +344,14 @@ class TransferLogic:
             product_desc = group_df['Article Description'].iloc[0] if 'Article Description' in group_df.columns else ""
             
             # 識別轉出候選店鋪
-            if mode_ab == self.mode_a:
-                sources = self.identify_sources_conservative(group_df)
-            else:
-                sources = self.identify_sources_enhanced(group_df)
+            sources = self.identify_sources(group_df, mode)
             
             # 識別接收候選店鋪
             destinations = self.identify_destinations(group_df)
             
             # 執行匹配
-            if mode_cd == self.mode_c:
-                # C模式：按OM匹配
-                article, om = group_keys
-                recommendations = self.match_transfers_by_om(article, om, sources, destinations, product_desc)
-            else:
-                # D模式：按港澳地區匹配
-                article = group_keys
-                recommendations = self.match_transfers_by_hk(article, sources, destinations, product_desc)
+            article, om = group_keys
+            recommendations = self.match_transfers(article, om, sources, destinations, product_desc)
             
             # 更新安全庫存和MOQ信息
             for rec in recommendations:

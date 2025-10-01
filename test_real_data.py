@@ -1,5 +1,6 @@
 """
-使用真實數據測試系統功能 v1.8
+使用真實數據測試系統功能 v1.9
+簡化為雙模式系統：A(保守轉貨)/B(加強轉貨)
 """
 
 import os
@@ -44,63 +45,63 @@ def test_with_real_data(file_path: str):
         print("\n   數據樣本:")
         print(df.head(3).to_string())
         
-        # 2. 測試A模式(保守轉貨) + C模式(按OM調配)
-        print("\n2. 測試A模式(保守轉貨) + C模式(按OM調配)...")
+        # 2. 測試A模式(保守轉貨)
+        print("\n2. 測試A模式(保守轉貨)...")
         transfer_logic = TransferLogic()
-        recommendations_ac = transfer_logic.generate_transfer_recommendations(df, "保守轉貨", "按OM調配")
-        quality_passed_ac = transfer_logic.perform_quality_checks(df)
-        statistics_ac = transfer_logic.get_transfer_statistics()
+        recommendations_a = transfer_logic.generate_transfer_recommendations(df, "保守轉貨")
+        quality_passed_a = transfer_logic.perform_quality_checks(df)
+        statistics_a = transfer_logic.get_transfer_statistics()
         
-        print(f"   - 調貨建議數量: {len(recommendations_ac)}")
-        print(f"   - 總調貨件數: {statistics_ac.get('total_transfer_qty', 0)}")
-        print(f"   - 質量檢查: {'通過' if quality_passed_ac else '失敗'}")
+        print(f"   - 調貨建議數量: {len(recommendations_a)}")
+        print(f"   - 總調貨件數: {statistics_a.get('total_transfer_qty', 0)}")
+        print(f"   - 質量檢查: {'通過' if quality_passed_a else '失敗'}")
         
         # 顯示前3條調貨建議
-        if recommendations_ac:
+        if recommendations_a:
             print("\n   前3條調貨建議:")
-            for i, rec in enumerate(recommendations_ac[:3]):
-                print(f"   {i+1}. 從 {rec['Transfer Site']} 調貨 {rec['Transfer Qty']} 件到 {rec['Receive Site']} (商品: {rec['Article']})")
+            for i, rec in enumerate(recommendations_a[:3]):
+                print(f"   {i+1}. 從 {rec['Transfer Site']} 調貨 {rec['Transfer Qty']} 件到 {rec['Receive Site']} (商品: {rec['Article']}, 轉出類型: {rec.get('Source Type', '')})")
         
-        # 3. 測試B模式(加強轉貨) + D模式(按港澳調配)
-        print("\n3. 測試B模式(加強轉貨) + D模式(按港澳調配)...")
+        # 3. 測試B模式(加強轉貨)
+        print("\n3. 測試B模式(加強轉貨)...")
         transfer_logic = TransferLogic()
-        recommendations_bd = transfer_logic.generate_transfer_recommendations(df, "加強轉貨", "按港澳調配")
-        quality_passed_bd = transfer_logic.perform_quality_checks(df)
-        statistics_bd = transfer_logic.get_transfer_statistics()
+        recommendations_b = transfer_logic.generate_transfer_recommendations(df, "加強轉貨")
+        quality_passed_b = transfer_logic.perform_quality_checks(df)
+        statistics_b = transfer_logic.get_transfer_statistics()
         
-        print(f"   - 調貨建議數量: {len(recommendations_bd)}")
-        print(f"   - 總調貨件數: {statistics_bd.get('total_transfer_qty', 0)}")
-        print(f"   - 質量檢查: {'通過' if quality_passed_bd else '失敗'}")
+        print(f"   - 調貨建議數量: {len(recommendations_b)}")
+        print(f"   - 總調貨件數: {statistics_b.get('total_transfer_qty', 0)}")
+        print(f"   - 質量檢查: {'通過' if quality_passed_b else '失敗'}")
         
         # 顯示前3條調貨建議
-        if recommendations_bd:
+        if recommendations_b:
             print("\n   前3條調貨建議:")
-            for i, rec in enumerate(recommendations_bd[:3]):
-                print(f"   {i+1}. 從 {rec['Transfer Site']} 調貨 {rec['Transfer Qty']} 件到 {rec['Receive Site']} (商品: {rec['Article']})")
+            for i, rec in enumerate(recommendations_b[:3]):
+                print(f"   {i+1}. 從 {rec['Transfer Site']} 調貨 {rec['Transfer Qty']} 件到 {rec['Receive Site']} (商品: {rec['Article']}, 轉出類型: {rec.get('Source Type', '')})")
         
         # 4. 生成Excel文件
         print("\n4. 生成Excel文件...")
         excel_generator = ExcelGenerator()
         
-        # 生成A+C模式Excel文件
-        excel_path_ac = excel_generator.generate_excel_file(recommendations_ac, statistics_ac)
-        print(f"   - A+C模式Excel文件: {excel_path_ac}")
+        # 生成A模式Excel文件
+        excel_path_a = excel_generator.generate_excel_file(recommendations_a, statistics_a)
+        print(f"   - A模式Excel文件: {excel_path_a}")
         
-        # 生成B+D模式Excel文件
-        excel_path_bd = excel_generator.generate_excel_file(recommendations_bd, statistics_bd)
-        print(f"   - B+D模式Excel文件: {excel_path_bd}")
+        # 生成B模式Excel文件
+        excel_path_b = excel_generator.generate_excel_file(recommendations_b, statistics_b)
+        print(f"   - B模式Excel文件: {excel_path_b}")
         
         # 5. 比較不同模式的結果
         print("\n5. 比較不同模式的結果...")
-        print(f"   - A+C模式調貨建議數量: {len(recommendations_ac)}")
-        print(f"   - B+D模式調貨建議數量: {len(recommendations_bd)}")
-        print(f"   - A+C模式總調貨件數: {statistics_ac.get('total_transfer_qty', 0)}")
-        print(f"   - B+D模式總調貨件數: {statistics_bd.get('total_transfer_qty', 0)}")
+        print(f"   - A模式調貨建議數量: {len(recommendations_a)}")
+        print(f"   - B模式調貨建議數量: {len(recommendations_b)}")
+        print(f"   - A模式總調貨件數: {statistics_a.get('total_transfer_qty', 0)}")
+        print(f"   - B模式總調貨件數: {statistics_b.get('total_transfer_qty', 0)}")
         
         # 6. 統計分析
-        print("\n6. 統計分析 (A+C模式)...")
-        source_type_stats = statistics_ac.get('source_type_stats', {})
-        dest_type_stats = statistics_ac.get('dest_type_stats', {})
+        print("\n6. 統計分析 (A模式)...")
+        source_type_stats = statistics_a.get('source_type_stats', {})
+        dest_type_stats = statistics_a.get('dest_type_stats', {})
         
         print("   - 轉出類型分析:")
         for source_type, stats in source_type_stats.items():
@@ -110,9 +111,9 @@ def test_with_real_data(file_path: str):
         for dest_type, stats in dest_type_stats.items():
             print(f"     * {dest_type}: {stats['count']} 條建議, {stats['qty']} 件")
         
-        print("\n6. 統計分析 (B+D模式)...")
-        source_type_stats = statistics_bd.get('source_type_stats', {})
-        dest_type_stats = statistics_bd.get('dest_type_stats', {})
+        print("\n6. 統計分析 (B模式)...")
+        source_type_stats = statistics_b.get('source_type_stats', {})
+        dest_type_stats = statistics_b.get('dest_type_stats', {})
         
         print("   - 轉出類型分析:")
         for source_type, stats in source_type_stats.items():
@@ -121,6 +122,16 @@ def test_with_real_data(file_path: str):
         print("   - 接收類型分析:")
         for dest_type, stats in dest_type_stats.items():
             print(f"     * {dest_type}: {stats['count']} 條建議, {stats['qty']} 件")
+        
+        # 7. 轉出類型詳細分析
+        print("\n7. 轉出類型詳細分析...")
+        print("   - A模式轉出類型:")
+        for rec in recommendations_a[:5]:  # 顯示前5條
+            print(f"     * {rec['Transfer Site']} -> {rec['Receive Site']}: {rec['Source Type']}, 庫存變化: {rec['Original Stock']} -> {rec['After Transfer Stock']}, 安全庫存: {rec['Safety Stock']}")
+        
+        print("   - B模式轉出類型:")
+        for rec in recommendations_b[:5]:  # 顯示前5條
+            print(f"     * {rec['Transfer Site']} -> {rec['Receive Site']}: {rec['Source Type']}, 庫存變化: {rec['Original Stock']} -> {rec['After Transfer Stock']}, 安全庫存: {rec['Safety Stock']}")
         
         print("\n" + "=" * 50)
         print("✅ 真實數據測試完成！系統運行正常。")
