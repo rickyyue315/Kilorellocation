@@ -1,5 +1,5 @@
 """
-業務邏輯模組 v1.9.3
+業務邏輯模組 v1.9.4
 實現調貨規則、源/目的地識別和匹配算法
 支持三模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v1.9.3"""
+    """調貨業務邏輯類 v1.9.4"""
     
     def __init__(self):
         self.transfer_recommendations = []
@@ -174,8 +174,8 @@ class TransferLogic:
             
             # C模式特殊處理：針對(SaSa Net Stock+Pending Received)<=1的店鋪
             if mode == self.mode_c and total_available <= 1:
-                # 計算需要補充的數量：補充至該店鋪的Safety或MOQ+1的數量(取最低值)
-                target_qty = min(row['Safety Stock'], row['MOQ'] + 1)
+                # 計算需要補充的數量：根據Safety Stock的50%和3件的最高值來確定補充數量
+                target_qty = max(int(row['Safety Stock'] * 0.5), 3)
                 needed_qty = target_qty - total_available
                 
                 if needed_qty > 0:
