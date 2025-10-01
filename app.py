@@ -1,6 +1,6 @@
 """
 庫存調貨建議系統 v1.9 - Streamlit應用程序
-簡化為雙模式系統：A(保守轉貨)/B(加強轉貨)
+支持三模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)
 """
 
 import streamlit as st
@@ -43,8 +43,8 @@ with st.sidebar:
     **開發者: Ricky** 
     
     **核心功能：**  
-    - ✅ 簡化雙模式系統
-    - ✅ A模式(保守轉貨)/B模式(加強轉貨)
+    - ✅ 三模式系統
+    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/C模式(重點補0)
     - ✅ ND/RF類型智慧識別
     - ✅ 優先順序調貨匹配
     - ✅ RF轉出限制控制
@@ -55,7 +55,7 @@ with st.sidebar:
     st.sidebar.header("操作指引")
     st.sidebar.markdown("""
     1.  **上傳 Excel 文件**：點擊瀏覽文件或拖放文件到上傳區域。
-    2.  **選擇轉貨模式**：在側邊欄選擇轉貨模式（保守轉貨或加強轉貨）。
+    2.  **選擇轉貨模式**：在側邊欄選擇轉貨模式（保守轉貨、加強轉貨或重點補0）。
     3.  **啟動分析**：點擊「生成調貨建議」按鈕開始處理。
     4.  **查看結果**：在主頁面查看KPI、建議和圖表。
     5.  **下載報告**：點擊下載按鈕獲取 Excel 報告。
@@ -65,9 +65,9 @@ with st.sidebar:
     st.sidebar.header("模式選擇")
     transfer_mode = st.radio(
         "選擇轉貨模式",
-        ["A: 保守轉貨", "B: 加強轉貨"],
+        ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0"],
         key='transfer_mode',
-        help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品。"
+        help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品，C模式重點補充庫存為0或1的店鋪。"
     )
     
     # 模式說明
@@ -76,6 +76,7 @@ with st.sidebar:
         **轉貨模式：**
         - **A模式(保守轉貨)**：轉出後剩餘庫存不低於安全庫存，轉出類型為RF過剩轉出
         - **B模式(加強轉貨)**：轉出後剩餘庫存可能低於安全庫存，轉出類型為RF加強轉出
+        - **C模式(重點補0)**：主要針對接收店鋪，當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
         
         **轉出類型判斷：**
         - 如果轉出店鋪轉出後, 剩餘庫存不會低過Safety stock, 轉出類型定位為RF過剩轉出
@@ -83,6 +84,7 @@ with st.sidebar:
         
         **接收條件：**
         - SaSa Net Stock + Pending Received < Safety Stock，便需要進行調撥接收
+        - C模式特殊條件：當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
         """)
 
 # 3. 頁面頭部
@@ -151,7 +153,12 @@ if uploaded_file is not None:
             progress_bar.progress(70, text="正在分析數據並生成建議...")
             with st.spinner("演算法運行中，請稍候..."):
                 # 轉換模式名稱
-                mode_name = "保守轉貨" if transfer_mode == "A: 保守轉貨" else "加強轉貨"
+                if transfer_mode == "A: 保守轉貨":
+                    mode_name = "保守轉貨"
+                elif transfer_mode == "B: 加強轉貨":
+                    mode_name = "加強轉貨"
+                else:
+                    mode_name = "重點補0"
                 
                 # 創建業務邏輯對象
                 transfer_logic = TransferLogic()
@@ -361,8 +368,40 @@ if uploaded_file is not None:
                         ax.barh(y_pos + width*1.5, nd_qtys, width, label='ND Transfer Out', color='skyblue')
                         ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
                         
-                    else:
+                    elif mode_name == "加強轉貨":
                         # B模式圖表
+                        source_type_stats = statistics.get('source_type_stats', {})
+                        nd_qtys = []
+                        rf_excess_qtys = []
+                        rf_enhanced_qtys = []
+                        
+                        for om in om_names:
+                            # 計算每個OM的ND和RF轉出數量
+                            nd_qty = 0
+                            rf_excess_qty = 0
+                            rf_enhanced_qty = 0
+                            
+                            for rec in recommendations:
+                                if rec['Transfer OM'] == om:
+                                    if rec.get('Source Type') == 'ND轉出':
+                                        nd_qty += rec['Transfer Qty']
+                                    elif rec.get('Source Type') == 'RF過剩轉出':
+                                        rf_excess_qty += rec['Transfer Qty']
+                                    elif rec.get('Source Type') == 'RF加強轉出':
+                                        rf_enhanced_qty += rec['Transfer Qty']
+                            
+                            nd_qtys.append(nd_qty)
+                            rf_excess_qtys.append(rf_excess_qty)
+                            rf_enhanced_qtys.append(rf_enhanced_qty)
+                        
+                        # 繪製五條形圖
+                        width = 0.15
+                        ax.barh(y_pos + width*1.5, nd_qtys, width, label='ND Transfer Out', color='skyblue')
+                        ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
+                        ax.barh(y_pos - width*0.5, rf_enhanced_qtys, width, label='RF Enhanced Transfer Out', color='orange')
+                    
+                    else:
+                        # C模式圖表
                         source_type_stats = statistics.get('source_type_stats', {})
                         nd_qtys = []
                         rf_excess_qtys = []
@@ -396,11 +435,13 @@ if uploaded_file is not None:
                     # 計算接收類型數據
                     urgent_qtys = []
                     potential_qtys = []
+                    zero_stock_qtys = []
                     
                     for om in om_names:
-                        # 計算每個OM的緊急和潛在缺貨接收數量
+                        # 計算每個OM的緊急、潛在缺貨和重點補0接收數量
                         urgent_qty = 0
                         potential_qty = 0
+                        zero_stock_qty = 0
                         
                         for rec in recommendations:
                             if rec['Receive OM'] == om:
@@ -408,14 +449,21 @@ if uploaded_file is not None:
                                     urgent_qty += rec['Transfer Qty']
                                 elif rec.get('Destination Type') == '潛在缺貨補貨':
                                     potential_qty += rec['Transfer Qty']
+                                elif rec.get('Destination Type') == '重點補0':
+                                    zero_stock_qty += rec['Transfer Qty']
                         
                         urgent_qtys.append(urgent_qty)
                         potential_qtys.append(potential_qty)
+                        zero_stock_qtys.append(zero_stock_qty)
                     
                     # 繪製接收類型
                     width = 0.2 if mode_name == "保守轉貨" else 0.15
                     ax.barh(y_pos - width*1.5, urgent_qtys, width, label='Urgent Shortage Receive', color='salmon')
                     ax.barh(y_pos - width*2.5, potential_qtys, width, label='Potential Shortage Receive', color='gold')
+                    
+                    # C模式增加重點補0接收類型
+                    if mode_name == "重點補0":
+                        ax.barh(y_pos - width*3.5, zero_stock_qtys, width, label='Zero Stock Receive', color='purple')
                     
                     # 設置圖表標籤和標題
                     ax.set_yticks(y_pos)
