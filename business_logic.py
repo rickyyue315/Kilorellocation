@@ -1,5 +1,5 @@
 """
-業務邏輯模組 v1.9.2
+業務邏輯模組 v1.9.3
 實現調貨規則、源/目的地識別和匹配算法
 支持三模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v1.9.2"""
+    """調貨業務邏輯類 v1.9.3"""
     
     def __init__(self):
         self.transfer_recommendations = []
@@ -174,8 +174,9 @@ class TransferLogic:
             
             # C模式特殊處理：針對(SaSa Net Stock+Pending Received)<=1的店鋪
             if mode == self.mode_c and total_available <= 1:
-                # 需要補充至Safety Stock或MOQ+1的數量(取最低值)
-                needed_qty = min(row['Safety Stock'], row['MOQ'] + 1) - total_available
+                # 計算需要補充的數量：補充至該店鋪的Safety或MOQ+1的數量(取最低值)
+                target_qty = min(row['Safety Stock'], row['MOQ'] + 1)
+                needed_qty = target_qty - total_available
                 
                 if needed_qty > 0:
                     destinations.append({
@@ -187,8 +188,10 @@ class TransferLogic:
                         'current_stock': row['SaSa Net Stock'],
                         'pending_received': row['Pending Received'],
                         'safety_stock': row['Safety Stock'],
+                        'moq': row['MOQ'],
                         'effective_sold_qty': row['Effective Sold Qty'],
-                        'dest_type': '重點補0'
+                        'dest_type': '重點補0',
+                        'target_qty': target_qty  # 添加目標數量信息
                     })
                 continue
             
@@ -208,8 +211,10 @@ class TransferLogic:
                     'current_stock': row['SaSa Net Stock'],
                     'pending_received': row['Pending Received'],
                     'safety_stock': row['Safety Stock'],
+                    'moq': row['MOQ'],
                     'effective_sold_qty': row['Effective Sold Qty'],
-                    'dest_type': '緊急缺貨補貨'
+                    'dest_type': '緊急缺貨補貨',
+                    'target_qty': needed_qty  # 添加目標數量信息
                 })
                 continue
             
@@ -228,8 +233,10 @@ class TransferLogic:
                     'current_stock': row['SaSa Net Stock'],
                     'pending_received': row['Pending Received'],
                     'safety_stock': row['Safety Stock'],
+                    'moq': row['MOQ'],
                     'effective_sold_qty': row['Effective Sold Qty'],
-                    'dest_type': '潛在缺貨補貨'
+                    'dest_type': '潛在缺貨補貨',
+                    'target_qty': row['Safety Stock']  # 添加目標數量信息
                 })
         
         # 按優先級排序
@@ -379,6 +386,10 @@ class TransferLogic:
                     'Destination Type': dest['dest_type'],
                     'Notes': ''
                 }
+                
+                # 添加目標數量信息（如果有）
+                if 'target_qty' in dest:
+                    recommendation['Target Qty'] = dest['target_qty']
                 
                 recommendations.append(recommendation)
                 
