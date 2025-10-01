@@ -1,8 +1,9 @@
 """
-業務邏輯模組 v1.9.4
+業務邏輯模組 v1.9.6
 實現調貨規則、源/目的地識別和匹配算法
 支持三模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
+基於累計接收數量判斷是否達到最低保障標準的機制
 """
 
 import pandas as pd
@@ -15,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v1.9.4"""
+    """調貨業務邏輯類 v1.9.6"""
     
     def __init__(self):
         self.transfer_recommendations = []
@@ -191,7 +192,8 @@ class TransferLogic:
                         'moq': row['MOQ'],
                         'effective_sold_qty': row['Effective Sold Qty'],
                         'dest_type': '重點補0',
-                        'target_qty': target_qty  # 添加目標數量信息
+                        'target_qty': target_qty,  # 添加目標數量信息
+                        'received_qty': 0  # 初始化累計接收數量
                     })
                 continue
             
@@ -214,7 +216,8 @@ class TransferLogic:
                     'moq': row['MOQ'],
                     'effective_sold_qty': row['Effective Sold Qty'],
                     'dest_type': '緊急缺貨補貨',
-                    'target_qty': needed_qty  # 添加目標數量信息
+                    'target_qty': needed_qty,  # 添加目標數量信息
+                    'received_qty': 0  # 初始化累計接收數量
                 })
                 continue
             
@@ -236,7 +239,8 @@ class TransferLogic:
                     'moq': row['MOQ'],
                     'effective_sold_qty': row['Effective Sold Qty'],
                     'dest_type': '潛在缺貨補貨',
-                    'target_qty': row['Safety Stock']  # 添加目標數量信息
+                    'target_qty': row['Safety Stock'],  # 添加目標數量信息
+                    'received_qty': 0  # 初始化累計接收數量
                 })
         
         # 按優先級排序
@@ -269,42 +273,46 @@ class TransferLogic:
         # 記錄已經作為轉出店鋪的站點，避免它們同時作為接收店鋪
         transfer_sites = set()
         
+        # 記錄接收店鋪的累計接收數量
+        received_qty_by_site = {}
+        
         # 按優先級順序進行匹配
         # 1. ND轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 1, 1, transfer_sites)
+                               article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site)
         
         # 2. ND轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 1, 2, transfer_sites)
+                               article, om, product_desc, 1, 2, transfer_sites, received_qty_by_site)
         
         # 3. RF過剩轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1, transfer_sites, 'RF過剩轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, 'RF過剩轉出')
         
         # 4. RF過剩轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2, transfer_sites, 'RF過剩轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, 'RF過剩轉出')
         
         # 5. RF加強轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1, transfer_sites, 'RF加強轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, 'RF加強轉出')
         
         # 6. RF加強轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2, transfer_sites, 'RF加強轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, 'RF加強轉出')
         
         # 7. C模式特殊處理：RF轉出 -> 重點補0
         if mode == self.mode_c:
             self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                   article, om, product_desc, 2, 1, transfer_sites, None, '重點補0')
+                                   article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, None, '重點補0')
         
         return recommendations
     
     def _match_by_priority(self, sources: List[Dict], destinations: List[Dict], 
                           recommendations: List[Dict], article: str, group_id: str, 
                           product_desc: str, source_priority: int, dest_priority: int,
-                          transfer_sites: set, source_type_filter: Optional[str] = None,
+                          transfer_sites: set, received_qty_by_site: Dict,
+                          source_type_filter: Optional[str] = None,
                           dest_type_filter: Optional[str] = None):
         """
         按指定優先級進行匹配
@@ -319,6 +327,7 @@ class TransferLogic:
             source_priority: 轉出優先級
             dest_priority: 接收優先級
             transfer_sites: 已經作為轉出店鋪的站點集合
+            received_qty_by_site: 接收店鋪的累計接收數量字典
             source_type_filter: 轉出類型過濾器（可選）
             dest_type_filter: 接收類型過濾器（可選）
         """
@@ -352,8 +361,25 @@ class TransferLogic:
                 if dest['site'] in transfer_sites:
                     continue
                 
+                # 檢查接收店鋪是否已達到目標數量
+                receive_site_key = f"{dest['site']}_{article}"
+                current_received_qty = received_qty_by_site.get(receive_site_key, 0)
+                
+                # 對於C模式(重點補0)，檢查累計接收數量是否達到目標
+                if dest['dest_type'] == '重點補0':
+                    # 如果累計接收數量已達到目標數量，跳過此接收店鋪
+                    if current_received_qty >= dest['target_qty']:
+                        continue
+                
                 # 確定轉移數量
-                transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
+                # 對於C模式(重點補0)，考慮累計接收數量
+                if dest['dest_type'] == '重點補0':
+                    # 計算還需要接收的數量
+                    remaining_needed = dest['target_qty'] - current_received_qty
+                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_needed)
+                else:
+                    # A和B模式，使用原始邏輯
+                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
                 
                 # 調貨數量優化：如果只有1件，嘗試調高到2件
                 if transfer_qty == 1 and source['transferable_qty'] >= 2:
@@ -391,11 +417,21 @@ class TransferLogic:
                 if 'target_qty' in dest:
                     recommendation['Target Qty'] = dest['target_qty']
                 
+                # 添加累計接收數量信息
+                recommendation['Cumulative Received Qty'] = current_received_qty + transfer_qty
+                
                 recommendations.append(recommendation)
+                
+                # 更新接收店鋪的累計接收數量
+                received_qty_by_site[receive_site_key] = current_received_qty + transfer_qty
                 
                 # 更新剩餘可轉出數量和需求數量
                 source['transferable_qty'] -= transfer_qty
                 dest['needed_qty'] -= transfer_qty
+                
+                # 對於C模式(重點補0)，如果累計接收數量已達到目標，將需求設為0
+                if dest['dest_type'] == '重點補0' and received_qty_by_site[receive_site_key] >= dest['target_qty']:
+                    dest['needed_qty'] = 0
     
     def generate_transfer_recommendations(self, df: pd.DataFrame, mode: str) -> List[Dict]:
         """
@@ -422,6 +458,9 @@ class TransferLogic:
         # 記錄所有已經作為轉出店鋪的站點，避免它們同時作為接收店鋪
         global_transfer_sites = set()
         
+        # 記錄所有接收店鋪的累計接收數量
+        global_received_qty_by_site = {}
+        
         for group_keys, group_df in grouped:
             # 獲取商品描述
             product_desc = group_df['Article Description'].iloc[0] if 'Article Description' in group_df.columns else ""
@@ -439,6 +478,11 @@ class TransferLogic:
             # 更新全局轉出店鋪集合
             for rec in recommendations:
                 global_transfer_sites.add(rec['Transfer Site'])
+                
+                # 更新全局累計接收數量
+                receive_site_key = f"{rec['Receive Site']}_{rec['Article']}"
+                current_received_qty = global_received_qty_by_site.get(receive_site_key, 0)
+                global_received_qty_by_site[receive_site_key] = current_received_qty + rec['Transfer Qty']
             
             # 更新安全庫存和MOQ信息
             for rec in recommendations:
@@ -531,6 +575,25 @@ class TransferLogic:
                 if overlap:
                     self.quality_errors.append(f"同一SKU {article} 的轉出店鋪同時作為接收店鋪: {overlap}")
                     self.quality_check_passed = False
+        
+        # 檢查7：對於C模式(重點補0)，檢查接收店鋪的累計接收數量是否超過目標數量
+        receive_site_stats = {}
+        for rec in self.transfer_recommendations:
+            if rec.get('Destination Type') == '重點補0':
+                key = (rec['Article'], rec['Receive Site'])
+                if key not in receive_site_stats:
+                    receive_site_stats[key] = {
+                        'target_qty': rec.get('Target Qty', 0),
+                        'total_received': 0
+                    }
+                receive_site_stats[key]['total_received'] += rec['Transfer Qty']
+        
+        # 檢查是否有超過目標數量的情況
+        for key, stats in receive_site_stats.items():
+            article, site = key
+            if stats['total_received'] > stats['target_qty']:
+                self.quality_errors.append(f"同一SKU {article} 的接收店鋪 {site} 累計接收數量超過目標數量: {stats['total_received']} > {stats['target_qty']}")
+                self.quality_check_passed = False
         
         if self.quality_check_passed:
             logger.info("質量檢查通過")
