@@ -55,7 +55,8 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 
 3. 安裝依賴
 ```bash
-pip install -r requirements.txt
+python install_dependencies.py
+# 或者使用 pip install -r requirements.txt
 ```
 
 4. 運行應用
@@ -65,6 +66,36 @@ streamlit run app.py
 
 應用程序將在瀏覽器中打開，默認地址為 `http://localhost:8501`
 
+## 依賴安裝問題解決
+
+如果遇到依賴安裝問題，請嘗試以下解決方案：
+
+### 1. 使用專用安裝腳本
+
+```bash
+python install_dependencies.py
+```
+
+這個腳本會檢查並安裝所有必需的依賴包，提供詳細的安裝狀態信息。
+
+### 2. 手動安裝核心依賴
+
+```bash
+pip install pandas openpyxl streamlit numpy xlsxwriter matplotlib seaborn
+```
+
+### 3. 升級pip
+
+```bash
+python -m pip install --upgrade pip
+```
+
+### 4. 使用國內鏡像源
+
+```bash
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
+```
+
 ## 使用說明
 
 ### 1. 上傳數據文件
@@ -72,7 +103,7 @@ streamlit run app.py
 - 點擊"瀏覽文件"按鈕上傳Excel文件（.xlsx格式）
 - 確保文件包含以下必需欄位：
   - Article（商品編號，12位文本格式）
-  - Article Description（商品描述）
+  - Article Description（商品描述）或 Article Long Text (60 Chars)
   - OM（OM編號）
   - RP Type（店鋪類型：ND或RF）
   - Site（店鋪代碼）
@@ -230,6 +261,12 @@ streamlit run app.py
    - 確認選擇了正確的轉貨和調配模式組合
    - 僅允許A+C、A+D、B+C、B+D四種組合
 
+5. **依賴安裝失敗**
+   - 嘗試使用專用安裝腳本：`python install_dependencies.py`
+   - 手動安裝核心依賴：`pip install pandas openpyxl streamlit numpy xlsxwriter matplotlib seaborn`
+   - 升級pip：`python -m pip install --upgrade pip`
+   - 使用國內鏡像源：`pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/`
+
 ### 日誌查看
 
 應用程序運行時會生成日誌，可在控制台查看詳細錯誤信息。
@@ -239,17 +276,27 @@ streamlit run app.py
 ```
 inventory_transfer_system/
 ├── app.py                 # Streamlit主應用 v1.8
-├── data_processor.py      # 數據預處理模組 v1.8
+├── data_processor.py      # 數據預處理模組 v1.8.1
 ├── business_logic.py      # 業務邏輯模組 v1.8
 ├── excel_generator.py     # Excel輸出模組 v1.8
 ├── requirements.txt       # 依賴包列表
+├── install_dependencies.py # 依賴安裝腳本
 ├── README.md             # 使用說明
 ├── VERSION.md            # 版本更新記錄
 ├── run.bat               # Windows運行腳本
-└── run.sh                # Linux/macOS運行腳本
+├── run.sh                # Linux/macOS運行腳本
+├── test_system.py        # 系統測試腳本
+├── test_chart_v1.8.py    # 圖表測試腳本
+└── test_real_data.py     # 真實數據測試腳本
 ```
 
 ## 更新日誌
+
+### v1.8.1 (2025-10-01)
+- 修復依賴安裝問題
+- 添加專用依賴安裝腳本
+- 增強錯誤處理和日誌記錄
+- 適配真實數據文件格式
 
 ### v1.8 (2025-10-01)
 - 新增雙模式(雙組合)系統：A(保守轉貨)/B(加強轉貨) + C(按OM調配)/D(按港澳調配)
