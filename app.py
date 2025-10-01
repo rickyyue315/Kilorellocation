@@ -199,14 +199,34 @@ if uploaded_file is not None:
                 # 準備顯示數據
                 display_data = []
                 for rec in recommendations:
+                    # 獲取轉出店鋪的原始數據
+                    source_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Transfer Site'])]
+                    source_stock = source_data['SaSa Net Stock'].iloc[0] if not source_data.empty else 0
+                    source_pending = source_data['Pending Received'].iloc[0] if not source_data.empty else 0
+                    source_safety = source_data['Safety Stock'].iloc[0] if not source_data.empty else 0
+                    
+                    # 獲取接收店鋪的原始數據
+                    dest_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Receive Site'])]
+                    dest_stock = dest_data['SaSa Net Stock'].iloc[0] if not dest_data.empty else 0
+                    dest_pending = dest_data['Pending Received'].iloc[0] if not dest_data.empty else 0
+                    dest_safety = dest_data['Safety Stock'].iloc[0] if not dest_data.empty else 0
+                    
+                    # 計算接收後的總貨量
+                    dest_total_after = dest_stock + dest_pending + rec['Transfer Qty']
+                    
                     display_data.append({
                         'Article': rec['Article'],
                         'Product Desc': rec['Product Desc'],
                         'Transfer OM': rec['Transfer OM'],
                         'Transfer Site': rec['Transfer Site'],
+                        'Transfer Qty': rec['Transfer Qty'],
+                        'Source Original Stock': source_stock,
+                        'Source After Transfer Stock': source_stock - rec['Transfer Qty'],
                         'Receive OM': rec['Receive OM'],
                         'Receive Site': rec['Receive Site'],
-                        'Transfer Qty': rec['Transfer Qty'],
+                        'Receive Original Stock': dest_stock,
+                        'Receive Pending': dest_pending,
+                        'Receive Total After': dest_total_after,
                         'Source Type': rec.get('Source Type', ''),
                         'Destination Type': rec.get('Destination Type', '')
                     })
@@ -281,7 +301,7 @@ if uploaded_file is not None:
                 st.markdown("---")
                 
                 # 顯示統計圖表
-                st.subheader("OM 調貨分析圖表 (OM Transfer vs Receive Analysis Chart)")
+                st.subheader("OM Transfer vs Receive Analysis Chart")
                 
                 # 創建OM Transfer vs Receive Analysis圖表
                 fig, ax = plt.subplots(figsize=(12, 8))

@@ -1,7 +1,8 @@
 """
-業務邏輯模組 v1.9
+業務邏輯模組 v1.9.1
 實現調貨規則、源/目的地識別和匹配算法
 簡化為雙模式系統：A(保守轉貨)/B(加強轉貨)
+優化接收條件和避免同一SKU的轉出店鋪同時接收
 """
 
 import pandas as pd
@@ -14,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v1.9"""
+    """調貨業務邏輯類 v1.9.1"""
     
     def __init__(self):
         self.transfer_recommendations = []
@@ -212,37 +213,40 @@ class TransferLogic:
         temp_sources = [s.copy() for s in sources]
         temp_destinations = [d.copy() for d in destinations]
         
+        # 記錄已經作為轉出店鋪的站點，避免它們同時作為接收店鋪
+        transfer_sites = set()
+        
         # 按優先級順序進行匹配
         # 1. ND轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 1, 1)
+                               article, om, product_desc, 1, 1, transfer_sites)
         
         # 2. ND轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 1, 2)
+                               article, om, product_desc, 1, 2, transfer_sites)
         
         # 3. RF過剩轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1, 'RF過剩轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, 'RF過剩轉出')
         
         # 4. RF過剩轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2, 'RF過剩轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, 'RF過剩轉出')
         
         # 5. RF加強轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1, 'RF加強轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, 'RF加強轉出')
         
         # 6. RF加強轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2, 'RF加強轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, 'RF加強轉出')
         
         return recommendations
     
     def _match_by_priority(self, sources: List[Dict], destinations: List[Dict], 
                           recommendations: List[Dict], article: str, group_id: str, 
                           product_desc: str, source_priority: int, dest_priority: int,
-                          source_type_filter: Optional[str] = None):
+                          transfer_sites: set, source_type_filter: Optional[str] = None):
         """
         按指定優先級進行匹配
         
@@ -255,6 +259,7 @@ class TransferLogic:
             product_desc: 商品描述
             source_priority: 轉出優先級
             dest_priority: 接收優先級
+            transfer_sites: 已經作為轉出店鋪的站點集合
             source_type_filter: 轉出類型過濾器（可選）
         """
         # 篩選指定優先級的源和目的地
@@ -268,12 +273,19 @@ class TransferLogic:
         
         # 執行匹配
         for source in filtered_sources:
+            # 將當前轉出店鋪添加到轉出店鋪集合
+            transfer_sites.add(source['site'])
+            
             for dest in filtered_destinations:
                 if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
                     continue
                 
                 # 避免同一店鋪自我調貨
                 if source['site'] == dest['site']:
+                    continue
+                
+                # 避免轉出店鋪同時作為接收店鋪
+                if dest['site'] in transfer_sites:
                     continue
                 
                 # 確定轉移數量
@@ -339,6 +351,9 @@ class TransferLogic:
         
         all_recommendations = []
         
+        # 記錄所有已經作為轉出店鋪的站點，避免它們同時作為接收店鋪
+        global_transfer_sites = set()
+        
         for group_keys, group_df in grouped:
             # 獲取商品描述
             product_desc = group_df['Article Description'].iloc[0] if 'Article Description' in group_df.columns else ""
@@ -352,6 +367,10 @@ class TransferLogic:
             # 執行匹配
             article, om = group_keys
             recommendations = self.match_transfers(article, om, sources, destinations, product_desc)
+            
+            # 更新全局轉出店鋪集合
+            for rec in recommendations:
+                global_transfer_sites.add(rec['Transfer Site'])
             
             # 更新安全庫存和MOQ信息
             for rec in recommendations:
@@ -419,6 +438,31 @@ class TransferLogic:
             if not isinstance(rec['Article'], str) or len(rec['Article']) != 12:
                 self.quality_errors.append(f"Article欄位必須是12位文本格式: {rec}")
                 self.quality_check_passed = False
+        
+        # 檢查6：同一SKU的轉出店鋪不能同時作為接收店鋪
+        transfer_sites_by_article = {}
+        receive_sites_by_article = {}
+        
+        for rec in self.transfer_recommendations:
+            article = rec['Article']
+            
+            # 記錄轉出店鋪
+            if article not in transfer_sites_by_article:
+                transfer_sites_by_article[article] = set()
+            transfer_sites_by_article[article].add(rec['Transfer Site'])
+            
+            # 記錄接收店鋪
+            if article not in receive_sites_by_article:
+                receive_sites_by_article[article] = set()
+            receive_sites_by_article[article].add(rec['Receive Site'])
+        
+        # 檢查是否有重疊
+        for article in transfer_sites_by_article:
+            if article in receive_sites_by_article:
+                overlap = transfer_sites_by_article[article] & receive_sites_by_article[article]
+                if overlap:
+                    self.quality_errors.append(f"同一SKU {article} 的轉出店鋪同時作為接收店鋪: {overlap}")
+                    self.quality_check_passed = False
         
         if self.quality_check_passed:
             logger.info("質量檢查通過")
