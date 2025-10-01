@@ -12,6 +12,8 @@ from datetime import datetime
 import logging
 import matplotlib.pyplot as plt
 import seaborn as sns
+import time
+from io import BytesIO
 
 # 導入自定義模組
 from data_processor import DataProcessor
@@ -26,123 +28,133 @@ logger = logging.getLogger(__name__)
 plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
-# 設置頁面配置
+# 1. 頁面配置
 st.set_page_config(
     page_title="庫存調貨建議系統 v1.9",
     page_icon="📦",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# 應用程序標題
-st.title("📦 調貨建議生成系統 v1.9")
+# 2. 側邊欄設計
+with st.sidebar:
+    st.header("系統資訊")
+    st.info(""" 
+    **版本：v1.9** 
+    **開發者: Ricky** 
+    
+    **核心功能：**  
+    - ✅ 簡化雙模式系統
+    - ✅ A模式(保守轉貨)/B模式(加強轉貨)
+    - ✅ ND/RF類型智慧識別
+    - ✅ 優先順序調貨匹配
+    - ✅ RF轉出限制控制
+    - ✅ 統計分析和圖表
+    - ✅ Excel格式匯出
+    """)
+    
+    st.sidebar.header("操作指引")
+    st.sidebar.markdown("""
+    1.  **上傳 Excel 文件**：點擊瀏覽文件或拖放文件到上傳區域。
+    2.  **選擇轉貨模式**：在側邊欄選擇轉貨模式（保守轉貨或加強轉貨）。
+    3.  **啟動分析**：點擊「生成調貨建議」按鈕開始處理。
+    4.  **查看結果**：在主頁面查看KPI、建議和圖表。
+    5.  **下載報告**：點擊下載按鈕獲取 Excel 報告。
+    """)
+    
+    # 模式選擇
+    st.sidebar.header("模式選擇")
+    transfer_mode = st.radio(
+        "選擇轉貨模式",
+        ["A: 保守轉貨", "B: 加強轉貨"],
+        key='transfer_mode',
+        help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品。"
+    )
+    
+    # 模式說明
+    with st.sidebar.expander("模式說明"):
+        st.markdown("""
+        **轉貨模式：**
+        - **A模式(保守轉貨)**：轉出後剩餘庫存不低於安全庫存，轉出類型為RF過剩轉出
+        - **B模式(加強轉貨)**：轉出後剩餘庫存可能低於安全庫存，轉出類型為RF加強轉出
+        
+        **轉出類型判斷：**
+        - 如果轉出店鋪轉出後, 剩餘庫存不會低過Safety stock, 轉出類型定位為RF過剩轉出
+        - 如果轉出店鋪轉出後, 剩餘庫存會低過Safety stock, 轉出類型定位為RF加強轉出
+        
+        **接收條件：**
+        - SaSa Net Stock + Pending Received < Safety Stock，便需要進行調撥接收
+        """)
+
+# 3. 頁面頭部
+st.title("📦 庫存調貨建議系統 v1.9")
 st.markdown("---")
 
-# 側邊欄
-st.sidebar.header("系統資訊")
-st.sidebar.info("""
-**版本：v1.9**
-**開發者: Ricky**
-
-**核心功能：**  
-- ✅ 雙模式系統
-- ✅ A模式(保守轉貨)/B模式(加強轉貨)
-- ✅ ND/RF類型智慧識別
-- ✅ 優先順序調貨匹配
-- ✅ RF轉出限制控制
-- ✅ 統計分析和圖表
-- ✅ Excel格式匯出
-""")
-
-# 模式選擇
-st.sidebar.subheader("模式選擇")
-mode = st.sidebar.radio(
-    "選擇轉貨模式",
-    ["保守轉貨 (A模式)", "加強轉貨 (B模式)"],
-    key="mode"
-)
-
-# 模式說明
-with st.sidebar.expander("模式說明"):
-    st.markdown("""
-    **轉貨模式：**
-    - **A模式(保守轉貨)**：轉出後剩餘庫存不低於安全庫存，轉出類型為RF過剩轉出
-    - **B模式(加強轉貨)**：轉出後剩餘庫存可能低於安全庫存，轉出類型為RF加強轉出
-    
-    **轉出類型判斷：**
-    - 如果轉出店鋪轉出後, 剩餘庫存不會低過Safety stock, 轉出類型定位為RF過剩轉出
-    - 如果轉出店鋪轉出後, 剩餘庫存會低過Safety stock, 轉出類型定位為RF加強轉出
-    
-    **接收條件：**
-    - SaSa Net Stock + Pending Received < Safety Stock，便需要進行調撥接收
-    """)
-
-# 文件上傳區域
-st.header("1. 上傳數據文件")
+# 4. 主要區塊
+# 4.1. 資料上傳區塊
+st.header("1. 資料上傳")
 uploaded_file = st.file_uploader(
-    "請上傳Excel文件（.xlsx格式）",
-    type=['xlsx'],
-    help="上傳包含庫存數據的Excel文件，必須包含以下欄位：Article, Article Description, OM, RP Type, Site, MOQ, SaSa Net Stock, Pending Received, Safety Stock, Last Month Sold Qty, MTD Sold Qty"
+    "請上傳包含庫存和銷量數據的 Excel 文件",
+    type=["xlsx", "xls"],
+    help="必需欄位：Article, Article Description, OM, RP Type, Site, MOQ, SaSa Net Stock, Pending Received, Safety Stock, Last Month Sold Qty, MTD Sold Qty"
 )
 
-# 如果有文件上傳
 if uploaded_file is not None:
-    # 顯示文件信息
-    st.success(f"文件上傳成功: {uploaded_file.name}")
-    
-    # 創建臨時文件
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
-        tmp_file.write(uploaded_file.getvalue())
-        tmp_file_path = tmp_file.name
-    
+    progress_bar = st.progress(0, text="準備開始處理文件...")
     try:
+        # 文件上傳驗證
+        progress_bar.progress(10, text="正在驗證文件格式...")
+        
+        # 創建臨時文件
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            tmp_file_path = tmp_file.name
+        
         # 數據預處理
-        st.header("2. 數據預處理")
-        with st.spinner("正在處理數據，請稍候..."):
-            processor = DataProcessor()
+        progress_bar.progress(25, text="文件讀取成功！正在進行數據預處理...")
+        processor = DataProcessor()
+        
+        # 驗證文件格式
+        file_valid, error_msg = processor.validate_file_format(uploaded_file)
+        if not file_valid:
+            st.error(f"文件格式驗證失敗: {error_msg}")
+            os.unlink(tmp_file_path)
+            st.stop()
+        
+        df, processing_stats = processor.preprocess_data(tmp_file_path)
+        progress_bar.progress(60, text="數據預處理完成！")
+        
+        # 清理臨時文件
+        os.unlink(tmp_file_path)
+        
+        st.success("文件上傳與數據預處理成功！")
+        
+        # 4.2. 資料預覽區塊
+        with st.expander("基本統計和資料樣本展示", expanded=False):
+            st.subheader("資料基本統計")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("總行數", processing_stats['processed_stats']['total_rows'])
+            with col2:
+                st.metric("商品數量", df['Article'].nunique())
+            with col3:
+                st.metric("店鋪數量", df['Site'].nunique())
             
-            # 驗證文件格式
-            file_valid, error_msg = processor.validate_file_format(uploaded_file)
-            if not file_valid:
-                st.error(f"文件格式驗證失敗: {error_msg}")
-                os.unlink(tmp_file_path)
-                st.stop()
-            
-            df, processing_stats = processor.preprocess_data(tmp_file_path)
+            st.subheader("資料樣本（前10行）")
+            st.dataframe(df.head(10))
         
-        # 顯示處理統計
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("原始數據行數", processing_stats['original_stats']['total_rows'])
-        with col2:
-            st.metric("處理後數據行數", processing_stats['processed_stats']['total_rows'])
+        # 4.3. 分析按鈕區塊
+        st.header("2. 分析與建議")
         
-        # 顯示數據預覽
-        st.subheader("數據預覽")
-        st.dataframe(df.head(10))
+        st.info(f"當前選擇的模式為： **{transfer_mode}**")
         
-        # 數據統計
-        st.subheader("數據統計")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("商品數量", df['Article'].nunique())
-        with col2:
-            st.metric("OM數量", df['OM'].nunique())
-        with col3:
-            st.metric("店鋪數量", df['Site'].nunique())
-        
-        # 生成調貨建議
-        st.header("3. 生成調貨建議")
-        st.info(f"當前模式：{mode}")
-        
-        if st.button("生成調貨建議", type="primary"):
-            with st.spinner("正在生成調貨建議，請稍候..."):
+        if st.button("🚀 生成調貨建議", type="primary"):
+            progress_bar.progress(70, text="正在分析數據並生成建議...")
+            with st.spinner("演算法運行中，請稍候..."):
+                # 轉換模式名稱
+                mode_name = "保守轉貨" if transfer_mode == "A: 保守轉貨" else "加強轉貨"
+                
                 # 創建業務邏輯對象
                 transfer_logic = TransferLogic()
-                
-                # 轉換模式名稱
-                mode_name = "保守轉貨" if mode == "保守轉貨 (A模式)" else "加強轉貨"
                 
                 # 生成調貨建議
                 recommendations = transfer_logic.generate_transfer_recommendations(df, mode_name)
@@ -152,8 +164,11 @@ if uploaded_file is not None:
                 
                 # 獲取統計信息
                 statistics = transfer_logic.get_transfer_statistics()
+                
+                time.sleep(1)  # 模擬耗時操作
+                
+            progress_bar.progress(90, text="分析完成！正在準備結果展示...")
             
-            # 顯示結果
             if quality_passed:
                 st.success("質量檢查通過！")
             else:
@@ -164,21 +179,22 @@ if uploaded_file is not None:
                     for error in transfer_logic.quality_errors:
                         st.error(error)
             
-            # 顯示調貨建議統計
-            st.subheader("調貨建議統計")
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("總調貨建議數量", statistics.get('total_recommendations', 0))
-            with col2:
-                st.metric("總調貨件數", statistics.get('total_transfer_qty', 0))
-            with col3:
-                st.metric("涉及產品數量", statistics.get('unique_articles', 0))
-            with col4:
-                st.metric("涉及OM數量", statistics.get('unique_oms', 0))
-            
-            # 顯示調貨建議詳情
             if recommendations:
-                st.subheader("調貨建議詳情")
+                # 4.4. 結果展示區塊
+                st.header("3. 分析結果")
+                
+                # KPI 指標卡
+                st.subheader("關鍵指標 (KPIs)")
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("總調貨建議數量", statistics.get('total_recommendations', 0))
+                col2.metric("總調貨件數", statistics.get('total_transfer_qty', 0))
+                col3.metric("涉及產品數量", statistics.get('unique_articles', 0))
+                col4.metric("涉及OM數量", statistics.get('unique_oms', 0))
+                
+                st.markdown("---")
+                
+                # 調貨建議表格
+                st.subheader("調貨建議清單")
                 
                 # 準備顯示數據
                 display_data = []
@@ -199,25 +215,73 @@ if uploaded_file is not None:
                 rec_df = pd.DataFrame(display_data)
                 st.dataframe(rec_df, use_container_width=True)
                 
-                # 生成Excel文件
-                st.header("4. 下載結果")
-                excel_generator = ExcelGenerator()
+                st.markdown("---")
                 
-                # 創建下載按鈕
-                with st.spinner("正在生成Excel文件..."):
-                    excel_path = excel_generator.generate_excel_file(recommendations, statistics)
+                # 統計圖表
+                st.subheader("詳細統計分析 (Detailed Statistical Analysis)")
                 
-                # 讀取Excel文件
-                with open(excel_path, "rb") as file:
-                    st.download_button(
-                        label="下載調貨建議Excel文件",
-                        data=file.read(),
-                        file_name=excel_generator.output_filename,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("#### 按產品統計 (Statistics by Article)")
+                    article_stats = statistics.get('article_stats', {})
+                    if article_stats:
+                        article_df = pd.DataFrame([
+                            {
+                                'Article': article,
+                                'Total Qty': stats['total_qty'],
+                                'Count': stats['count'],
+                                'OM Count': stats['om_count']
+                            }
+                            for article, stats in article_stats.items()
+                        ])
+                        st.dataframe(article_df)
+                    
+                    st.write("#### 轉出類型分佈 (Transfer Type Distribution)")
+                    source_type_stats = statistics.get('source_type_stats', {})
+                    if source_type_stats:
+                        source_df = pd.DataFrame([
+                            {
+                                'Source Type': source_type,
+                                'Count': stats['count'],
+                                'Qty': stats['qty']
+                            }
+                            for source_type, stats in source_type_stats.items()
+                        ])
+                        st.dataframe(source_df)
+                
+                with col2:
+                    st.write("#### 按OM統計 (Statistics by OM)")
+                    om_stats = statistics.get('om_stats', {})
+                    if om_stats:
+                        om_df = pd.DataFrame([
+                            {
+                                'OM': om,
+                                'Total Qty': stats['total_qty'],
+                                'Count': stats['count'],
+                                'Article Count': stats['article_count']
+                            }
+                            for om, stats in om_stats.items()
+                        ])
+                        st.dataframe(om_df)
+                    
+                    st.write("#### 接收類型分佈 (Receive Type Distribution)")
+                    dest_type_stats = statistics.get('dest_type_stats', {})
+                    if dest_type_stats:
+                        dest_df = pd.DataFrame([
+                            {
+                                'Destination Type': dest_type,
+                                'Count': stats['count'],
+                                'Qty': stats['qty']
+                            }
+                            for dest_type, stats in dest_type_stats.items()
+                        ])
+                        st.dataframe(dest_df)
+                
+                st.markdown("---")
                 
                 # 顯示統計圖表
-                st.subheader("統計圖表")
+                st.subheader("OM 調貨分析圖表 (OM Transfer vs Receive Analysis Chart)")
                 
                 # 創建OM Transfer vs Receive Analysis圖表
                 fig, ax = plt.subplots(figsize=(12, 8))
@@ -325,31 +389,37 @@ if uploaded_file is not None:
                     st.pyplot(fig)
                 else:
                     st.info("沒有足夠的數據生成圖表")
+                
+                st.success("分析完成！您現在可以下載建議。")
+                
+                # 生成Excel文件
+                with st.spinner("正在生成Excel文件..."):
+                    excel_generator = ExcelGenerator()
+                    excel_path = excel_generator.generate_excel_file(recommendations, statistics)
+                
+                # 讀取Excel文件
+                with open(excel_path, "rb") as file:
+                    st.download_button(
+                        label="📥 下載調貨建議 (Excel)",
+                        data=file.read(),
+                        file_name=excel_generator.output_filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                
+                progress_bar.progress(100, text="處理完畢！")
             else:
-                st.info("沒有生成調貨建議，可能是當前數據條件不滿足調貨要求。")
+                st.info("根據當前規則，沒有生成任何調貨建議。")
+                progress_bar.progress(100, text="處理完畢！")
     
-    finally:
+    except Exception as e:
+        st.error(f"處理文件時發生嚴重錯誤: {e}")
+        st.exception(e)  # 顯示詳細的錯誤追蹤信息
+        if 'progress_bar' in locals():
+            progress_bar.progress(100, text="處理失敗！")
+        
         # 清理臨時文件
-        if os.path.exists(tmp_file_path):
+        if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
             os.unlink(tmp_file_path)
-
-# 使用說明
-st.sidebar.markdown("---")
-st.sidebar.subheader("使用說明")
-st.sidebar.markdown("""
-1. 上傳包含庫存數據的Excel文件
-2. 選擇轉貨模式（保守轉貨或加強轉貨）
-3. 點擊"生成調貨建議"按鈕
-4. 查看調貨建議結果和統計信息
-5. 下載生成的Excel文件
-
-**注意事項：**
-- 確保Excel文件包含所有必需的欄位
-- Article欄位必須為12位文本格式
-- 系統會自動處理缺失值和異常值
-- RF過剩轉出：轉出後剩餘庫存不低於安全庫存
-- RF加強轉出：轉出後剩餘庫存可能低於安全庫存
-""")
 
 # 系統信息
 st.sidebar.markdown("---")

@@ -1,7 +1,7 @@
 """
-數據預處理模組 v1.8.1
+數據預處理模組 v1.9.1
 處理Excel文件讀取、數據清理和驗證
-支持雙模式(雙組合)系統
+支持雙模式系統：A(保守轉貨)/B(加強轉貨)
 """
 
 import pandas as pd
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DataProcessor:
-    """數據預處理類 v1.8.1"""
+    """數據預處理類 v1.9.1"""
     
     def __init__(self):
         self.required_columns = [
@@ -101,8 +101,9 @@ class DataProcessor:
         if uploaded_file.name == '':
             return False, "文件名不能為空"
         
-        # 檢查文件擴展名
-        if not (uploaded_file.name.endswith('.xlsx') or uploaded_file.name.endswith('.xls')):
+        # 檢查文件擴展名（不區分大小寫）
+        file_name = uploaded_file.name.lower()
+        if not (file_name.endswith('.xlsx') or file_name.endswith('.xls')):
             return False, "文件格式不正確，請上傳.xlsx或.xls格式的Excel文件"
         
         # 檢查文件大小（限制為50MB）
