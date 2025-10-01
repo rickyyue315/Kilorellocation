@@ -198,23 +198,38 @@ if uploaded_file is not None:
                 
                 # 準備顯示數據
                 display_data = []
+                
+                # 創建一個字典來跟蹤每個店鋪的累計轉出量
+                cumulative_transfers = {}
+                
                 for rec in recommendations:
                     # 獲取轉出店鋪的原始數據
                     source_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Transfer Site'])]
                     source_stock = source_data['SaSa Net Stock'].iloc[0] if not source_data.empty else 0
-                    source_pending = source_data['Pending Received'].iloc[0] if not source_data.empty else 0
                     source_safety = source_data['Safety Stock'].iloc[0] if not source_data.empty else 0
                     source_moq = source_data['MOQ'].iloc[0] if not source_data.empty else 0
                     
                     # 獲取接收店鋪的原始數據
                     dest_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Receive Site'])]
                     dest_stock = dest_data['SaSa Net Stock'].iloc[0] if not dest_data.empty else 0
-                    dest_pending = dest_data['Pending Received'].iloc[0] if not dest_data.empty else 0
                     dest_safety = dest_data['Safety Stock'].iloc[0] if not dest_data.empty else 0
                     dest_moq = dest_data['MOQ'].iloc[0] if not dest_data.empty else 0
                     
                     # 計算接收後的總貨量
-                    dest_total_after = dest_stock + dest_pending + rec['Transfer Qty']
+                    dest_total_after = dest_stock + rec['Transfer Qty']
+                    
+                    # 創建店鋪的唯一標識符
+                    source_key = f"{rec['Article']}_{rec['Transfer Site']}"
+                    
+                    # 如果是第一次轉出，初始化累計轉出量
+                    if source_key not in cumulative_transfers:
+                        cumulative_transfers[source_key] = 0
+                    
+                    # 更新累計轉出量
+                    cumulative_transfers[source_key] += rec['Transfer Qty']
+                    
+                    # 計算累減後的庫存
+                    source_after_transfer_stock = source_stock - cumulative_transfers[source_key]
                     
                     display_data.append({
                         'Article': rec['Article'],
@@ -223,13 +238,12 @@ if uploaded_file is not None:
                         'Transfer Site': rec['Transfer Site'],
                         'Transfer Qty': rec['Transfer Qty'],
                         'Source Original Stock': source_stock,
-                        'Source After Transfer Stock': source_stock - rec['Transfer Qty'],
+                        'Source After Transfer Stock': source_after_transfer_stock,
                         'Source Safety Stock': source_safety,
                         'Source MOQ': source_moq,
                         'Receive OM': rec['Receive OM'],
                         'Receive Site': rec['Receive Site'],
                         'Receive Original Stock': dest_stock,
-                        'Receive Pending': dest_pending,
                         'Receive Total After': dest_total_after,
                         'Receive Safety Stock': dest_safety,
                         'Receive MOQ': dest_moq,
