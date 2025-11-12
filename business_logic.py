@@ -71,91 +71,87 @@ class TransferLogic:
             # 條件2：不是最高銷量店鋪（保護最高動銷店）
             is_not_highest_sold = effective_sold < max_sold_qty
 
+            # 不符合前置條件則略過
             if not (is_stock_above_safety and is_not_highest_sold):
                 continue
 
-            # 根據模式計算可轉出數量
+            # 根據模式計算可轉出數量（已明確階梯：A < C < B）
             if mode == self.mode_a:
                 # A模式(保守轉貨)
-                # 基礎可轉出 = (庫存+在途) - 安全庫存
+                # 僅動用明顯過剩庫存，嚴格不跌破 Safety Stock
                 base_transferable = total_available - safety_stock
-
-                # 上限控制 = (庫存+在途) × 20%，但最少2件
-                upper_limit = max(int(total_available * 0.2), 2)
-
-                # 實際轉出 = min(基礎可轉出, 上限控制)
-                actual_transferable = min(base_transferable, upper_limit)
-
-                # 不能超過實際庫存數量
-                actual_transferable = min(actual_transferable, int(row['SaSa Net Stock']))
-
-                # 判斷轉出類型（A模式不允許跌破Safety）
-                remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
-                if remaining_stock >= safety_stock and actual_transferable > 0:
-                    source_type = 'RF過剩轉出'
-                else:
-                    # 不允許破壞安全庫存，放棄此源
-                    continue
-
-            elif mode == self.mode_b:
-                # B模式(加強轉貨)
-                # 根據最新要求：解除 MOQ 限制，比 A 模式更進取，
-                # 僅以 Safety Stock 為主要約束來源，但仍保護基本安全庫存。
-                #
-                # 基礎可轉出：超出 Safety Stock 的部分
-                base_transferable = total_available - safety_stock
-
-                # 若沒有超出安全庫存，則不可轉出
                 if base_transferable <= 0:
                     continue
 
-                # 上限控制：最多轉出 50% 的 total_available，但最少 2 件
-                upper_limit = max(int(total_available * 0.5), 2)
+                # 上限：20% total_available，至少 2 件
+                upper_limit = max(int(total_available * 0.2), 2)
 
-                # 實際可轉出數量：受 base_transferable、upper_limit 及實際庫存約束
                 actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
-
                 if actual_transferable <= 0:
                     continue
 
                 remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
 
-                # 判斷轉出類型：
-                # - 若轉出後仍 >= Safety Stock，視為 RF過剩轉出（風險較低）
-                # - 若略低於 Safety Stock，也允許作為 RF加強轉出（加強型策略）
+                # 僅當仍維持 >= Safety Stock 才允許轉出
+                if remaining_stock >= safety_stock:
+                    source_type = 'RF過剩轉出'
+                else:
+                    continue
+
+            elif mode == self.mode_c:
+                # C模式(重點補0)
+                # 中等強度，小量精準支援 0 / 低庫存店，不做大規模抽貨。
+                base_transferable = total_available - safety_stock
+                if base_transferable <= 0:
+                    continue
+
+                # 上限設計：
+                # - 比例：最多 30% total_available
+                # - 件數：最多 3 件
+                # - 並允許至少 1 件（支援補0微調貨）
+                ratio_cap = int(total_available * 0.3)
+                abs_cap = 3
+                # 有效上限不能為負
+                capped_ratio = max(ratio_cap, 0)
+                raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
+                upper_limit = max(1, raw_upper)
+
+                actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
+                if actual_transferable <= 0:
+                    continue
+
+                remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+
+                # 類型標記：
+                # - 若仍 >= Safety → RF過剩轉出（風險低）
+                # - 若略低於 Safety → RF加強轉出（為重點補0作有限犧牲）
                 if remaining_stock >= safety_stock:
                     source_type = 'RF過剩轉出'
                 else:
                     source_type = 'RF加強轉出'
 
             else:
-                # C模式(重點補0) — 按需求更新：
-                # 「忽視 MOQ 限制」，僅以 Safety Stock 為主要約束，
-                # 只要 total_available > Safety Stock，即可釋放部份庫存，
-                # 允許小量（含1件）轉出，支援重點補0店鋪。
-                #
-                # 基礎可轉出：超出 Safety Stock 的部分
+                # B模式(加強轉貨)
+                # 最 aggressive：最大釋放，多於 C 模式，並可在可控範圍下下探 Safety。
                 base_transferable = total_available - safety_stock
-
-                # 若沒有超出安全庫存，則不可轉出
                 if base_transferable <= 0:
                     continue
 
-                # 上限控制：最多轉出 50% 的 total_available，但至少允許 1 件
-                upper_limit = max(int(total_available * 0.5), 1)
+                # 上限：最多 50% total_available，至少 2 件
+                upper_limit = max(int(total_available * 0.5), 2)
 
-                # 實際可轉出數量：受 base_transferable、upper_limit 及實際庫存約束
                 actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
-
                 if actual_transferable <= 0:
                     continue
 
-                # C 模式下，只要仍保留不少於 Safety Stock，即標記為 RF過剩轉出
                 remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+
+                # 類型標記：
+                # - 若仍 >= Safety → RF過剩轉出
+                # - 若 < Safety → RF加強轉出（接受更強調撥出）
                 if remaining_stock >= safety_stock:
                     source_type = 'RF過剩轉出'
                 else:
-                    # 允許在 C 模式更進取支援補0：若仍有存貨但略低於安全，也可視為加強轉出來源
                     source_type = 'RF加強轉出'
 
             # 加入可轉出來源（所有模式共用）
