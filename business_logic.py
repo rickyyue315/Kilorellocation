@@ -410,7 +410,7 @@ class TransferLogic:
                     'Destination Priority': dest['priority'],
                     'Source Type': source['source_type'],
                     'Destination Type': dest['dest_type'],
-                    'Notes': ''
+                    'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty)
                 }
                 
                 # 添加目標數量信息（如果有）
@@ -690,3 +690,82 @@ class TransferLogic:
             'source_type_stats': source_type_stats,
             'dest_type_stats': dest_type_stats
         }
+    def _create_recommendation_note(self, source: Dict, dest: Dict, current_received_qty: int, transfer_qty: int) -> str:
+        """
+        創建調貨建議的Notes欄位內容
+        
+        Args:
+            source: 轉出店鋪信息
+            dest: 接收店鋪信息
+            current_received_qty: 當前累計接收數量
+            transfer_qty: 本次轉移數量
+            
+        Returns:
+            詳細的Notes欄位內容
+        """
+        notes_parts = []
+        
+        # 1. 轉出店鋪分類
+        notes_parts.append(f"【轉出分類: {source['source_type']}】")
+        
+        # 2. 接收店鋪分類
+        notes_parts.append(f"【接收分類: {dest['dest_type']}】")
+        
+        # 3. 優先級信息
+        if source['priority'] == 1:
+            priority_desc = "ND轉出(最高優先級)"
+        else:
+            priority_desc = "RF轉出"
+        notes_parts.append(f"【轉出優先級: {priority_desc}】")
+        
+        if dest['priority'] == 1:
+            priority_desc = "接收(最高優先級)"
+        else:
+            priority_desc = "接收(一般優先級)"
+        notes_parts.append(f"【接收優先級: {priority_desc}】")
+        
+        # 4. 庫存狀況分析
+        if source['source_type'] == 'ND轉出':
+            notes_parts.append("【轉出分析: ND類型店鋪，無庫存限制，可全數轉出】")
+        elif source['source_type'] == 'RF過剩轉出':
+            remaining_after_transfer = source['original_stock'] - transfer_qty
+            notes_parts.append(f"【轉出分析: RF過剩轉出，轉出後剩餘庫存({remaining_after_transfer})仍高於安全庫存({source.get('safety_stock', 'N/A')})】")
+        elif source['source_type'] == 'RF加強轉出':
+            remaining_after_transfer = source['original_stock'] - transfer_qty
+            notes_parts.append(f"【轉出分析: RF加強轉出，轉出後剩餘庫存({remaining_after_transfer})可能低於安全庫存({source.get('safety_stock', 'N/A')})】")
+        
+        # 5. 接收需求分析
+        if dest['dest_type'] == '重點補0':
+            if 'target_qty' in dest:
+                notes_parts.append(f"【接收分析: 重點補0，目標數量{dest['target_qty']}件，累計已接收{current_received_qty + transfer_qty}件，缺口{abs((current_received_qty + transfer_qty) - dest['target_qty'])}件】")
+            else:
+                notes_parts.append("【接收分析: 重點補0，針對低庫存店鋪補貨】")
+        elif dest['dest_type'] == '緊急缺貨補貨':
+            notes_parts.append("【接收分析: 緊急缺貨補貨，該店鋪零庫存但有銷售記錄】")
+        elif dest['dest_type'] == '潛在缺貨補貨':
+            current_stock = dest.get('current_stock', 0)
+            pending = dest.get('pending_received', 0)
+            safety_stock = dest.get('safety_stock', 0)
+            total_available = current_stock + pending
+            shortage = safety_stock - total_available
+            notes_parts.append(f"【接收分析: 潛在缺貨補貨，庫存不足{shortage}件，補充至安全庫存{safety_stock}件】")
+        
+        # 6. 轉移數量說明
+        if transfer_qty == 2 and source.get('original_stock', 0) == 1:
+            notes_parts.append("【數量說明: 已優化至2件，最小轉移單位】")
+        elif transfer_qty == 1:
+            notes_parts.append("【數量說明: 最小轉移單位1件】")
+        else:
+            notes_parts.append(f"【數量說明: 轉移{transfer_qty}件】")
+        
+        # 7. 轉移後狀況
+        remaining_stock = source['original_stock'] - transfer_qty
+        notes_parts.append(f"【轉移後狀況: 轉出店鋪剩餘庫存{remaining_stock}件，接收店鋪累計接收{current_received_qty + transfer_qty}件】")
+        
+        # 8. 特殊標記
+        if source['source_type'] in ['RF加強轉出']:
+            notes_parts.append("【特殊標記: 加強轉出類型，需注意轉出後庫存狀況】")
+        if dest['dest_type'] == '重點補0':
+            notes_parts.append("【特殊標記: 重點補0類型，確保最低保障標準】")
+        
+        return " | ".join(notes_parts)

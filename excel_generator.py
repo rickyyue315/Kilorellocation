@@ -1,7 +1,8 @@
 """
-Excel輸出模組 v1.8
+Excel輸出模組 v1.9.7
 生成調貨建議和統計摘要的Excel文件
-支持雙模式(雙組合)系統
+支持三模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)
+增加詳細Notes分類資訊
 """
 
 import pandas as pd
@@ -16,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ExcelGenerator:
-    """Excel輸出類 v1.8"""
+    """Excel輸出類 v1.9.7"""
     
     def __init__(self):
         self.output_filename = ""
@@ -83,7 +84,7 @@ class ExcelGenerator:
         worksheet.set_column('I:I', 18)  # After Transfer Stock
         worksheet.set_column('J:J', 12)  # Safety Stock
         worksheet.set_column('K:K', 8)   # MOQ
-        worksheet.set_column('L:L', 30)  # Notes
+        worksheet.set_column('L:L', 60)  # Notes - 增加寬度以顯示詳細分類信息
         
         # 添加標題格式
         header_format = workbook.add_format({
@@ -105,10 +106,29 @@ class ExcelGenerator:
             'valign': 'top'
         })
         
+        # Notes欄位的特殊格式（換行和自動高度）
+        notes_format = workbook.add_format({
+            'border': 1,
+            'text_wrap': True,
+            'valign': 'top',
+            'font_size': 9,
+            'align': 'left'
+        })
+        
         # 應用數據格式
         for row_num in range(1, len(df) + 1):
             for col_num in range(len(df.columns)):
-                worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], data_format)
+                if col_num == 11:  # Notes欄位 (第L列，索引為11)
+                    # 設置Notes欄位自動換行和更適合的高度
+                    worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], notes_format)
+                else:
+                    worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], data_format)
+                    
+        # 設置Notes欄位自動換行
+        worksheet.set_column('L:L', 60)  # Notes欄位寬度
+        worksheet.set_row(0, 40)  # 標題行高度
+        for row_num in range(1, len(df) + 1):
+            worksheet.set_row(row_num, 60)  # 數據行高度，特別是Notes欄位
     
     def create_summary_dashboard_sheet(self, writer, statistics: Dict):
         """
