@@ -29,17 +29,17 @@ class TransferLogic:
     def identify_sources(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
         """
         識別轉出候選店鋪
-        
+
         Args:
             group_df: 按Article和OM分組的DataFrame
             mode: 轉貨模式（保守轉貨、加強轉貨或重點補0）
-            
+
         Returns:
             轉出候選店鋪列表
         """
-        sources = []
-        
-        # 優先級1：ND類型轉出
+        sources: List[Dict] = []
+
+        # 優先級1：ND類型轉出（所有模式一致）
         nd_sources = group_df[group_df['RP Type'] == 'ND']
         for _, row in nd_sources.iterrows():
             if row['SaSa Net Stock'] > 0:  # 只考慮有庫存的店鋪
@@ -47,108 +47,133 @@ class TransferLogic:
                     'site': row['Site'],
                     'om': row['OM'],
                     'rp_type': row['RP Type'],
-                    'transferable_qty': row['SaSa Net Stock'],
+                    'transferable_qty': int(row['SaSa Net Stock']),
                     'priority': 1,
-                    'original_stock': row['SaSa Net Stock'],
-                    'effective_sold_qty': row['Effective Sold Qty'],
+                    'original_stock': int(row['SaSa Net Stock']),
+                    'effective_sold_qty': int(row['Effective Sold Qty']),
                     'source_type': 'ND轉出'
                 })
-        
+
         # 優先級2：RF類型轉出
         rf_sources = group_df[group_df['RP Type'] == 'RF']
-        
-        # 找出該Article+OM組合中的最高有效銷量
+
+        # 找出該Article+OM組合中的最高有效銷量（用於避免從最高動銷店轉出）
         max_sold_qty = rf_sources['Effective Sold Qty'].max() if not rf_sources.empty else 0
-        
+
         for _, row in rf_sources.iterrows():
+            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+            safety_stock = int(row['Safety Stock'])
+            effective_sold = int(row['Effective Sold Qty'])
+
             # 條件1：(庫存+在途) > Safety Stock
-            total_available = row['SaSa Net Stock'] + row['Pending Received']
-            is_stock_above_safety = total_available > row['Safety Stock']
-            
-            # 條件2：不是最高銷量店鋪
-            is_not_highest_sold = row['Effective Sold Qty'] < max_sold_qty
-            
-            if is_stock_above_safety and is_not_highest_sold:
-                # 根據模式計算可轉出數量
-                if mode == self.mode_a:
-                    # A模式(保守轉貨)
-                    # 基礎可轉出 = (庫存+在途) - 安全庫存
-                    base_transferable = total_available - row['Safety Stock']
-                    
-                    # 上限控制 = (庫存+在途) × 20%，但最少2件
-                    upper_limit = max(total_available * 0.2, 2)
-                    
-                    # 實際轉出 = min(基礎可轉出, max(上限控制, 2))
-                    actual_transferable = min(base_transferable, upper_limit)
-                    
-                    # 不能超過實際庫存數量
-                    actual_transferable = min(actual_transferable, row['SaSa Net Stock'])
-                    
-                    # 判斷轉出類型
-                    remaining_stock = row['SaSa Net Stock'] - actual_transferable
-                    if remaining_stock >= row['Safety Stock']:
-                        source_type = 'RF過剩轉出'
-                    else:
-                        # A模式下不允許剩餘庫存低於安全庫存
-                        continue
-                        
-                elif mode == self.mode_b:
-                    # B模式(加強轉貨)
-                    # 基礎可轉出 = (庫存+在途) – (MOQ數量+1件)
-                    base_transferable = total_available - (row['MOQ'] + 1)
-                    
-                    # 上限控制 = (庫存+在途) × 50%，但最少2件
-                    upper_limit = max(total_available * 0.5, 2)
-                    
-                    # 實際轉出 = min(基礎可轉出, max(上限控制, 2))
-                    actual_transferable = min(base_transferable, upper_limit)
-                    
-                    # 不能超過實際庫存數量
-                    actual_transferable = min(actual_transferable, row['SaSa Net Stock'])
-                    
-                    # 判斷轉出類型
-                    remaining_stock = row['SaSa Net Stock'] - actual_transferable
-                    if remaining_stock >= row['Safety Stock']:
-                        source_type = 'RF過剩轉出'
-                    else:
-                        source_type = 'RF加強轉出'
-                
+            is_stock_above_safety = total_available > safety_stock
+
+            # 條件2：不是最高銷量店鋪（保護最高動銷店）
+            is_not_highest_sold = effective_sold < max_sold_qty
+
+            if not (is_stock_above_safety and is_not_highest_sold):
+                continue
+
+            # 根據模式計算可轉出數量
+            if mode == self.mode_a:
+                # A模式(保守轉貨)
+                # 基礎可轉出 = (庫存+在途) - 安全庫存
+                base_transferable = total_available - safety_stock
+
+                # 上限控制 = (庫存+在途) × 20%，但最少2件
+                upper_limit = max(int(total_available * 0.2), 2)
+
+                # 實際轉出 = min(基礎可轉出, 上限控制)
+                actual_transferable = min(base_transferable, upper_limit)
+
+                # 不能超過實際庫存數量
+                actual_transferable = min(actual_transferable, int(row['SaSa Net Stock']))
+
+                # 判斷轉出類型（A模式不允許跌破Safety）
+                remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+                if remaining_stock >= safety_stock and actual_transferable > 0:
+                    source_type = 'RF過剩轉出'
                 else:
-                    # C模式(重點補0) - 與B模式相同的轉出邏輯
-                    # 基礎可轉出 = (庫存+在途) – (MOQ數量+1件)
-                    base_transferable = total_available - (row['MOQ'] + 1)
-                    
-                    # 上限控制 = (庫存+在途) × 50%，但最少2件
-                    upper_limit = max(total_available * 0.5, 2)
-                    
-                    # 實際轉出 = min(基礎可轉出, max(上限控制, 2))
-                    actual_transferable = min(base_transferable, upper_limit)
-                    
-                    # 不能超過實際庫存數量
-                    actual_transferable = min(actual_transferable, row['SaSa Net Stock'])
-                    
-                    # 判斷轉出類型
-                    remaining_stock = row['SaSa Net Stock'] - actual_transferable
-                    if remaining_stock >= row['Safety Stock']:
-                        source_type = 'RF過剩轉出'
-                    else:
-                        source_type = 'RF加強轉出'
-                
-                if actual_transferable > 0:  # 只考慮有可轉出庫存的店鋪
-                    sources.append({
-                        'site': row['Site'],
-                        'om': row['OM'],
-                        'rp_type': row['RP Type'],
-                        'transferable_qty': int(actual_transferable),
-                        'priority': 2,
-                        'original_stock': row['SaSa Net Stock'],
-                        'effective_sold_qty': row['Effective Sold Qty'],
-                        'source_type': source_type
-                    })
-        
-        # 按優先級排序
+                    # 不允許破壞安全庫存，放棄此源
+                    continue
+
+            elif mode == self.mode_b:
+                # B模式(加強轉貨)
+                # 根據最新要求：解除 MOQ 限制，比 A 模式更進取，
+                # 僅以 Safety Stock 為主要約束來源，但仍保護基本安全庫存。
+                #
+                # 基礎可轉出：超出 Safety Stock 的部分
+                base_transferable = total_available - safety_stock
+
+                # 若沒有超出安全庫存，則不可轉出
+                if base_transferable <= 0:
+                    continue
+
+                # 上限控制：最多轉出 50% 的 total_available，但最少 2 件
+                upper_limit = max(int(total_available * 0.5), 2)
+
+                # 實際可轉出數量：受 base_transferable、upper_limit 及實際庫存約束
+                actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
+
+                if actual_transferable <= 0:
+                    continue
+
+                remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+
+                # 判斷轉出類型：
+                # - 若轉出後仍 >= Safety Stock，視為 RF過剩轉出（風險較低）
+                # - 若略低於 Safety Stock，也允許作為 RF加強轉出（加強型策略）
+                if remaining_stock >= safety_stock:
+                    source_type = 'RF過剩轉出'
+                else:
+                    source_type = 'RF加強轉出'
+
+            else:
+                # C模式(重點補0) — 按需求更新：
+                # 「忽視 MOQ 限制」，僅以 Safety Stock 為主要約束，
+                # 只要 total_available > Safety Stock，即可釋放部份庫存，
+                # 允許小量（含1件）轉出，支援重點補0店鋪。
+                #
+                # 基礎可轉出：超出 Safety Stock 的部分
+                base_transferable = total_available - safety_stock
+
+                # 若沒有超出安全庫存，則不可轉出
+                if base_transferable <= 0:
+                    continue
+
+                # 上限控制：最多轉出 50% 的 total_available，但至少允許 1 件
+                upper_limit = max(int(total_available * 0.5), 1)
+
+                # 實際可轉出數量：受 base_transferable、upper_limit 及實際庫存約束
+                actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
+
+                if actual_transferable <= 0:
+                    continue
+
+                # C 模式下，只要仍保留不少於 Safety Stock，即標記為 RF過剩轉出
+                remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+                if remaining_stock >= safety_stock:
+                    source_type = 'RF過剩轉出'
+                else:
+                    # 允許在 C 模式更進取支援補0：若仍有存貨但略低於安全，也可視為加強轉出來源
+                    source_type = 'RF加強轉出'
+
+            # 加入可轉出來源（所有模式共用）
+            if actual_transferable > 0:
+                sources.append({
+                    'site': row['Site'],
+                    'om': row['OM'],
+                    'rp_type': row['RP Type'],
+                    'transferable_qty': int(actual_transferable),
+                    'priority': 2,
+                    'original_stock': int(row['SaSa Net Stock']),
+                    'effective_sold_qty': effective_sold,
+                    'source_type': source_type
+                })
+
+        # 按優先級排序（ND優先，RF其次）
         sources.sort(key=lambda x: x['priority'])
-        
+
         return sources
     
     def identify_destinations(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
