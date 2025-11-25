@@ -1,0 +1,12 @@
+Verification Results
+====================
+
+Data:
+Row 1: Article=ART001, Remark=RF over → Priority 0
+Row 2: Article=ART002, Remark=ND Transfer → Priority 0
+
+
+Summary:
+SUCCESS: All Remark cells are populated
+Total rows: 2
+Remarks populated: 2

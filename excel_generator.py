@@ -62,7 +62,7 @@ class ExcelGenerator:
         for rec in recommendations:
             # 生成Remark
             source_type = rec.get('Source Type', '')
-            dest_type = rec.get('Receive Type', '')
+            dest_type = rec.get('Destination Type') or rec.get('Receive Type', '')
             remark = self._generate_remark(source_type, dest_type) if source_type and dest_type else ''
             
             df_data.append({

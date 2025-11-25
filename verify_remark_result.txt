@@ -1,0 +1,28 @@
+================================================================================
+REMARK COLUMN VERIFICATION
+================================================================================
+File: 調貨建議_20251125.xlsx
+Total rows: 10
+Columns: ['Article', 'Product Desc', 'Transfer OM', 'Transfer Site', 'Receive OM', 'Receive Site', 'Transfer Qty', 'Original Stock', 'After Transfer Stock', 'Safety Stock', 'MOQ', 'Remark', 'Notes']
+
+Sample rows with Remark column:
+--------------------------------------------------------------------------------
+Row 1: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 2: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 3: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 4: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 5: Article=1053875, Remark=RF過剩轉出 → 重點補0
+
+================================================================================
+REMARK STATISTICS
+================================================================================
+Total rows: 10
+Populated remarks: 10
+Empty remarks: 0
+
+SUCCESS: All Remark cells are populated!
+
+================================================================================
+UNIQUE REMARKS
+================================================================================
+1. RF過剩轉出 → 重點補0 (appears 10 times)

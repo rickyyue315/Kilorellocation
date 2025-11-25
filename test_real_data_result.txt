@@ -1,0 +1,20 @@
+Test with Real Data Results
+============================
+
+Generated Recommendations:
+Row 1: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 2: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 3: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 4: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 5: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 6: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 7: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 8: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 9: Article=1053875, Remark=RF過剩轉出 → 重點補0
+Row 10: Article=1053875, Remark=RF過剩轉出 → 重點補0
+
+
+Summary:
+SUCCESS: All Remark cells are populated
+Total rows: 10
+Remarks populated: 10
