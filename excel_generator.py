@@ -34,6 +34,19 @@ class ExcelGenerator:
         self.output_filename = filename
         return filename
     
+    def _generate_remark(self, source_type: str, dest_type: str) -> str:
+        """
+        生成簡潔的Remark，顯示轉出分類到接收分類的映射
+        
+        Args:
+            source_type: 轉出分類 (e.g., 'ND轉出', 'RF過剩轉出', 'RF加強轉出')
+            dest_type: 接收分類 (e.g., '重點補0', '緊急缺貨補貨', '潛在缺貨補貨')
+            
+        Returns:
+            簡潔的Remark字符串
+        """
+        return f"{source_type} → {dest_type}"
+    
     def create_transfer_recommendations_sheet(self, writer, recommendations: List[Dict]):
         """
         創建調貨建議工作表
@@ -47,6 +60,11 @@ class ExcelGenerator:
         # 準備數據
         df_data = []
         for rec in recommendations:
+            # 生成Remark
+            source_type = rec.get('Source Type', '')
+            dest_type = rec.get('Receive Type', '')
+            remark = self._generate_remark(source_type, dest_type) if source_type and dest_type else ''
+            
             df_data.append({
                 'Article': rec['Article'],
                 'Product Desc': rec['Product Desc'],
@@ -59,6 +77,7 @@ class ExcelGenerator:
                 'After Transfer Stock': rec['After Transfer Stock'],
                 'Safety Stock': rec['Safety Stock'],
                 'MOQ': rec['MOQ'],
+                'Remark': remark,
                 'Notes': rec.get('Notes', '')
             })
         
@@ -84,7 +103,8 @@ class ExcelGenerator:
         worksheet.set_column('I:I', 18)  # After Transfer Stock
         worksheet.set_column('J:J', 12)  # Safety Stock
         worksheet.set_column('K:K', 8)   # MOQ
-        worksheet.set_column('L:L', 60)  # Notes - 增加寬度以顯示詳細分類信息
+        worksheet.set_column('L:L', 35)  # Remark - 簡潔的轉出→接收映射
+        worksheet.set_column('M:M', 60)  # Notes - 增加寬度以顯示詳細分類信息
         
         # 添加標題格式
         header_format = workbook.add_format({
@@ -118,14 +138,14 @@ class ExcelGenerator:
         # 應用數據格式
         for row_num in range(1, len(df) + 1):
             for col_num in range(len(df.columns)):
-                if col_num == 11:  # Notes欄位 (第L列，索引為11)
+                if col_num == 12:  # Notes欄位 (第M列，索引為12)
                     # 設置Notes欄位自動換行和更適合的高度
                     worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], notes_format)
                 else:
                     worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], data_format)
                     
         # 設置Notes欄位自動換行
-        worksheet.set_column('L:L', 60)  # Notes欄位寬度
+        worksheet.set_column('M:M', 60)  # Notes欄位寬度
         worksheet.set_row(0, 40)  # 標題行高度
         for row_num in range(1, len(df) + 1):
             worksheet.set_row(row_num, 60)  # 數據行高度，特別是Notes欄位
