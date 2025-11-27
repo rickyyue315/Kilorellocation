@@ -1,9 +1,10 @@
 """
-業務邏輯模組 v1.9.6
+業務邏輯模組 v1.9.7
 實現調貨規則、源/目的地識別和匹配算法
 支持三模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
 基於累計接收數量判斷是否達到最低保障標準的機制
+強化ND店鋪限制：所有模式下ND店鋪只能轉出，不能接收
 """
 
 import pandas as pd
@@ -16,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v1.9.6"""
+    """調貨業務邏輯類 v1.9.7"""
     
     def __init__(self):
         self.transfer_recommendations = []
@@ -185,8 +186,8 @@ class TransferLogic:
         """
         destinations = []
         
-        # 只考慮RF類型店鋪
-        rf_destinations = group_df[group_df['RP Type'] == 'RF']
+        # 只考慮RF類型店鋪，明確排除ND類型店鋪（ND店鋪在所有模式下都只能轉出，不能接收）
+        rf_destinations = group_df[(group_df['RP Type'] == 'RF') & (group_df['RP Type'] != 'ND')]
         
         # 找出該Article+OM組合中的最高有效銷量
         max_sold_qty = rf_destinations['Effective Sold Qty'].max() if not rf_destinations.empty else 0
@@ -380,6 +381,10 @@ class TransferLogic:
                 
                 # 避免轉出店鋪同時作為接收店鋪
                 if dest['site'] in transfer_sites:
+                    continue
+                
+                # 防禦性檢查：確保接收店鋪不是ND類型（ND店鋪在所有模式下都只能轉出，不能接收）
+                if dest.get('rp_type') == 'ND':
                     continue
                 
                 # 檢查接收店鋪是否已達到目標數量
@@ -597,7 +602,18 @@ class TransferLogic:
                     self.quality_errors.append(f"同一SKU {article} 的轉出店鋪同時作為接收店鋪: {overlap}")
                     self.quality_check_passed = False
         
-        # 檢查7：對於C模式(重點補0)，檢查接收店鋪的累計接收數量是否超過目標數量
+        # 檢查7：接收店鋪不能是ND類型（ND店鋪在所有模式下都只能轉出，不能接收）
+        for rec in self.transfer_recommendations:
+            receive_site = rec['Receive Site']
+            article = rec['Article']
+            receive_data = df[(df['Article'] == article) & (df['Site'] == receive_site)]
+            if not receive_data.empty:
+                rp_type = receive_data['RP Type'].iloc[0]
+                if rp_type == 'ND':
+                    self.quality_errors.append(f"ND店鋪不能作為接收店鋪 - Site: {receive_site}, Article: {article}")
+                    self.quality_check_passed = False
+        
+        # 檢查8：對於C模式(重點補0)，檢查接收店鋪的累計接收數量是否超過目標數量
         receive_site_stats = {}
         for rec in self.transfer_recommendations:
             if rec.get('Destination Type') == '重點補0':

@@ -1,0 +1,223 @@
+## 三種調貨模式詳解
+
+### **模式A：保守轉貨 (Conservative Transfer)**
+
+**核心特徵：**
+- 保守型調貨策略，嚴格保護安全庫存
+- 轉出後剩餘庫存必須≥ Safety Stock
+- 僅使用RF過剩轉出類型
+
+**調貨邏輯：**
+```python
+# 轉出條件：(庫存+在途) > Safety Stock
+# 轉出限制：最多20%總庫存，至少2件
+base_transferable = total_available - safety_stock
+upper_limit = max(int(total_available * 0.2), 2)
+```
+
+**轉出類型：** `RF過剩轉出`
+**接收類型：** 緊急缺貨補貨、潛在缺貨補貨
+
+---
+
+### **模式B：加強轉貨 (Enhanced Transfer)**
+
+**核心特徵：**
+- 積極型調貨策略，允許下探安全庫存
+- 轉出後剩餘庫存可低於Safety Stock
+- 包含RF過剩轉出和RF加強轉出
+
+**調貨邏輯：**
+```python
+# 轉出條件：(庫存+在途) > Safety Stock  
+# 轉出限制：最多50%總庫存，至少2件
+base_transferable = total_available - safety_stock
+upper_limit = max(int(total_available * 0.5), 2)
+```
+
+**轉出類型：** `RF過剩轉出`、`RF加強轉出`
+**接收類型：** 緊急缺貨補貨、潛在缺貨補貨
+
+---
+
+### **模式C：重點補0 (Priority Zero Stock Replenishment)**
+
+**核心特徵：**
+- 針對性調貨策略，重點補充低庫存店鋪
+- 專注於(SaSa Net Stock+Pending Received)≤1的店鋪
+- 追蹤累計接收數量達到目標
+
+**調貨邏輯：**
+```python
+# 特殊條件：總可用庫存≤1的店鋪
+if total_available <= 1:
+    target_qty = max(int(safety_stock * 0.5), 3)
+    needed_qty = target_qty - total_available
+
+# 轉出限制：最多30%總庫存，最多3件，至少1件
+ratio_cap = int(total_available * 0.3)
+abs_cap = 3
+upper_limit = max(1, min(ratio_cap, abs_cap))
+```
+
+**轉出類型：** `RF過剩轉出`、`RF加強轉出`
+**接收類型：** `重點補0`（獨有）、緊急缺貨補貨、潛在缺貨補貨
+
+---
+
+## 調貨邏輯資料結構
+
+### **1. 轉出候選識別 (identify_sources)**
+
+**資料結構：**
+```python
+sources = [{
+    'site': str,           # 店鋪編號
+    'om': str,             # OM編號  
+    'rp_type': str,        # RP類型 (ND/RF)
+    'transferable_qty': int,    # 可轉出數量
+    'priority': int,       # 優先級 (1=ND優先, 2=RF次之)
+    'original_stock': int,      # 原始庫存
+    'effective_sold_qty': int,  # 有效銷量
+    'source_type': str     # 轉出分類
+}]
+```
+
+**轉出分類類型：**
+- `ND轉出`：ND類型店鋪轉出
+- `RF過剩轉出`：RF類型過剩庫存轉出
+- `RF加強轉出`：RF類型加強轉出
+
+### **2. 接收候選識別 (identify_destinations)**
+
+**資料結構：**
+```python
+destinations = [{
+    'site': str,           # 店鋪編號
+    'om': str,             # OM編號
+    'rp_type': str,        # RP類型 (僅RF)
+    'needed_qty': int,     # 需要數量
+    'priority': int,       # 優先級
+    'current_stock': int,      # 當前庫存
+    'pending_received': int,   # 在途接收
+    'safety_stock': int,       # 安全庫存
+    'moq': int,            # MOQ
+    'effective_sold_qty': int,  # 有效銷量
+    'dest_type': str,      # 接收分類
+    'target_qty': int,     # 目標數量 (C模式)
+    'received_qty': int    # 累計接收數量
+}]
+```
+
+**接收分類類型：**
+- `緊急缺貨補貨`：零庫存但有銷售記錄
+- `潛在缺貨補貨`：庫存+在途 < 安全庫存，且為最高銷量店
+- `重點補0`：(僅C模式) 總庫存≤1的特殊接收
+
+### **3. 優先級匹配系統**
+
+**匹配優先級順序：**
+1. ND轉出 → 緊急缺貨補貨
+2. ND轉出 → 潛在缺貨補貨  
+3. RF過剩轉出 → 緊急缺貨補貨
+4. RF過剩轉出 → 潛在缺貨補貨
+5. RF加強轉出 → 緊急缺貨補貨
+6. RF加強轉出 → 潛在缺貨補貨
+7. C模式：RF轉出 → 重點補0
+
+### **4. 調貨建議輸出格式**
+
+**最終建議資料結構：**
+```python
+recommendation = {
+    'Article': str,                    # 12位商品編號
+    'Product Desc': str,               # 商品描述
+    'Transfer OM': str,                # 轉出OM
+    'Transfer Site': str,              # 轉出店鋪
+    'Transfer Qty': int,               # 轉出數量
+    'Original Stock': int,             # 原始庫存
+    'After Transfer Stock': int,       # 轉出後庫存
+    'Safety Stock': int,               # 安全庫存
+    'MOQ': int,                       # MOQ
+    'Source Type': str,                # 轉出分類
+    'Destination Type': str,           # 接收分類
+    'Cumulative Received Qty': int,    # 累計接收數量 (C模式)
+    'Target Qty': int,                 # 目標數量 (C模式)
+    'Notes': str                       # 詳細說明
+}
+```
+
+### **5. 統計分析資料**
+
+**系統統計結構：**
+```python
+statistics = {
+    'total_recommendations': int,      # 總建議數量
+    'total_transfer_qty': int,        # 總調貨件數
+    'unique_articles': int,           # 涉及產品數量
+    'unique_oms': int,               # 涉及OM數量
+    'article_stats': {},              # 按商品統計
+    'om_stats': {},                   # 按OM統計  
+    'source_type_stats': {},          # 轉出類型分析
+    'dest_type_stats': {}             # 接收類型分析
+}
+```
+
+### **6. 質量檢查機制**
+
+**檢查項目：**
+1. Article欄位完整性
+2. Transfer Qty正整數驗證
+3. 轉移數量不超過原始庫存
+4. 轉出與接收店鋪不重複
+5. Article格式驗證(12位)
+6. 同一SKU轉出店鋪不重複接收
+7. C模式累計接收數量不超標
+
+---
+
+## Excel輸出資料結構
+
+### **主要工作表：調貨建議**
+
+**欄位順序：**
+1. Article (15列寬)
+2. Product Desc (30列寬) 
+3. Transfer OM (15列寬)
+4. Transfer Site (15列寬)
+5. Receive OM (15列寬)
+6. Receive Site (15列寬)
+7. Transfer Qty (12列寬)
+8. Original Stock (15列寬)
+9. After Transfer Stock (18列寬)
+10. Safety Stock (12列寬)
+11. MOQ (8列寬)
+12. **Remark** (35列寬) - 轉出分類→接收分類映射
+13. Notes (60列寬) - 詳細分類信息
+
+### **次要工作表：統計摘要**
+
+包含KPI指標、按商品統計、按OM統計、轉出/接收類型分析等。
+
+---
+
+## 關鍵差異對比
+
+| 特性 | 模式A (保守轉貨) | 模式B (加強轉貨) | 模式C (重點補0) |
+|------|------------------|------------------|------------------|
+| 轉出比例上限 | 20% | 50% | 30% |
+| 轉出數量上限 | 無特別限制 | 無特別限制 | 最多3件 |
+| 安全庫存保護 | 嚴格保護 | 可下探 | 可下探 |
+| 轉出類型 | RF過剩轉出 | RF過剩+RF加強 | RF過剩+RF加強 |
+| 特殊功能 | 無 | 無 | 累計接收追蹤 |
+| 主要目標 | 平衡庫存 | 最大化調貨 | 重點補貨 |
+
+---
+
+## 應用場景建議
+
+- **模式A**：適合追求穩定運營，不願承擔庫存風險的情況
+- **模式B**：適合需要積極處理滯銷庫存，最大化調貨效率的情況  
+- **模式C**：適合針對性補充低庫存店鋪，確保最低服務水平的場景
+
+這是系統中三種調貨模式的完整邏輯資料結構和運作機制。每種模式都有其特定的應用場景和風險控制策略。
