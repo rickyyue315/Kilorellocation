@@ -52,7 +52,10 @@ class TransferLogic:
                     'priority': 1,
                     'original_stock': int(row['SaSa Net Stock']),
                     'effective_sold_qty': int(row['Effective Sold Qty']),
-                    'source_type': 'ND轉出'
+                    'source_type': 'ND轉出',
+                    # 添加銷售數據
+                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                    'mtd_sold_qty': int(row['MTD Sold Qty'])
                 })
 
         # 優先級2：RF類型轉出
@@ -165,7 +168,10 @@ class TransferLogic:
                     'priority': 2,
                     'original_stock': int(row['SaSa Net Stock']),
                     'effective_sold_qty': effective_sold,
-                    'source_type': source_type
+                    'source_type': source_type,
+                    # 添加銷售數據
+                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                    'mtd_sold_qty': int(row['MTD Sold Qty'])
                 })
 
         # 按優先級排序（ND優先，RF其次）
@@ -215,7 +221,10 @@ class TransferLogic:
                         'effective_sold_qty': row['Effective Sold Qty'],
                         'dest_type': '重點補0',
                         'target_qty': target_qty,  # 添加目標數量信息
-                        'received_qty': 0  # 初始化累計接收數量
+                        'received_qty': 0,  # 初始化累計接收數量
+                        # 添加銷售數據
+                        'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                        'mtd_sold_qty': int(row['MTD Sold Qty'])
                     })
                 continue
             
@@ -239,7 +248,10 @@ class TransferLogic:
                     'effective_sold_qty': row['Effective Sold Qty'],
                     'dest_type': '緊急缺貨補貨',
                     'target_qty': needed_qty,  # 添加目標數量信息
-                    'received_qty': 0  # 初始化累計接收數量
+                    'received_qty': 0,  # 初始化累計接收數量
+                    # 添加銷售數據
+                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                    'mtd_sold_qty': int(row['MTD Sold Qty'])
                 })
                 continue
             
@@ -262,7 +274,10 @@ class TransferLogic:
                     'effective_sold_qty': row['Effective Sold Qty'],
                     'dest_type': '潛在缺貨補貨',
                     'target_qty': row['Safety Stock'],  # 添加目標數量信息
-                    'received_qty': 0  # 初始化累計接收數量
+                    'received_qty': 0,  # 初始化累計接收數量
+                    # 添加銷售數據
+                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                    'mtd_sold_qty': int(row['MTD Sold Qty'])
                 })
         
         # 按優先級排序
@@ -436,7 +451,12 @@ class TransferLogic:
                     'Destination Priority': dest['priority'],
                     'Source Type': source['source_type'],
                     'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty)
+                    'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty),
+                    # 新增銷售數據欄位
+                    'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
+                    'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
+                    'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
+                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0)
                 }
                 
                 # 添加目標數量信息（如果有）

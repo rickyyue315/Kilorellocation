@@ -78,7 +78,12 @@ class ExcelGenerator:
                 'Safety Stock': rec['Safety Stock'],
                 'MOQ': rec['MOQ'],
                 'Remark': remark,
-                'Notes': rec.get('Notes', '')
+                'Notes': rec.get('Notes', ''),
+                # 新增銷售數據欄位
+                'Transfer Site Last Month Sold Qty': rec.get('Transfer Site Last Month Sold Qty', 0),
+                'Transfer Site MTD Sold Qty': rec.get('Transfer Site MTD Sold Qty', 0),
+                'Receive Site Last Month Sold Qty': rec.get('Receive Site Last Month Sold Qty', 0),
+                'Receive Site MTD Sold Qty': rec.get('Receive Site MTD Sold Qty', 0)
             })
         
         # 創建DataFrame
@@ -104,7 +109,11 @@ class ExcelGenerator:
         worksheet.set_column('J:J', 12)  # Safety Stock
         worksheet.set_column('K:K', 8)   # MOQ
         worksheet.set_column('L:L', 35)  # Remark - 簡潔的轉出→接收映射
-        worksheet.set_column('M:M', 60)  # Notes - 增加寬度以顯示詳細分類信息
+        worksheet.set_column('M:M', 25)  # Transfer Site Last Month Sold Qty
+        worksheet.set_column('N:N', 20)  # Transfer Site MTD Sold Qty
+        worksheet.set_column('O:O', 25)  # Receive Site Last Month Sold Qty
+        worksheet.set_column('P:P', 20)  # Receive Site MTD Sold Qty
+        worksheet.set_column('Q:Q', 60)  # Notes - 增加寬度以顯示詳細分類信息
         
         # 添加標題格式
         header_format = workbook.add_format({
@@ -138,14 +147,14 @@ class ExcelGenerator:
         # 應用數據格式
         for row_num in range(1, len(df) + 1):
             for col_num in range(len(df.columns)):
-                if col_num == 12:  # Notes欄位 (第M列，索引為12)
+                if col_num == 16:  # Notes欄位 (第Q列，索引為16)
                     # 設置Notes欄位自動換行和更適合的高度
                     worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], notes_format)
                 else:
                     worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], data_format)
                     
         # 設置Notes欄位自動換行
-        worksheet.set_column('M:M', 60)  # Notes欄位寬度
+        worksheet.set_column('Q:Q', 60)  # Notes欄位寬度
         worksheet.set_row(0, 40)  # 標題行高度
         for row_num in range(1, len(df) + 1):
             worksheet.set_row(row_num, 60)  # 數據行高度，特別是Notes欄位

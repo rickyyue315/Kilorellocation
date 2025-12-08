@@ -1,0 +1,25 @@
+================================================================================
+Real Data Sales Data Verification
+================================================================================
+
+Input data rows: 747
+Generated recommendations: 110
+Output file: 調貨建議_20251208.xlsx
+
+Sales data fields verification:
+  ✓ Transfer Site Last Month Sold Qty: Present
+  ✓ Transfer Site MTD Sold Qty: Present
+  ✓ Receive Site Last Month Sold Qty: Present
+  ✓ Receive Site MTD Sold Qty: Present
+
+Output Excel rows: 110
+
+Sample sales data from first recommendation:
+  Transfer Site Last Month Sold Qty: 4
+  Transfer Site MTD Sold Qty: 0
+  Receive Site Last Month Sold Qty: 8
+  Receive Site MTD Sold Qty: 0
+
+================================================================================
+RESULT: Real data verification PASSED
+================================================================================

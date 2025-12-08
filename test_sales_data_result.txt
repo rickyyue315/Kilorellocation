@@ -1,0 +1,52 @@
+================================================================================
+Sales Data Column Integration Test
+================================================================================
+
+Created 3 rows of test data
+Data preprocessing completed, 3 rows
+Generated 1 transfer recommendations
+
+Checking sales data fields in recommendations:
+
+Recommendation 1:
+  Transfer Site: SITE001
+  Receive Site: SITE002
+  Transfer Site Last Month Sold Qty: 25
+  Transfer Site MTD Sold Qty: 15
+  Receive Site Last Month Sold Qty: 30
+  Receive Site MTD Sold Qty: 20
+
+Excel file generated: 調貨建議_20251208.xlsx
+
+Columns in Excel file:
+  - Article
+  - Product Desc
+  - Transfer OM
+  - Transfer Site
+  - Receive OM
+  - Receive Site
+  - Transfer Qty
+  - Original Stock
+  - After Transfer Stock
+  - Safety Stock
+  - MOQ
+  - Remark
+  - Notes
+  - Transfer Site Last Month Sold Qty
+  - Transfer Site MTD Sold Qty
+  - Receive Site Last Month Sold Qty
+  - Receive Site MTD Sold Qty
+
+SUCCESS: All sales data fields have been correctly added
+
+Actual sales data content:
+
+Row 1:
+  Transfer Site Last Month Sold Qty: 25
+  Transfer Site MTD Sold Qty: 15
+  Receive Site Last Month Sold Qty: 30
+  Receive Site MTD Sold Qty: 20
+
+================================================================================
+RESULT: Sales data column test PASSED
+================================================================================
