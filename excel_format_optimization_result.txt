@@ -1,0 +1,70 @@
+================================================================================
+Excel Format Optimization Test
+================================================================================
+
+Generated Excel file: 調貨建議_20251208.xlsx
+Total recommendations: 110
+Excel rows: 110
+
+Column structure verification:
+  ✓ Column 1: Article
+  ✓ Column 2: Product Desc
+  ✓ Column 3: Transfer OM
+  ✓ Column 4: Transfer Site
+  ✓ Column 5: Receive OM
+  ✓ Column 6: Receive Site
+  ✓ Column 7: Transfer Qty
+  ✓ Column 8: Original Stock
+  ✓ Column 9: After Transfer Stock
+  ✓ Column 10: Safety Stock
+  ✓ Column 11: MOQ
+  ✓ Column 12: Remark
+  ✗ Column 13: Transfer Site Last Month Sold Qty - Missing or Wrong Position
+  ✗ Column 14: Transfer Site MTD Sold Qty - Missing or Wrong Position
+  ✗ Column 15: Receive Site Last Month Sold Qty - Missing or Wrong Position
+  ✗ Column 16: Receive Site MTD Sold Qty - Missing or Wrong Position
+  ✗ Column 17: Notes - Missing or Wrong Position
+
+Actual column count: 17
+Expected column count: 17
+
+Sales data fields verification:
+  ✓ Transfer Site Last Month Sold Qty: Present
+  ✓ Transfer Site MTD Sold Qty: Present
+  ✓ Receive Site Last Month Sold Qty: Present
+  ✓ Receive Site MTD Sold Qty: Present
+
+Sample data (first 3 rows):
+
+Row 1:
+  Article: 1053875
+  Transfer Site: HA15 → Receive Site: HB63
+  Transfer Qty: 2
+  Remark: RF過剩轉出 → 緊急缺貨補貨
+  Transfer Site Sales: Last Month=4, MTD=0
+  Receive Site Sales: Last Month=8, MTD=0
+
+Row 2:
+  Article: 1053875
+  Transfer Site: HC60 → Receive Site: HA37
+  Transfer Qty: 2
+  Remark: RF過剩轉出 → 緊急缺貨補貨
+  Transfer Site Sales: Last Month=3, MTD=1
+  Receive Site Sales: Last Month=4, MTD=0
+
+Row 3:
+  Article: 1100813
+  Transfer Site: HB25 → Receive Site: HC26
+  Transfer Qty: 2
+  Remark: RF過剩轉出 → 緊急缺貨補貨
+  Transfer Site Sales: Last Month=3, MTD=2
+  Receive Site Sales: Last Month=7, MTD=2
+
+================================================================================
+Format Optimization Features Applied:
+  ✓ Font: Arial (all cells)
+  ✓ Font Size: 10pt (data cells), 14pt (headers/KPIs)
+  ✓ Optimized Column Widths: Balanced for better readability
+  ✓ Consistent Formatting: Applied to both worksheets
+================================================================================
+RESULT: Excel format optimization FAILED

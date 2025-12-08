@@ -96,24 +96,24 @@ class ExcelGenerator:
         workbook = writer.book
         worksheet = writer.sheets['調貨建議 (Transfer Recommendations)']
         
-        # 設置列寬
-        worksheet.set_column('A:A', 15)  # Article
-        worksheet.set_column('B:B', 30)  # Product Desc
-        worksheet.set_column('C:C', 15)  # Transfer OM
-        worksheet.set_column('D:D', 15)  # Transfer Site
-        worksheet.set_column('E:E', 15)  # Receive OM
-        worksheet.set_column('F:F', 15)  # Receive Site
-        worksheet.set_column('G:G', 12)  # Transfer Qty
-        worksheet.set_column('H:H', 15)  # Original Stock
-        worksheet.set_column('I:I', 18)  # After Transfer Stock
-        worksheet.set_column('J:J', 12)  # Safety Stock
+        # 設置列寬（優化為適中寬度）
+        worksheet.set_column('A:A', 12)  # Article
+        worksheet.set_column('B:B', 25)  # Product Desc
+        worksheet.set_column('C:C', 12)  # Transfer OM
+        worksheet.set_column('D:D', 12)  # Transfer Site
+        worksheet.set_column('E:E', 12)  # Receive OM
+        worksheet.set_column('F:F', 12)  # Receive Site
+        worksheet.set_column('G:G', 10)  # Transfer Qty
+        worksheet.set_column('H:H', 12)  # Original Stock
+        worksheet.set_column('I:I', 15)  # After Transfer Stock
+        worksheet.set_column('J:J', 10)  # Safety Stock
         worksheet.set_column('K:K', 8)   # MOQ
-        worksheet.set_column('L:L', 35)  # Remark - 簡潔的轉出→接收映射
-        worksheet.set_column('M:M', 25)  # Transfer Site Last Month Sold Qty
-        worksheet.set_column('N:N', 20)  # Transfer Site MTD Sold Qty
-        worksheet.set_column('O:O', 25)  # Receive Site Last Month Sold Qty
-        worksheet.set_column('P:P', 20)  # Receive Site MTD Sold Qty
-        worksheet.set_column('Q:Q', 60)  # Notes - 增加寬度以顯示詳細分類信息
+        worksheet.set_column('L:L', 25)  # Remark - 簡潔的轉出→接收映射
+        worksheet.set_column('M:M', 18)  # Transfer Site Last Month Sold Qty
+        worksheet.set_column('N:N', 15)  # Transfer Site MTD Sold Qty
+        worksheet.set_column('O:O', 18)  # Receive Site Last Month Sold Qty
+        worksheet.set_column('P:P', 15)  # Receive Site MTD Sold Qty
+        worksheet.set_column('Q:Q', 40)  # Notes - 優化寬度
         
         # 添加標題格式
         header_format = workbook.add_format({
@@ -121,7 +121,9 @@ class ExcelGenerator:
             'text_wrap': True,
             'valign': 'top',
             'fg_color': '#D7E4BC',
-            'border': 1
+            'border': 1,
+            'font_name': 'Arial',
+            'font_size': 10
         })
         
         # 應用標題格式
@@ -132,7 +134,9 @@ class ExcelGenerator:
         data_format = workbook.add_format({
             'border': 1,
             'text_wrap': True,
-            'valign': 'top'
+            'valign': 'top',
+            'font_name': 'Arial',
+            'font_size': 10
         })
         
         # Notes欄位的特殊格式（換行和自動高度）
@@ -140,7 +144,8 @@ class ExcelGenerator:
             'border': 1,
             'text_wrap': True,
             'valign': 'top',
-            'font_size': 9,
+            'font_name': 'Arial',
+            'font_size': 10,
             'align': 'left'
         })
         
@@ -177,7 +182,8 @@ class ExcelGenerator:
             'bold': True,
             'font_size': 16,
             'align': 'center',
-            'valign': 'vcenter'
+            'valign': 'vcenter',
+            'font_name': 'Arial'
         })
         
         kpi_format = workbook.add_format({
@@ -187,7 +193,8 @@ class ExcelGenerator:
             'font_color': 'white',
             'align': 'center',
             'valign': 'vcenter',
-            'border': 1
+            'border': 1,
+            'font_name': 'Arial'
         })
         
         kpi_value_format = workbook.add_format({
@@ -196,17 +203,22 @@ class ExcelGenerator:
             'bg_color': '#D7E4BC',
             'align': 'center',
             'valign': 'vcenter',
-            'border': 1
+            'border': 1,
+            'font_name': 'Arial'
         })
         
         header_format = workbook.add_format({
             'bold': True,
             'bg_color': '#D7E4BC',
-            'border': 1
+            'border': 1,
+            'font_name': 'Arial',
+            'font_size': 10
         })
         
         data_format = workbook.add_format({
-            'border': 1
+            'border': 1,
+            'font_name': 'Arial',
+            'font_size': 10
         })
         
         # 標題
@@ -287,11 +299,11 @@ class ExcelGenerator:
             worksheet.write(f'B{row}', stats['count'], data_format)
             worksheet.write(f'C{row}', stats['qty'], data_format)
         
-        # 設置列寬
-        worksheet.set_column('A:A', 20)
-        worksheet.set_column('B:B', 15)
-        worksheet.set_column('C:C', 15)
-        worksheet.set_column('D:D', 15)
+        # 設置列寬（優化為適中寬度）
+        worksheet.set_column('A:A', 18)
+        worksheet.set_column('B:B', 12)
+        worksheet.set_column('C:C', 12)
+        worksheet.set_column('D:D', 12)
         
         # 設置行高
         worksheet.set_row(0, 25)  # 標題行
