@@ -456,7 +456,9 @@ class TransferLogic:
                     'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
                     'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
                     'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0)
+                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
+                    # 新增Receive Original Stock欄位
+                    'Receive Original Stock': dest.get('current_stock', 0)
                 }
                 
                 # 添加目標數量信息（如果有）
