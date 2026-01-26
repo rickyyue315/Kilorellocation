@@ -29,8 +29,8 @@ class ExcelGenerator:
         Returns:
             格式化的文件名
         """
-        current_date = datetime.now().strftime("%Y%m%d")
-        filename = f"調貨建議_{current_date}.xlsx"
+        current_datetime = datetime.now().strftime("%Y%m%d_%H:%M:%S")
+        filename = f"調貨建議_{current_datetime}.xlsx"
         self.output_filename = filename
         return filename
     
