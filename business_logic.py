@@ -329,32 +329,32 @@ class TransferLogic:
         # 按優先級順序進行匹配
         # 1. ND轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site)
+                               article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site, mode)
         
         # 2. ND轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 1, 2, transfer_sites, received_qty_by_site)
+                               article, om, product_desc, 1, 2, transfer_sites, received_qty_by_site, mode)
         
         # 3. RF過剩轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, 'RF過剩轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出')
         
         # 4. RF過剩轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, 'RF過剩轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出')
         
         # 5. RF加強轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, 'RF加強轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出')
         
         # 6. RF加強轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, 'RF加強轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF加強轉出')
         
         # 7. C模式特殊處理：RF轉出 -> 重點補0
         if mode == self.mode_c:
             self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                   article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, None, '重點補0')
+                                   article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, None, '重點補0')
         
         return recommendations
     
@@ -362,6 +362,7 @@ class TransferLogic:
                           recommendations: List[Dict], article: str, group_id: str, 
                           product_desc: str, source_priority: int, dest_priority: int,
                           transfer_sites: set, received_qty_by_site: Dict,
+                          mode: str,
                           source_type_filter: Optional[str] = None,
                           dest_type_filter: Optional[str] = None):
         """
@@ -435,32 +436,36 @@ class TransferLogic:
                     # A、B和D模式，使用原始邏輯
                     transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
                 
-                # D模式特殊處理：避免ND清貨轉出後剩餘1件
-                if source['source_type'] == 'ND清貨轉出':
-                    # 計算轉出後剩餘庫存
+                # --- 數量調整邏輯 (D模式放寬限制以避免1件餘貨) ---
+                
+                # 1. D模式特殊處理：避免ND轉出後剩餘1件 (涵蓋ND清貨轉出和一般ND轉出)
+                if mode == self.mode_d and source['rp_type'] == 'ND':
                     remaining_after_transfer = source['original_stock'] - transfer_qty
-                    
-                    # 如果轉出後會剩餘1件，則需要調整
                     if remaining_after_transfer == 1:
-                        # 嘗試多轉1件，使剩餘為0件
+                        # 嘗試多轉1件，使剩餘為0件 (放寬接收店鋪的 needed_qty 限制)
                         if source['transferable_qty'] >= transfer_qty + 1:
                             transfer_qty += 1
-                        # 如果無法多轉1件（可轉出數量已達上限），則少轉1件，使剩餘為2件
+                        # 如果無法多轉1件，則少轉1件，使剩餘為2件
                         elif transfer_qty > 1:
                             transfer_qty -= 1
-                        # 如果轉移數量只有1件且無法調整，則保持不變（這種情況下會剩餘1件，但已盡力避免）
                 
-                # 調貨數量優化：如果只有1件，嘗試調高到2件
+                # 2. 調貨數量優化：如果只有1件，嘗試調高到2件 (避免小額調撥)
                 if transfer_qty == 1 and source['transferable_qty'] >= 2:
-                    # 檢查是否不影響轉出店鋪安全庫存
-                    if source['source_type'] in ['ND轉出', 'RF加強轉出']:
-                        # ND類型轉出，不影響安全庫存
-                        transfer_qty = 2
-                    else:
-                        # RF過剩轉出類型，需要檢查安全庫存
-                        remaining_stock = source['original_stock'] - 2
-                        # 這裡簡化處理，實際應根據業務邏輯檢查
-                        transfer_qty = 2
+                    # 檢查是否為允許優化的類型
+                    if source['source_type'] in ['ND轉出', 'ND清貨轉出', 'RF加強轉出']:
+                        potential_qty = 2
+                        remaining_after_opt = source['original_stock'] - potential_qty
+                        
+                        # 在模式D下，ND店鋪要特別避免優化後留下1件餘貨
+                        if mode == self.mode_d and source['rp_type'] == 'ND' and remaining_after_opt == 1:
+                            if source['transferable_qty'] >= 3:
+                                transfer_qty = 3
+                            else:
+                                # 如果不能調到3，則保持1件 (避免1件餘貨優先於避免小額調撥)
+                                pass
+                        else:
+                            # 其他情況正常優化到2件
+                            transfer_qty = 2
                 
                 # 創建調貨建議
                 recommendation = {
@@ -479,7 +484,7 @@ class TransferLogic:
                     'Destination Priority': dest['priority'],
                     'Source Type': source['source_type'],
                     'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty),
+                    'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode),
                     # 新增銷售數據欄位
                     'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
                     'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
@@ -777,7 +782,7 @@ class TransferLogic:
             'source_type_stats': source_type_stats,
             'dest_type_stats': dest_type_stats
         }
-    def _create_recommendation_note(self, source: Dict, dest: Dict, current_received_qty: int, transfer_qty: int) -> str:
+    def _create_recommendation_note(self, source: Dict, dest: Dict, current_received_qty: int, transfer_qty: int, mode: str) -> str:
         """
         創建調貨建議的Notes欄位內容
         
@@ -786,6 +791,7 @@ class TransferLogic:
             dest: 接收店鋪信息
             current_received_qty: 當前累計接收數量
             transfer_qty: 本次轉移數量
+            mode: 轉貨模式
             
         Returns:
             詳細的Notes欄位內容
@@ -812,11 +818,11 @@ class TransferLogic:
         notes_parts.append(f"【接收優先級: {priority_desc}】")
         
         # 4. 庫存狀況分析
-        if source['source_type'] == 'ND轉出':
+        if source['source_type'] == 'ND轉出' and mode != self.mode_d:
             notes_parts.append("【轉出分析: ND類型店鋪，無庫存限制，可全數轉出】")
-        elif source['source_type'] == 'ND清貨轉出':
+        elif source['rp_type'] == 'ND' and mode == self.mode_d:
             remaining_after_transfer = source['original_stock'] - transfer_qty
-            notes_parts.append(f"【轉出分析: ND清貨轉出，無銷售記錄店鋪，轉出後剩餘庫存({remaining_after_transfer})件，已優化避免1件餘貨】")
+            notes_parts.append(f"【轉出分析: ND店鋪清貨(模式D)，轉出後剩餘庫存({remaining_after_transfer})件，已優化避免1件餘貨】")
         elif source['source_type'] == 'RF過剩轉出':
             remaining_after_transfer = source['original_stock'] - transfer_qty
             notes_parts.append(f"【轉出分析: RF過剩轉出，轉出後剩餘庫存({remaining_after_transfer})仍高於安全庫存({source.get('safety_stock', 'N/A')})】")

@@ -55,11 +55,11 @@ with st.sidebar:
     
     st.sidebar.header("操作指引")
     st.sidebar.markdown("""
-    1.  **上傳 Excel 文件**：點擊瀏覽文件或拖放文件到上傳區域。
-    2.  **選擇轉貨模式**：在側邊欄選擇轉貨模式（保守轉貨、加強轉貨或重點補0）。
-    3.  **啟動分析**：點擊「生成調貨建議」按鈕開始處理。
-    4.  **查看結果**：在主頁面查看KPI、建議和圖表。
-    5.  **下載報告**：點擊下載按鈕獲取 Excel 報告。
+    1. **上傳 Excel 文件**：點擊瀏覽文件或拖放文件到上傳區域。
+    2. **選擇轉貨模式**：在側邊欄選擇轉貨模式（保守轉貨、加強轉貨、重點補0或清貨轉貨）。
+    3. **啟動分析**：點擊「生成調貨建議」按鈕開始處理。
+    4. **查看結果**：在主頁面查看KPI、建議和圖表。
+    5. **下載報告**：點擊下載按鈕獲取 Excel 報告。
     """)
     
     # 模式選擇
@@ -92,7 +92,7 @@ with st.sidebar:
         """)
 
 # 3. 頁面頭部
-st.title("📦 庫存調貨建議系統 v1.9")
+st.title("📦 庫存調貨建議系統 v1.9.8")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -151,7 +151,7 @@ if uploaded_file is not None:
         # 4.3. 分析按鈕區塊
         st.header("2. 分析與建議")
         
-        st.info(f"當前選擇的模式為： **{transfer_mode}**")
+        st.info(f"當前選擇的模式為：**{transfer_mode}**")
         
         if st.button("🚀 生成調貨建議", type="primary"):
             progress_bar.progress(70, text="正在分析數據並生成建議...")
@@ -406,7 +406,7 @@ if uploaded_file is not None:
                         ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
                         ax.barh(y_pos - width*0.5, rf_enhanced_qtys, width, label='RF Enhanced Transfer Out', color='orange')
                     
-                    else:
+                    elif mode_name == "重點補0":
                         # C模式圖表
                         source_type_stats = statistics.get('source_type_stats', {})
                         nd_qtys = []
@@ -437,6 +437,38 @@ if uploaded_file is not None:
                         ax.barh(y_pos + width*1.5, nd_qtys, width, label='ND Transfer Out', color='skyblue')
                         ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
                         ax.barh(y_pos - width*0.5, rf_enhanced_qtys, width, label='RF Enhanced Transfer Out', color='orange')
+                    
+                    else:
+                        # D模式圖表
+                        source_type_stats = statistics.get('source_type_stats', {})
+                        nd_qtys = []
+                        rf_excess_qtys = []
+                        nd_clearance_qtys = []
+                        
+                        for om in om_names:
+                            # 計算每個OM的ND和RF轉出數量
+                            nd_qty = 0
+                            rf_excess_qty = 0
+                            nd_clearance_qty = 0
+                            
+                            for rec in recommendations:
+                                if rec['Transfer OM'] == om:
+                                    if rec.get('Source Type') == 'ND轉出':
+                                        nd_qty += rec['Transfer Qty']
+                                    elif rec.get('Source Type') == 'RF過剩轉出':
+                                        rf_excess_qty += rec['Transfer Qty']
+                                    elif rec.get('Source Type') == 'ND清貨轉出':
+                                        nd_clearance_qty += rec['Transfer Qty']
+                            
+                            nd_qtys.append(nd_qty)
+                            rf_excess_qtys.append(rf_excess_qty)
+                            nd_clearance_qtys.append(nd_clearance_qty)
+                        
+                        # 繪製六條形圖
+                        width = 0.12
+                        ax.barh(y_pos + width*1.5, nd_qtys, width, label='ND Transfer Out', color='skyblue')
+                        ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
+                        ax.barh(y_pos - width*0.5, nd_clearance_qtys, width, label='ND Clearance Transfer Out', color='red')
                     
                     # 計算接收類型數據
                     urgent_qtys = []

@@ -1,4 +1,4 @@
-## 三種調貨模式詳解
+## 四種調貨模式詳解
 
 ---
 
@@ -23,7 +23,7 @@ is_not_highest_sold = effective_sold < max_sold_qty
 
 ---
 
-### **模式A：保守轉貨 (Conservative Transfer)**
+## 模式A：保守轉貨 (Conservative Transfer)
 
 **核心特徵：**
 - 保守型調貨策略，嚴格保護安全庫存
@@ -36,6 +36,7 @@ is_not_highest_sold = effective_sold < max_sold_qty
 # 轉出限制：最多20%總庫存，至少2件
 base_transferable = total_available - safety_stock
 upper_limit = max(int(total_available * 0.2), 2)
+actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
 ```
 
 **轉出類型：** `RF過剩轉出`
@@ -43,7 +44,7 @@ upper_limit = max(int(total_available * 0.2), 2)
 
 ---
 
-### **模式B：加強轉貨 (Enhanced Transfer)**
+## 模式B：加強轉貨 (Enhanced Transfer)
 
 **核心特徵：**
 - 積極型調貨策略，允許下探安全庫存
@@ -52,10 +53,11 @@ upper_limit = max(int(total_available * 0.2), 2)
 
 **調貨邏輯：**
 ```python
-# 轉出條件：(庫存+在途) > Safety Stock  
+# 轉出條件：(庫存+在途) > Safety Stock
 # 轉出限制：最多50%總庫存，至少2件
 base_transferable = total_available - safety_stock
 upper_limit = max(int(total_available * 0.5), 2)
+actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
 ```
 
 **轉出類型：** `RF過剩轉出`、`RF加強轉出`
@@ -63,7 +65,7 @@ upper_limit = max(int(total_available * 0.5), 2)
 
 ---
 
-### **模式C：重點補0 (Priority Zero Stock Replenishment)**
+## 模式C：重點補0 (Priority Zero Stock Replenishment)
 
 **核心特徵：**
 - 針對性調貨策略，重點補充低庫存店鋪
@@ -72,7 +74,7 @@ upper_limit = max(int(total_available * 0.5), 2)
 
 **調貨邏輯：**
 ```python
-# 特殊條件：總可用庫存≤1的店鋪
+# 特殊條件：總可用庫存≤1
 if total_available <= 1:
     target_qty = max(int(safety_stock * 0.5), 3)
     needed_qty = target_qty - total_available
@@ -85,6 +87,119 @@ upper_limit = max(1, min(ratio_cap, abs_cap))
 
 **轉出類型：** `RF過剩轉出`、`RF加強轉出`
 **接收類型：** `重點補0`（獨有）、緊急缺貨補貨、潛在缺貨補貨
+
+---
+
+## 模式D：清貨轉貨 (Clearance Transfer) ⭐ 新增
+
+**核心特徵：**
+- 針對ND類型且無銷售記錄的店鋪進行清貨處理
+- **避免1件餘貨**的特殊功能
+- 確保轉出後不會留下1件尷尬的餘貨
+- 遵循A模式(保守轉貨)的接收規則
+
+**調貨邏輯：**
+
+### 1. 轉出規則
+
+#### 優先級1：ND類型清貨轉出
+- **條件1**：RP Type為"ND"
+- **條件2**：Last Month Sold Qty = 0
+- **條件3**：MTD Sold Qty = 0
+- **條件4**：SaSa Net Stock > 0（有庫存）
+- **可轉數量**：全部SaSa Net Stock
+- **轉出類型**：`ND清貨轉出`
+- **代碼位置**：`business_logic.py` 第 44-60 行
+
+```python
+# D模式特殊處理：檢查是否為清貨對象
+last_month_sold = int(row['Last Month Sold Qty'])
+mtd_sold = int(row['MTD Sold Qty'])
+
+if mode == self.mode_d and last_month_sold == 0 and mtd_sold == 0:
+    source_type = 'ND清貨轉出'
+else:
+    source_type = 'ND轉出'
+```
+
+#### 優先級2：RF類型轉出
+- **條件1**：RP Type為"RF"
+- **條件2**：(庫存+在途) > Safety Stock
+- **條件3**：該店鋪的有效銷量不是此Article+OM組合中的最高值
+- **條件4**：轉出後剩餘庫存不低於安全庫存
+- **轉出限制**：最多20%總庫存，至少2件
+- **轉出類型**：`RF過剩轉出`
+- **代碼位置**：`business_logic.py` 第 106-160 行
+
+### 2. 避免1件餘貨的特殊邏輯
+
+#### 匹配階段處理
+在 `_match_by_priority` 方法中，對於 `ND清貨轉出` 類型，添加以下特殊處理：
+
+```python
+# D模式特殊處理：避免1件餘貨
+if source['source_type'] == 'ND清貨轉出':
+    # 計算轉出後剩餘庫存
+    remaining_after_transfer = source['original_stock'] - transfer_qty
+    
+    # 如果轉出後會剩餘1件，則需要調整
+    if remaining_after_transfer == 1:
+        # 嘗試多轉1件，使剩餘為0件
+        if source['transferable_qty'] >= transfer_qty + 1:
+            transfer_qty += 1
+        # 若無法多轉1件（可轉出數量已達上限），則少轉1件，使剩餘為2件
+        elif transfer_qty > 1:
+            transfer_qty -= 1
+```
+
+**代碼位置**：`business_logic.py` 第 438-454 行
+
+### 3. 接收規則
+
+D模式遵循A模式(保守轉貨)的接收規則：
+
+#### 優先級1：緊急缺貨補貨
+- **條件1**：RP Type為"RF"
+- **條件2**：完全無庫存（SaSa Net Stock = 0）
+- **條件3**：曾有銷售記錄（Effective Sold Qty > 0）
+- **需求數量**：Safety Stock
+
+#### 優先級2：潛在缺貨補貨
+- **條件1**：RP Type為"RF"
+- **條件2**：庫存不足（SaSa Net Stock + Pending Received < Safety Stock）
+- **條件3**：該店鋪的有效銷量是此Article+OM組合中的最高值
+- **需求數量**：Safety Stock - (SaSa Net Stock + Pending Received)
+
+### 4. Notes 生成
+
+對於 `ND清貨轉出` 類型，Notes欄位會包含以下特殊說明：
+
+```python
+if source['source_type'] == 'ND清貨轉出':
+    remaining_after_transfer = source['original_stock'] - transfer_qty
+    notes_parts.append(f"【轉出分析: ND清貨轉出，無銷售記錄店鋪，轉出後剩餘庫存({remaining_after_transfer})件，已優化避免1件餘貨】")
+```
+
+**代碼位置**：`business_logic.py` 第 818-820 行
+
+### 5. 模式對比
+
+| 特性 | 模式 A (保守) | 模式 B (加強) | 模式 C (重點補0) | 模式 D (清貨) ⭐ |
+|------|----------------|----------------|---------------------|----------------|
+| 轉出比例上限 | 20% | 50% | 30% | 無特別限制 |
+| 轉出數量上限 | 無特別限制 | 無特別限制 | 最多3件 | 全部庫存 |
+| 安全庫存保護 | 嚴格保護 | 可下探 | 可下探 | 不適用 (ND) |
+| 轉出類型 | RF過剩轉出 | RF過剩+RF加強轉出 | RF過剩+RF加強轉出 | ND清貨轉出 ⭐ |
+| 特殊功能 | 無 | 無 | 累計接收追蹤 | **避免1件餘貨** ⭐ |
+| 主要目標 | 平衡庫存 | 最大化調貨 | 重點補貨 | **清貨處理** |
+| 應用場景 | 穩定運營 | 積極處理滯銷品 | 針對性補充低庫存 | **ND店鋪清貨** |
+
+### 6. 應用場景建議
+
+- **模式 A**：適合追求穩定運營，不願承擔庫存風險的情況
+- **模式 B**：適合需要積極處理滯銷庫存，最大化調貨效率的情況
+- **模式 C**：適合針對性補充低庫存店鋪，確保最低服務水平的場景
+- **模式 D**：適合ND店鋪需要清貨的情況，特別是無銷售記錄的店鋪，避免留下1件餘貨的尷尬情況
 
 ---
 
@@ -108,6 +223,7 @@ sources = [{
 
 **轉出分類類型：**
 - `ND轉出`：ND類型店鋪轉出
+- `ND清貨轉出`：ND類型店鋪清貨轉出（D模式專用）
 - `RF過剩轉出`：RF類型過剩庫存轉出
 - `RF加強轉出`：RF類型加強轉出
 
@@ -140,13 +256,15 @@ destinations = [{
 ### **3. 優先級匹配系統**
 
 **匹配優先級順序：**
-1. ND轉出 → 緊急缺貨補貨
-2. ND轉出 → 潛在缺貨補貨  
-3. RF過剩轉出 → 緊急缺貨補貨
-4. RF過剩轉出 → 潛在缺貨補貨
-5. RF加強轉出 → 緊急缺貨補貨
-6. RF加強轉出 → 潛在缺貨補貨
-7. C模式：RF轉出 → 重點補0
+1. ND轉出 → 緊急缺貨
+2. ND轉出 → 潛在缺貨
+3. ND清貨轉出 → 緊急缺貨（D模式）
+4. ND清貨轉出 → 潛在缺貨（D模式）
+5. RF過剩轉出 → 緊急缺貨
+6. RF過剩轉出 → 潛在缺貨
+7. RF加強轉出 → 緊急缺貨
+8. RF加強轉出 → 潛在缺貨
+9. C模式：RF轉出 → 重點補0
 
 ### **4. 調貨建議輸出格式**
 
@@ -162,11 +280,20 @@ recommendation = {
     'After Transfer Stock': int,       # 轉出後庫存
     'Safety Stock': int,               # 安全庫存
     'MOQ': int,                       # MOQ
+    'Source Priority': int,            # 轉出優先級
+    'Destination Priority': int,           # 接收優先級
     'Source Type': str,                # 轉出分類
     'Destination Type': str,           # 接收分類
-    'Cumulative Received Qty': int,    # 累計接收數量 (C模式)
+    'Notes': str,                       # 詳細說明
+    # 新增銷售數據欄位
+    'Transfer Site Last Month Sold Qty': int,  # 轉出店鋪上月銷量
+    'Transfer Site MTD Sold Qty': int,         # 轉出店鋪本月銷量
+    'Receive Site Last Month Sold Qty': int,  # 接收店鋪上月銷量
+    'Receive Site MTD Sold Qty': int,           # 接收店鋪本月銷量
+    'Receive Original Stock': int,          # 接收店鋪原始庫存
+    # 新增累計接收數量信息
     'Target Qty': int,                 # 目標數量 (C模式)
-    'Notes': str                       # 詳細說明
+    'Cumulative Received Qty': int,    # 累計接收數量
 }
 ```
 
@@ -190,11 +317,11 @@ statistics = {
 
 **檢查項目：**
 1. Article欄位完整性
-2. Transfer Qty正整數驗證
-3. 轉移數量不超過原始庫存
-4. 轉出與接收店鋪不重複
+2. Transfer Qty必須為正整數
+3. Transfer Qty不得超過轉出店鋪的原始SaSa Net Stock
+4. Transfer Site和Receive Site不能相同
 5. Article格式驗證(12位)
-6. 同一SKU轉出店鋪不重複接收
+6. 同一SKU的轉出店鋪不能同時作為接收店鋪
 7. **ND店鋪不能作為接收店鋪** (所有模式適用)
 8. C模式累計接收數量不超標
 
@@ -218,6 +345,13 @@ statistics = {
 11. MOQ (8列寬)
 12. **Remark** (35列寬) - 轉出分類→接收分類映射
 13. Notes (60列寬) - 詳細分類信息
+14. **Transfer Site Last Month Sold Qty** (18列寬) - 轉出店鋪上月銷量
+15. **Transfer Site MTD Sold Qty** (18列寬) - 轉出店鋪本月銷量
+16. **Receive Site Last Month Sold Qty** (18列寬) - 接收店鋪上月銷量
+17. **Receive Site MTD Sold Qty** (18列寬) - 接收店鋪本月銷量
+18. **Receive Original Stock** (18列寬) - 接收店鋪原始庫存
+19. **Target Qty** (12列寬) - 目標數量 (C模式)
+20. **Cumulative Received Qty** (18列寬) - 累計接收數量 (C模式)
 
 ### **次要工作表：統計摘要**
 
@@ -227,21 +361,22 @@ statistics = {
 
 ## 關鍵差異對比
 
-| 特性 | 模式A (保守轉貨) | 模式B (加強轉貨) | 模式C (重點補0) |
-|------|------------------|------------------|------------------|
-| 轉出比例上限 | 20% | 50% | 30% |
-| 轉出數量上限 | 無特別限制 | 無特別限制 | 最多3件 |
-| 安全庫存保護 | 嚴格保護 | 可下探 | 可下探 |
-| 轉出類型 | RF過剩轉出 | RF過剩+RF加強 | RF過剩+RF加強 |
-| 特殊功能 | 無 | 無 | 累計接收追蹤 |
-| 主要目標 | 平衡庫存 | 最大化調貨 | 重點補貨 |
+| 特性 | 模式 A (保守) | 模式 B (加強) | 模式 C (重點補0) | 模式 D (清貨) ⭐ |
+|------|----------------|----------------|---------------------|----------------|
+| 轉出比例上限 | 20% | 50% | 30% | 無特別限制 |
+| 轉出數量上限 | 無特別限制 | 無特別限制 | 最多3件 | 全部庫存 |
+| 安全庫存保護 | 嚴格保護 | 可下探 | 可下探 | 不適用 (ND) |
+| 轉出類型 | RF過剩轉出 | RF過剩+RF加強轉出 | RF過剩+RF加強轉出 | ND清貨轉出 ⭐ |
+| 特殊功能 | 無 | 無 | 累計接收追蹤 | **避免1件餘貨** ⭐ |
+| 主要目標 | 平衡庫存 | 最大化調貨 | 重點補貨 | **清貨處理** |
 
 ---
 
 ## 應用場景建議
 
-- **模式A**：適合追求穩定運營，不願承擔庫存風險的情況
-- **模式B**：適合需要積極處理滯銷庫存，最大化調貨效率的情況  
-- **模式C**：適合針對性補充低庫存店鋪，確保最低服務水平的場景
+- **模式 A**：適合追求穩定運營，不願承擔庫存風險的情況
+- **模式 B**：適合需要積極處理滯銷庫存，最大化調貨效率的情況
+- **模式 C**：適合針對性補充低庫存店鋪，確保最低服務水平的場景
+- **模式 D**：適合ND店鋪需要清貨的情況，特別是無銷售記錄的店鋪，避免留下1件餘貨的尷尬情況
 
-這是系統中三種調貨模式的完整邏輯資料結構和運作機制。每種模式都有其特定的應用場景和風險控制策略。
+這是系統中四種調貨模式的完整邏輯資料結構和運作機制。每種模式都有其特定的應用場景和風險控制策略。
