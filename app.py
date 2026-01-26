@@ -1,6 +1,6 @@
 """
-庫存調貨建議系統 v1.9 - Streamlit應用程序
-支持三模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)
+庫存調貨建議系統 v1.9.8 - Streamlit應用程序
+支持四模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)
 """
 
 import streamlit as st
@@ -30,7 +30,7 @@ plt.rcParams['axes.unicode_minus'] = False
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title="庫存調貨建議系統 v1.9",
+    page_title="庫存調貨建議系統 v1.9.8",
     page_icon="📦",
     layout="wide"
 )
@@ -39,15 +39,16 @@ st.set_page_config(
 with st.sidebar:
     st.header("系統資訊")
     st.info(""" 
-    **版本：v1.9** 
+    **版本：v1.9.8** 
     **開發者: Ricky** 
     
     **核心功能：**  
-    - ✅ 三模式系統
-    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/C模式(重點補0)
+    - ✅ 四模式系統
+    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/C模式(重點補0)/D模式(清貨轉貨)
     - ✅ ND/RF類型智慧識別
     - ✅ 優先順序調貨匹配
     - ✅ RF轉出限制控制
+    - ✅ D模式特殊功能：避免1件餘貨
     - ✅ 統計分析和圖表
     - ✅ Excel格式匯出
     """)
@@ -65,9 +66,9 @@ with st.sidebar:
     st.sidebar.header("模式選擇")
     transfer_mode = st.radio(
         "選擇轉貨模式",
-        ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0"],
+        ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0", "D: 清貨轉貨"],
         key='transfer_mode',
-        help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品，C模式重點補充庫存為0或1的店鋪。"
+        help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品，C模式重點補充庫存為0或1的店鋪，D模式針對ND店鋪無銷售記錄時的清貨處理。"
     )
     
     # 模式說明
@@ -77,14 +78,17 @@ with st.sidebar:
         - **A模式(保守轉貨)**：轉出後剩餘庫存不低於安全庫存，轉出類型為RF過剩轉出
         - **B模式(加強轉貨)**：轉出後剩餘庫存可能低於安全庫存，轉出類型為RF加強轉出
         - **C模式(重點補0)**：主要針對接收店鋪，當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
+        - **D模式(清貨轉貨)**：針對ND類型且無銷售記錄的店鋪進行清貨，避免1件餘貨
         
         **轉出類型判斷：**
         - 如果轉出店鋪轉出後, 剩餘庫存不會低過Safety stock, 轉出類型定位為RF過剩轉出
         - 如果轉出店鋪轉出後, 剩餘庫存會低過Safety stock, 轉出類型定位為RF加強轉出
+        - D模式特殊：ND店鋪無銷售記錄時，轉出類型為ND清貨轉出
         
         **接收條件：**
         - SaSa Net Stock + Pending Received < Safety Stock，便需要進行調撥接收
         - C模式特殊條件：當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
+        - D模式特殊規則：避免1件餘貨，確保轉出後剩餘庫存為0件或≥2件
         """)
 
 # 3. 頁面頭部
@@ -157,8 +161,10 @@ if uploaded_file is not None:
                     mode_name = "保守轉貨"
                 elif transfer_mode == "B: 加強轉貨":
                     mode_name = "加強轉貨"
-                else:
+                elif transfer_mode == "C: 重點補0":
                     mode_name = "重點補0"
+                else:
+                    mode_name = "清貨轉貨"
                 
                 # 創建業務邏輯對象
                 transfer_logic = TransferLogic()
@@ -513,6 +519,6 @@ if uploaded_file is not None:
 st.sidebar.markdown("---")
 st.sidebar.subheader("系統信息")
 st.sidebar.markdown(f"""
-版本: v1.9  
+版本: v1.9.8  
 更新時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """)
