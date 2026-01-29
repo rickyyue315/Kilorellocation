@@ -101,6 +101,26 @@ st.markdown("---")
 # 4. 主要區塊
 # 4.1. 資料上傳區塊
 st.header("1. 資料上傳")
+
+# 根據模式顯示所需欄位提示
+if transfer_mode in ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0", "D: 清貨轉貨"]:
+    st.info("""
+    ✅ **必需欄位（A-D 模式）：**
+    - 基本欄位：Article, Article Description, OM, RP Type, Site
+    - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
+    - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
+    """)
+else:  # E: 強制轉出
+    st.info("""
+    ✅ **必需欄位（E 模式）：**
+    - 基本欄位：Article, Article Description, OM, RP Type, Site, **ALL**（標記商品）
+    - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
+    - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
+    
+    ⚠️ **特殊要求：**
+    - **ALL 欄位**：請在要強制轉出的商品行填寫任意非空值（例如：*、Y、ALL 等），E 模式只會處理標記的商品
+    """)
+
 uploaded_file = st.file_uploader(
     "請上傳包含庫存和銷量數據的 Excel 文件",
     type=["xlsx", "xls"],
