@@ -1,0 +1,248 @@
+Total records: 1596
+Marked ALL records: 59
+
+=== Marked stores ===
+         Article RP Type  Total Stock  Store Count
+0   110737203011      RF            7            2
+1   110737203012      RF            4            1
+2   110737203013      RF           14            2
+3   110737203014      RF           20            2
+4   110737203015      RF            4            1
+5   110737303002      ND            1            1
+6   110737303004      ND            1            1
+7   110737303005      ND            3            2
+8   110737402002      ND           16            2
+9   110737402003      ND            9            2
+10  110737402004      ND           15            2
+11  110743302002      ND            8            1
+12  110743302003      ND            7            1
+13  110743302004      ND           21            2
+14  110743302005      ND            5            1
+15  110743402006      ND           11            2
+16  110743402007      ND           24            2
+17  110743402008      ND           20            2
+18  110743402009      ND            6            1
+19  110743502002      ND           11            2
+20  110743502003      ND            8            1
+21  110743602002      ND           23            2
+22  110743602003      ND           19            2
+23  110743602004      ND           11            1
+24  110744103005      RF           16            2
+25  110744103006      ND            2            1
+26  110744103006      RF           16            2
+27  110744103007      RF            8            2
+28  110744202002      ND           13            2
+29  110744202003      ND            6            2
+30  110744202004      ND           16            2
+31  110744202005      ND           16            2
+32  110744202006      ND           19            2
+33  110744302010      ND            7            2
+34  110744402002      ND            9            2
+
+=== Recommendations (112) ===
+=== Detailed Recommendations ===
+          Article Source Type Destination Type
+0    110737203011     E模式強制轉出            E模式接收
+1    110737203011     E模式強制轉出            E模式接收
+2    110737203012     E模式強制轉出            E模式接收
+3    110737203013     E模式強制轉出            E模式接收
+4    110737203013     E模式強制轉出            E模式接收
+5    110737203013     E模式強制轉出            E模式接收
+6    110737203014     E模式強制轉出            E模式接收
+7    110737203014     E模式強制轉出            E模式接收
+8    110737203014     E模式強制轉出            E模式接收
+9    110737203014     E模式強制轉出            E模式接收
+10   110737203015     E模式強制轉出            E模式接收
+11   110737303002     E模式強制轉出            E模式接收
+12   110737303004     E模式強制轉出            E模式接收
+13   110737303005     E模式強制轉出            E模式接收
+14   110737303005     E模式強制轉出            E模式接收
+15   110737402002     E模式強制轉出            E模式接收
+16   110737402002     E模式強制轉出            E模式接收
+17   110737402002     E模式強制轉出            E模式接收
+18   110737402002     E模式強制轉出            E模式接收
+19   110737402002     E模式強制轉出            E模式接收
+20   110737402003     E模式強制轉出            E模式接收
+21   110737402003     E模式強制轉出            E模式接收
+22   110737402003     E模式強制轉出            E模式接收
+23   110737402003     E模式強制轉出            E模式接收
+24   110737402004     E模式強制轉出            E模式接收
+25   110737402004     E模式強制轉出            E模式接收
+26   110737402004     E模式強制轉出            E模式接收
+27   110737402004     E模式強制轉出            E模式接收
+28   110743302002     E模式強制轉出            E模式接收
+29   110743302002     E模式強制轉出            E模式接收
+30   110743302003     E模式強制轉出            E模式接收
+31   110743302003     E模式強制轉出            E模式接收
+32   110743302004     E模式強制轉出            E模式接收
+33   110743302004     E模式強制轉出            E模式接收
+34   110743302004     E模式強制轉出            E模式接收
+35   110743302004     E模式強制轉出            E模式接收
+36   110743302004     E模式強制轉出            E模式接收
+37   110743302005     E模式強制轉出            E模式接收
+38   110743302005     E模式強制轉出            E模式接收
+39   110743402006     E模式強制轉出            E模式接收
+40   110743402006     E模式強制轉出            E模式接收
+41   110743402006     E模式強制轉出            E模式接收
+42   110743402007     E模式強制轉出            E模式接收
+43   110743402007     E模式強制轉出            E模式接收
+44   110743402007     E模式強制轉出            E模式接收
+45   110743402007     E模式強制轉出            E模式接收
+46   110743402007     E模式強制轉出            E模式接收
+47   110743402007     E模式強制轉出            E模式接收
+48   110743402008     E模式強制轉出            E模式接收
+49   110743402008     E模式強制轉出            E模式接收
+50   110743402008     E模式強制轉出            E模式接收
+51   110743402008     E模式強制轉出            E模式接收
+52   110743402009     E模式強制轉出            E模式接收
+53   110743402009     E模式強制轉出            E模式接收
+54   110743502002     E模式強制轉出            E模式接收
+55   110743502002     E模式強制轉出            E模式接收
+56   110743502002     E模式強制轉出            E模式接收
+57   110743502002     E模式強制轉出            E模式接收
+58   110743502003     E模式強制轉出            E模式接收
+59   110743502003     E模式強制轉出            E模式接收
+60   110743602002     E模式強制轉出            E模式接收
+61   110743602002     E模式強制轉出            E模式接收
+62   110743602002     E模式強制轉出            E模式接收
+63   110743602002     E模式強制轉出            E模式接收
+64   110743602002     E模式強制轉出            E模式接收
+65   110743602002     E模式強制轉出            E模式接收
+66   110743602003     E模式強制轉出            E模式接收
+67   110743602003     E模式強制轉出            E模式接收
+68   110743602003     E模式強制轉出            E模式接收
+69   110743602003     E模式強制轉出            E模式接收
+70   110743602003     E模式強制轉出            E模式接收
+71   110743602004     E模式強制轉出            E模式接收
+72   110743602004     E模式強制轉出            E模式接收
+73   110743602004     E模式強制轉出            E模式接收
+74   110744103005     E模式強制轉出            E模式接收
+75   110744103005     E模式強制轉出            E模式接收
+76   110744103005     E模式強制轉出            E模式接收
+77   110744103005     E模式強制轉出            E模式接收
+78   110744103006     E模式強制轉出            E模式接收
+79   110744103006     E模式強制轉出            E模式接收
+80   110744103006     E模式強制轉出            E模式接收
+81   110744103006     E模式強制轉出            E模式接收
+82   110744103006     E模式強制轉出            E模式接收
+83   110744103006     E模式強制轉出            E模式接收
+84   110744103006     E模式強制轉出            E模式接收
+85   110744103007     E模式強制轉出            E模式接收
+86   110744103007     E模式強制轉出            E模式接收
+87   110744202002     E模式強制轉出            E模式接收
+88   110744202002     E模式強制轉出            E模式接收
+89   110744202002     E模式強制轉出            E模式接收
+90   110744202002     E模式強制轉出            E模式接收
+91   110744202003     E模式強制轉出            E模式接收
+92   110744202003     E模式強制轉出            E模式接收
+93   110744202003     E模式強制轉出            E模式接收
+94   110744202004     E模式強制轉出            E模式接收
+95   110744202004     E模式強制轉出            E模式接收
+96   110744202004     E模式強制轉出            E模式接收
+97   110744202004     E模式強制轉出            E模式接收
+98   110744202005     E模式強制轉出            E模式接收
+99   110744202005     E模式強制轉出            E模式接收
+100  110744202005     E模式強制轉出            E模式接收
+101  110744202005     E模式強制轉出            E模式接收
+102  110744202005     E模式強制轉出            E模式接收
+103  110744202006     E模式強制轉出            E模式接收
+104  110744202006     E模式強制轉出            E模式接收
+105  110744202006     E模式強制轉出            E模式接收
+106  110744202006     E模式強制轉出            E模式接收
+107  110744202006     E模式強制轉出            E模式接收
+108  110744302010     E模式強制轉出            E模式接收
+109  110744302010     E模式強制轉出            E模式接收
+110  110744402002     E模式強制轉出            E模式接收
+111  110744402002     E模式強制轉出            E模式接收
+
+=== Analysis by Article ===
+
+--- Article: 110737203011 ---
+Marked stores: 2
+Total marked stock: 7
+  RF: 7 units
+
+RF stores (all): 82
+  HA02 (OM: Ivy): +6 units (current: 0, max: 6)
+  HA06 (OM: Ivy): +4 units (current: 2, max: 6)
+  HA15 (OM: Ivy): +6 units (current: 0, max: 6)
+  HA19 (OM: Violet): +6 units (current: 0, max: 6)
+  HA20 (OM: Queenie): +6 units (current: 0, max: 6)
+  HA21 (OM: Candy): +6 units (current: 0, max: 6)
+  HA30 (OM: Ivy): +6 units (current: 6, max: 12)
+  HA32 (OM: Queenie): +5 units (current: 1, max: 6)
+  HA33 (OM: Queenie): +6 units (current: 0, max: 6)
+  HA37 (OM: Queenie): +6 units (current: 0, max: 6)
+  HA39 (OM: Queenie): +6 units (current: 0, max: 6)
+  HA40 (OM: Candy): +10 units (current: 2, max: 12)
+  HA42 (OM: Queenie): +6 units (current: 0, max: 6)
+  HA43 (OM: Ivy): +4 units (current: 2, max: 6)
+  HA44 (OM: Queenie): +6 units (current: 0, max: 6)
+  HA45 (OM: Queenie): +5 units (current: 1, max: 6)
+  HB01 (OM: Ivy): +6 units (current: 0, max: 6)
+  HB10 (OM: Ivy): +12 units (current: 0, max: 12)
+  HB11 (OM: Hippo): +6 units (current: 0, max: 6)
+  HB12 (OM: Hippo): +3 units (current: 3, max: 6)
+  HB25 (OM: Candy): +6 units (current: 0, max: 6)
+  HB29 (OM: Ivy): +14 units (current: 2, max: 16)
+  HB30 (OM: Hippo): +1 units (current: 5, max: 6)
+  HB38 (OM: Candy): +5 units (current: 1, max: 6)
+  HB41 (OM: Hippo): +6 units (current: 0, max: 6)
+  HB49 (OM: Hippo): +6 units (current: 0, max: 6)
+  HB56 (OM: Eva): +6 units (current: 0, max: 6)
+  HB62 (OM: Violet): +6 units (current: 0, max: 6)
+  HB63 (OM: Ivy): +7 units (current: 5, max: 12)
+  HB66 (OM: Ivy): +3 units (current: 3, max: 6)
+  HB68 (OM: Ivy): +6 units (current: 0, max: 6)
+  HB69 (OM: Violet): +6 units (current: 0, max: 6)
+  HB72 (OM: Hippo): +6 units (current: 0, max: 6)
+  HB75 (OM: Ivy): +6 units (current: 0, max: 6)
+  HB77 (OM: Hippo): +6 units (current: 0, max: 6)
+  HB80 (OM: Eva): +6 units (current: 0, max: 6)
+  HB83 (OM: Ivy): +6 units (current: 0, max: 6)
+  HB91 (OM: Violet): +6 units (current: 0, max: 6)
+  HB93 (OM: Violet): +5 units (current: 1, max: 6)
+  HB94 (OM: Ivy): +6 units (current: 0, max: 6)
+  HB95 (OM: Violet): +6 units (current: 0, max: 6)
+  HB96 (OM: Hippo): +6 units (current: 0, max: 6)
+  HB97 (OM: Violet): +6 units (current: 0, max: 6)
+  HB98 (OM: Candy): +6 units (current: 0, max: 6)
+  HBA2 (OM: Hippo): +2 units (current: 4, max: 6)
+  HBA3 (OM: Hippo): +6 units (current: 0, max: 6)
+  HBA4 (OM: Candy): +10 units (current: 0, max: 10)
+  HC02 (OM: Eva): +6 units (current: 0, max: 6)
+  HC05 (OM: Candy): +6 units (current: 0, max: 6)
+  HC13 (OM: Queenie): +6 units (current: 0, max: 6)
+  HC15 (OM: Eva): +4 units (current: 2, max: 6)
+  HC19 (OM: Hippo): +6 units (current: 0, max: 6)
+  HC25 (OM: Candy): +4 units (current: 2, max: 6)
+  HC26 (OM: Candy): +6 units (current: 0, max: 6)
+  HC27 (OM: Queenie): +6 units (current: 0, max: 6)
+  HC31 (OM: Hippo): +6 units (current: 0, max: 6)
+  HC33 (OM: Queenie): +6 units (current: 0, max: 6)
+  HC42 (OM: Candy): +6 units (current: 0, max: 6)
+  HC44 (OM: Eva): +6 units (current: 0, max: 6)
+  HC45 (OM: Candy): +6 units (current: 0, max: 6)
+  HC49 (OM: Eva): +6 units (current: 0, max: 6)
+  HC51 (OM: Eva): +6 units (current: 0, max: 6)
+  HC55 (OM: Eva): +11 units (current: 1, max: 12)
+  HC60 (OM: Queenie): +6 units (current: 0, max: 6)
+  HC61 (OM: Eva): +4 units (current: 2, max: 6)
+  HC62 (OM: Eva): +6 units (current: 0, max: 6)
+  HC63 (OM: Candy): +5 units (current: 1, max: 6)
+  HC64 (OM: Eva): +3 units (current: 3, max: 6)
+  HC66 (OM: Queenie): +6 units (current: 0, max: 6)
+  HC67 (OM: Hippo): +4 units (current: 4, max: 8)
+  HC68 (OM: Candy): +6 units (current: 0, max: 6)
+  HC69 (OM: Eva): +6 units (current: 0, max: 6)
+  HD02 (OM: Windy): +6 units (current: 0, max: 6)
+  HD03 (OM: Windy): +4 units (current: 2, max: 6)
+  HD09 (OM: Windy): +3 units (current: 3, max: 6)
+  HD11 (OM: Windy): +5 units (current: 1, max: 6)
+  HD15 (OM: Windy): +6 units (current: 0, max: 6)
+  HD16 (OM: Windy): +3 units (current: 5, max: 8)
+  HD18 (OM: Windy): +16 units (current: 0, max: 16)
+  HD19 (OM: Windy): +5 units (current: 1, max: 6)
+
+Total receive capacity: 473
+Transfer demand: 7
