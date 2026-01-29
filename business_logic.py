@@ -789,8 +789,13 @@ class TransferLogic:
         if mode not in [self.mode_a, self.mode_b, self.mode_c, self.mode_d, self.mode_e]:
             raise ValueError(f"無效的轉貨模式: {mode}")
         
-        # 按Article和OM分組數據
-        grouped = df.groupby(['Article', 'OM'])
+        # 根據模式選擇分組方式
+        if mode == self.mode_e:
+            # E模式支持跨OM配對，因此僅按Article分組
+            grouped = df.groupby(['Article'])
+        else:
+            # 其他模式按Article和OM分組
+            grouped = df.groupby(['Article', 'OM'])
         
         all_recommendations = []
         
@@ -811,7 +816,12 @@ class TransferLogic:
             destinations = self.identify_destinations(group_df, mode)
             
             # 執行匹配
-            article, om = group_keys
+            if mode == self.mode_e:
+                article = group_keys[0] if isinstance(group_keys, (list, tuple)) else group_keys
+                om = "Multiple" # E模式下OM由source/dest決定
+            else:
+                article, om = group_keys
+            
             recommendations = self.match_transfers(article, om, sources, destinations, product_desc, mode)
             
             # 更新全局轉出店鋪集合
