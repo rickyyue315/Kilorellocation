@@ -43,12 +43,13 @@ with st.sidebar:
     **開發者: Ricky** 
     
     **核心功能：**  
-    - ✅ 四模式系統
-    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/C模式(重點補0)/D模式(清貨轉貨)
+    - ✅ 五模式系統
+    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/C模式(重點補0)/D模式(清貨轉貨)/E模式(強制轉出)
     - ✅ ND/RF類型智慧識別
     - ✅ 優先順序調貨匹配
     - ✅ RF轉出限制控制
     - ✅ D模式特殊功能：避免1件餘貨
+    - ✅ E模式特殊功能：標記商品強制轉出
     - ✅ 統計分析和圖表
     - ✅ Excel格式匯出
     """)
@@ -580,7 +581,15 @@ if uploaded_file is not None:
 # 系統信息
 st.sidebar.markdown("---")
 st.sidebar.subheader("系統信息")
-st.sidebar.markdown(f"""
-版本: v1.9.8  
+st.sideba9  
 更新時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+""")
+
+# 頁腳
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: #888; font-size: 12px; padding: 20px;">
+庫存調貨建議系統 Reallocation Calculator (2026) - For RP team (Build up by Ricky Yue)
+</div>
+""", unsafe_allow_html=True間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """)
