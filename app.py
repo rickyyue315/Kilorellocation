@@ -591,5 +591,4 @@ st.markdown("""
 <div style="text-align: center; color: #888; font-size: 12px; padding: 20px;">
 庫存調貨建議系統 Reallocation Calculator (2026) - For RP team (Build up by Ricky Yue)
 </div>
-""", unsafe_allow_html=True間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-""")
+""", unsafe_allow_html=True)
