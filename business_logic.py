@@ -490,6 +490,14 @@ class TransferLogic:
                 if dest.get('rp_type') == 'ND':
                     continue
                 
+                # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
+                source_site = source['site']
+                is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
+                if is_source_hd:
+                    dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
+                    if dest_site_upper.startswith(('HA', 'HB', 'HC')):
+                        continue  # 跳過不允許的目標
+                
                 # 執行轉移
                 transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
                 
@@ -701,6 +709,14 @@ class TransferLogic:
                     # 確保接收店舖不是ND類型
                     if dest.get('rp_type') == 'ND':
                         continue
+                    
+                    # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
+                    source_site = source['site']
+                    is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
+                    if is_source_hd:
+                        dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
+                        if dest_site_upper.startswith(('HA', 'HB', 'HC')):
+                            continue  # 跳過不允許的目標
                     
                     # 檢查累計接收數量，避免過量接收
                     receive_site_key = f"{dest['site']}_{article}"
