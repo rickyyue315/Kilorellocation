@@ -8,6 +8,7 @@ Excel輸出模組 v1.9.7
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import xlsxwriter
 from typing import Dict, List, Optional
 import logging
@@ -29,7 +30,7 @@ class ExcelGenerator:
         Returns:
             格式化的文件名
         """
-        current_datetime = datetime.now().strftime("%Y%m%d_%H:%M:%S")
+        current_datetime = datetime.now(ZoneInfo("Asia/Hong_Kong")).strftime("%Y%m%d_%H%M%S")
         filename = f"調貨建議_{current_datetime}.xlsx"
         self.output_filename = filename
         return filename
