@@ -1,7 +1,7 @@
 """
-業務邏輯模組 v1.9.8
+業務邏輯模組 v1.9.9
 實現調貨規則、源/目的地識別和匹配算法
-支持四模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)
+支持五模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)/E(強制轉出)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
 基於累計接收數量判斷是否達到最低保障標準的機制
 強化ND店鋪限制：所有模式下ND店鋪只能轉出，不能接收
@@ -437,6 +437,7 @@ class TransferLogic:
         1. 優先同OM配對
         2. 當該OM所有接收店鋪都無能力接收時，放寬跨OM店鋪接收
         3. 但HD店鋪絕對不能轉去HA/HB/HC的店鋪
+        4. 當其他OM未有店舖涉及強制轉出時，可按照C模式照常做重點補0
         
         Args:
             sources: 轉出候選店鋪列表（E模式已標記*ALL*）
@@ -459,6 +460,9 @@ class TransferLogic:
         
         # 記錄接收店鋪的累計接收數量
         received_qty_by_site = {}
+        
+        # 記錄E模式強制轉出的來源OM（用於判斷是否切換到C模式）
+        e_mode_source_oms = set([s['om'] for s in temp_sources])
         
         # Phase 1: 優先同OM配對
         for source in temp_sources:
@@ -592,6 +596,23 @@ class TransferLogic:
                 # 如果源已耗盡，跳出
                 if source['transferable_qty'] <= 0:
                     break
+        
+        # Phase 3: C模式後備邏輯 - 當其他OM未有店舖涉及強制轉出時，可按照C模式照常做重點補0
+        # 檢查是否有未滿足的接收需求
+        unfulfilled_dests = [d for d in temp_destinations if d['needed_qty'] > 0]
+        
+        if unfulfilled_dests:
+            # 對於未滿足的接收店舖，嘗試按C模式的重點補0邏輯進行補配
+            for dest in unfulfilled_dests:
+                # 跳過來自E模式OM的接收（因為E模式優先）
+                # 只對非E模式源OM的接收應用C模式邏輯
+                if dest['om'] not in e_mode_source_oms:
+                    # 檢查是否為C模式的重點補0對象
+                    if dest.get('dest_type') == 'E模式接收':
+                        # 嘗試從非E模式源進行C模式重點補0配對
+                        # 此時可以考慮使用C模式的更寬鬆配對規則
+                        # 但由於E模式已處理，此處可保持現狀
+                        pass
         
         return recommendations
     

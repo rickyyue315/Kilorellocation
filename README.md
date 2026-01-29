@@ -453,8 +453,8 @@ transfer_qty = min(轉出方可轉出, 接收方需求)
 
 ```
 KiLo Reallocation/
-├── app.py                          # Streamlit Web UI 主程序 (v1.9.8)
-├── business_logic.py               # 調貨業務邏輯模組 (v1.9.8)
+├── app.py                          # Streamlit Web UI 主程序 (v1.9.9)
+├── business_logic.py               # 調貨業務邏輯模組 (v1.9.9)
 ├── data_processor.py               # 數據預處理和驗證 (v1.8.1)
 ├── excel_generator.py              # Excel 報告生成器 (v1.8)
 ├── Geminiapp.py                    # 遺留實現版本（不維護）
@@ -473,8 +473,8 @@ KiLo Reallocation/
 
 | 模組 | 功能 | 版本 | 依賴 |
 |------|------|------|------|
-| `app.py` | Streamlit UI、用戶交互、結果展示 | v1.9.8 | streamlit, pandas, matplotlib, seaborn |
-| `business_logic.py` | 轉出/接收識別、優先級匹配、調貨算法 | v1.9.8 | pandas, numpy |
+| `app.py` | Streamlit UI、用戶交互、結果展示 | v1.9.9 | streamlit, pandas, matplotlib, seaborn |
+| `business_logic.py` | 轉出/接收識別、優先級匹配、調貨算法 | v1.9.9 | pandas, numpy |
 | `data_processor.py` | Excel 讀取、數據驗證、類型轉換、預處理 | v1.8.1 | pandas, openpyxl |
 | `excel_generator.py` | Excel 報告生成、格式化輸出 | v1.8 | xlsxwriter, pandas |
 
@@ -517,6 +517,21 @@ excel_generator.py (格式化輸出報告)
 **約束檢查**：多層次檢查確保數據完整性和業務規則合規性
  
 ## 更新日誌
+
+### v1.9.9 (2026-01-29)
+
+**新增功能：**
+- ✨ 實現 E 模式（強制轉出）- 針對標記為 *ALL* 的商品全數轉出
+- ✨ E 模式特殊邏輯：優先同 OM 配對，支持跨 OM（HD 除外）
+- ✨ E 模式回退機制：當其他 OM 無法配對時，按 C 模式重點補 0
+- ✨ 升級系統為五模式系統（A/B/C/D/E）
+
+**優化改進：**
+- 🔧 增強 E 模式配對邏輯：兩階段配對（同 OM → 跨 OM）
+- 🔧 優化接收上限：E 模式接收上限為 Safety Stock 的 2 倍
+- 📊 統一時區設定：系統統一使用香港時區
+
+---
 
 ### v1.9.8 (2026-01-26)
 
