@@ -25,7 +25,8 @@ class DataProcessor:
         
         self.optional_columns = [
             'Article Description',  # 商品描述
-            'Article Long Text (60 Chars)'  # 商品長描述
+            'Article Long Text (60 Chars)',  # 商品長描述
+            'ALL'  # E模式：強制轉出標記（不分大小寫）
         ]
         
         self.integer_columns = [
@@ -37,7 +38,7 @@ class DataProcessor:
     
     def read_excel_file(self, file_path: str) -> pd.DataFrame:
         """
-        讀取Excel文件，確保Article欄位為12位文本格式
+        讀取Excel文件，確保Article欄位為12位文本格式，並標記*ALL*欄位（不分大小寫）
         
         Args:
             file_path: Excel文件路徑
@@ -53,6 +54,20 @@ class DataProcessor:
             # 確保Article欄位為12位文本格式
             if 'Article' in df.columns:
                 df['Article'] = df['Article'].astype(str).str.zfill(12)
+            
+            # 處理*ALL*欄位：無論大小寫，都轉換為標準化的'ALL'欄位
+            all_column_names = [col for col in df.columns if col.upper() == 'ALL']
+            if all_column_names:
+                # 如果存在*ALL*欄位，將其標準化為'ALL'
+                for col in all_column_names:
+                    if col != 'ALL':
+                        df['ALL'] = df[col]
+                        df = df.drop(columns=[col])
+                logger.info("找到*ALL*欄位用於E模式")
+            else:
+                # 創建空的ALL欄位，用於後續邏輯判斷
+                df['ALL'] = ""
+                logger.info("未找到*ALL*欄位，自動創建空欄位")
             
             # 處理商品描述欄位
             if 'Article Description' not in df.columns and 'Article Long Text (60 Chars)' in df.columns:
