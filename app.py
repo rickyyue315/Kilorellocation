@@ -581,7 +581,8 @@ if uploaded_file is not None:
 # 系統信息
 st.sidebar.markdown("---")
 st.sidebar.subheader("系統信息")
-st.sideba9  
+st.sidebar.markdown(f"""
+版本: v1.9.9  
 更新時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """)
 
