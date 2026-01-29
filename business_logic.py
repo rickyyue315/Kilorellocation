@@ -459,7 +459,8 @@ class TransferLogic:
         temp_destinations = [d.copy() for d in destinations]
         
         # 記錄已經作為轉出店鋪的站點
-        transfer_sites = set()
+        # 關鍵：先將所有E模式source sites添加到transfer_sites，防止它們同時作為接收方
+        transfer_sites = set([s['site'] for s in temp_sources if s['transferable_qty'] > 0])
         
         # 記錄接收店鋪的累計接收數量
         received_qty_by_site = {}
@@ -471,8 +472,6 @@ class TransferLogic:
         for source in temp_sources:
             if source['transferable_qty'] <= 0:
                 continue
-            
-            transfer_sites.add(source['site'])
             
             # 找出同OM的接收店鋪
             same_om_dests = [d for d in temp_destinations 
@@ -527,16 +526,17 @@ class TransferLogic:
                 source['transferable_qty'] -= transfer_qty
                 dest['needed_qty'] -= transfer_qty
         
-        # Phase 2: 當同OM無法完全接收時，跨OM配對（但HD不能轉到HA/HB/HC）
+        # Phase 2: 當同OM無法完全接收時，跨OM配對（但HD店鋪不能轉去HA/HB/HC）
         for source in temp_sources:
             if source['transferable_qty'] <= 0:
                 continue
             
             # 找出可用的跨OM接收店鋪
             source_om = source['om']
+            source_site = source['site']
             
-            # 檢查轉出店鋪的OM是否為HD
-            is_source_hd = source_om.upper().startswith('HD') if isinstance(source_om, str) else False
+            # 檢查轉出店鋪的Site是否以HD開頭（限制規則）
+            is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
             
             for dest in temp_destinations:
                 if dest['needed_qty'] <= 0:
@@ -554,10 +554,10 @@ class TransferLogic:
                 if dest.get('rp_type') == 'ND':
                     continue
                 
-                # HD限制檢查：HD不能轉到HA/HB/HC
+                # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
                 if is_source_hd:
-                    dest_om_upper = dest['om'].upper() if isinstance(dest['om'], str) else ''
-                    if dest_om_upper.startswith(('HA', 'HB', 'HC')):
+                    dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
+                    if dest_site_upper.startswith(('HA', 'HB', 'HC')):
                         continue  # 跳過不允許的目標
                 
                 # 執行轉移
@@ -601,9 +601,17 @@ class TransferLogic:
                     break
         
         # Phase 3: C模式回退邏輯 - 當其他OM未有店舖涉及強制轉出時，可按照C模式照常做重點補0
-        # 檢查是否有未滿足的接收需求（來自非E模式OM的店舖）
+        
+        # 關鍵：收集所有非E模式OM的接收目標sites（無論其needed_qty當前狀態）
+        # 這些sites不應該再成為C模式的sources，因為它們已經被分配為接收方
+        non_e_mode_receiving_sites = set([d['site'] for d in temp_destinations 
+                                          if d['om'] not in e_mode_source_oms])
+        
+        # 篩選非E模式OM的未滿足接收需求
         unfulfilled_dests = [d for d in temp_destinations 
-                            if d['needed_qty'] > 0 and d['om'] not in e_mode_source_oms]
+                            if d['needed_qty'] > 0 
+                            and d['om'] not in e_mode_source_oms
+                            and d['site'] not in transfer_sites]
         
         if unfulfilled_dests:
             # 識別非E模式OM的RF過剩店舖，用於C模式轉出
@@ -616,6 +624,10 @@ class TransferLogic:
                 
                 # 跳過已經作為轉出店舖的（關鍵：避免轉出店舖同時接收）
                 if row['Site'] in transfer_sites:
+                    continue
+                
+                # 關鍵：不能同時作為接收目標的sites
+                if row['Site'] in non_e_mode_receiving_sites:
                     continue
                 
                 total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
@@ -946,6 +958,11 @@ class TransferLogic:
             
             # 識別接收候選店鋪
             destinations = self.identify_destinations(group_df, mode)
+            
+            # E模式特殊處理：從destinations中過濾掉同時作為轉出源的店鋪
+            if mode == self.mode_e:
+                source_sites = set([s['site'] for s in sources])
+                destinations = [d for d in destinations if d['site'] not in source_sites]
             
             # 執行匹配
             if mode == self.mode_e:
