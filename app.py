@@ -126,8 +126,13 @@ if uploaded_file is not None:
             os.unlink(tmp_file_path)
             st.stop()
         
-        df, processing_stats = processor.preprocess_data(tmp_file_path)
-        progress_bar.progress(60, text="數據預處理完成！")
+        try:
+            df, processing_stats = processor.preprocess_data(tmp_file_path)
+            progress_bar.progress(60, text="數據預處理完成！")
+        except ValueError as e:
+            st.error(f"❌ {str(e)}")
+            os.unlink(tmp_file_path)
+            st.stop()
         
         # 清理臨時文件
         os.unlink(tmp_file_path)

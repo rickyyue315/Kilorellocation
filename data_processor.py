@@ -81,7 +81,10 @@ class DataProcessor:
         """
         missing_columns = set(self.required_columns) - set(df.columns)
         if missing_columns:
-            logger.error(f"缺少必需欄位: {missing_columns}")
+            available_columns = ", ".join(sorted(df.columns))
+            missing_str = ", ".join(sorted(missing_columns))
+            error_msg = f"缺少必需欄位: {missing_str}\n現有欄位: {available_columns}"
+            logger.error(error_msg)
             return False
         
         logger.info("欄位驗證通過")
@@ -251,7 +254,14 @@ class DataProcessor:
         
         # 驗證欄位
         if not self.validate_columns(df):
-            raise ValueError("數據欄位驗證失敗")
+            missing_columns = set(self.required_columns) - set(df.columns)
+            available_columns = list(df.columns)
+            error_details = (
+                f"缺少必需欄位: {', '.join(sorted(missing_columns))}\n"
+                f"需要的欄位: {', '.join(sorted(self.required_columns))}\n"
+                f"現有欄位: {', '.join(sorted(available_columns))}"
+            )
+            raise ValueError(f"數據欄位驗證失敗\n{error_details}")
         
         # 記錄原始數據統計
         original_stats = {
