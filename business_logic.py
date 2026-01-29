@@ -386,7 +386,7 @@ class TransferLogic:
         
         # E模式特殊處理：優先級和OM匹配邏輯
         if mode == self.mode_e:
-            return self._match_transfers_e_mode(sources, destinations, article, om, product_desc)
+            return self._match_transfers_e_mode(sources, destinations, article, om, product_desc, group_df)
         
         # 複製源和目的地列表，避免修改原始數據
         temp_sources = [s.copy() for s in sources]
@@ -431,13 +431,15 @@ class TransferLogic:
         return recommendations
     
     def _match_transfers_e_mode(self, sources: List[Dict], destinations: List[Dict], 
-                               article: str, om: str, product_desc: str) -> List[Dict]:
+                               article: str, om: str, product_desc: str, 
+                               group_df: pd.DataFrame) -> List[Dict]:
         """
         E模式特殊匹配邏輯：
         1. 優先同OM配對
         2. 當該OM所有接收店鋪都無能力接收時，放寬跨OM店鋪接收
         3. 但HD店鋪絕對不能轉去HA/HB/HC的店鋪
         4. 當其他OM未有店舖涉及強制轉出時，可按照C模式照常做重點補0
+        5. 嚴格避免同一SKU的轉出店舖同時接收
         
         Args:
             sources: 轉出候選店鋪列表（E模式已標記*ALL*）
@@ -445,6 +447,7 @@ class TransferLogic:
             article: 商品編號
             om: OM編號
             product_desc: 商品描述
+            group_df: 該Article的完整數據DataFrame（用於Phase 3邏輯）
             
         Returns:
             匹配成功的調貨建議列表
@@ -597,22 +600,151 @@ class TransferLogic:
                 if source['transferable_qty'] <= 0:
                     break
         
-        # Phase 3: C模式後備邏輯 - 當其他OM未有店舖涉及強制轉出時，可按照C模式照常做重點補0
-        # 檢查是否有未滿足的接收需求
-        unfulfilled_dests = [d for d in temp_destinations if d['needed_qty'] > 0]
+        # Phase 3: C模式回退邏輯 - 當其他OM未有店舖涉及強制轉出時，可按照C模式照常做重點補0
+        # 檢查是否有未滿足的接收需求（來自非E模式OM的店舖）
+        unfulfilled_dests = [d for d in temp_destinations 
+                            if d['needed_qty'] > 0 and d['om'] not in e_mode_source_oms]
         
         if unfulfilled_dests:
-            # 對於未滿足的接收店舖，嘗試按C模式的重點補0邏輯進行補配
-            for dest in unfulfilled_dests:
-                # 跳過來自E模式OM的接收（因為E模式優先）
-                # 只對非E模式源OM的接收應用C模式邏輯
-                if dest['om'] not in e_mode_source_oms:
-                    # 檢查是否為C模式的重點補0對象
+            # 識別非E模式OM的RF過剩店舖，用於C模式轉出
+            c_mode_sources = []
+            
+            for _, row in group_df[(group_df['RP Type'] == 'RF')].iterrows():
+                # 跳過E模式OM的店舖
+                if row['OM'] in e_mode_source_oms:
+                    continue
+                
+                # 跳過已經作為轉出店舖的（關鍵：避免轉出店舖同時接收）
+                if row['Site'] in transfer_sites:
+                    continue
+                
+                total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+                safety_stock = int(row['Safety Stock'])
+                effective_sold = int(row['Effective Sold Qty'])
+                
+                # 找出該OM的最高銷量（保護最高動銷店）
+                om_rf_stores = group_df[(group_df['RP Type'] == 'RF') & (group_df['OM'] == row['OM'])]
+                max_sold_qty = om_rf_stores['Effective Sold Qty'].max() if not om_rf_stores.empty else 0
+                
+                # C模式條件：庫存高於安全庫存，且不是最高銷量店
+                is_stock_above_safety = total_available > safety_stock
+                is_not_highest_sold = effective_sold < max_sold_qty
+                
+                if is_stock_above_safety and is_not_highest_sold:
+                    base_transferable = total_available - safety_stock
+                    if base_transferable <= 0:
+                        continue
+                    
+                    # C模式上限：30% total_available，最多3件，至少1件
+                    ratio_cap = int(total_available * 0.3)
+                    abs_cap = 3
+                    capped_ratio = max(ratio_cap, 0)
+                    raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
+                    upper_limit = max(1, raw_upper)
+                    
+                    actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
+                    
+                    if actual_transferable > 0:
+                        remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+                        
+                        # 判斷類型
+                        if remaining_stock >= safety_stock:
+                            source_type = 'RF過剩轉出(C模式回退)'
+                        else:
+                            source_type = 'RF加強轉出(C模式回退)'
+                        
+                        c_mode_sources.append({
+                            'site': row['Site'],
+                            'om': row['OM'],
+                            'rp_type': row['RP Type'],
+                            'transferable_qty': actual_transferable,
+                            'priority': 2,
+                            'original_stock': int(row['SaSa Net Stock']),
+                            'effective_sold_qty': effective_sold,
+                            'source_type': source_type,
+                            'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                            'mtd_sold_qty': int(row['MTD Sold Qty'])
+                        })
+            
+            # 執行C模式匹配
+            for source in c_mode_sources:
+                if source['transferable_qty'] <= 0:
+                    continue
+                
+                # 標記為轉出店舖
+                transfer_sites.add(source['site'])
+                
+                for dest in unfulfilled_dests:
+                    if dest['needed_qty'] <= 0:
+                        continue
+                    
+                    # 避免同一店舖自我調貨
+                    if source['site'] == dest['site']:
+                        continue
+                    
+                    # 關鍵：嚴格避免轉出店舖同時作為接收店舖
+                    if dest['site'] in transfer_sites:
+                        continue
+                    
+                    # 確保接收店舖不是ND類型
+                    if dest.get('rp_type') == 'ND':
+                        continue
+                    
+                    # 檢查累計接收數量，避免過量接收
+                    receive_site_key = f"{dest['site']}_{article}"
+                    current_received = received_qty_by_site.get(receive_site_key, 0)
+                    
+                    # 對於E模式接收店舖，檢查是否已達到上限（2倍安全庫存）
                     if dest.get('dest_type') == 'E模式接收':
-                        # 嘗試從非E模式源進行C模式重點補0配對
-                        # 此時可以考慮使用C模式的更寬鬆配對規則
-                        # 但由於E模式已處理，此處可保持現狀
-                        pass
+                        max_receive = dest.get('max_receive_qty', dest.get('target_qty', float('inf')))
+                        if current_received >= max_receive:
+                            continue  # 已達上限，跳過
+                        # 計算剩餘可接收量
+                        remaining_capacity = max_receive - current_received
+                        transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_capacity)
+                    else:
+                        transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
+                    
+                    if transfer_qty <= 0:
+                        continue
+                    
+                    # 創建建議
+                    recommendation = {
+                        'Article': article,
+                        'Product Desc': product_desc,
+                        'Transfer OM': source['om'],
+                        'Transfer Site': source['site'],
+                        'Receive OM': dest['om'],
+                        'Receive Site': dest['site'],
+                        'Transfer Qty': transfer_qty,
+                        'Original Stock': source['original_stock'],
+                        'After Transfer Stock': source['original_stock'] - transfer_qty,
+                        'Safety Stock': 0,
+                        'MOQ': 0,
+                        'Source Priority': source['priority'],
+                        'Destination Priority': dest['priority'],
+                        'Source Type': source['source_type'],
+                        'Destination Type': dest['dest_type'],
+                        'Notes': f'E模式Phase3 - C模式回退（非E模式OM的重點補0）',
+                        'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
+                        'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
+                        'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
+                        'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
+                        'Receive Original Stock': dest.get('current_stock', 0)
+                    }
+                    
+                    if 'target_qty' in dest:
+                        recommendation['Target Qty'] = dest['target_qty']
+                    
+                    recommendations.append(recommendation)
+                    
+                    # 更新數量
+                    source['transferable_qty'] -= transfer_qty
+                    dest['needed_qty'] -= transfer_qty
+                    received_qty_by_site[receive_site_key] = current_received + transfer_qty
+                    
+                    if source['transferable_qty'] <= 0:
+                        break
         
         return recommendations
     
@@ -822,7 +954,11 @@ class TransferLogic:
             else:
                 article, om = group_keys
             
-            recommendations = self.match_transfers(article, om, sources, destinations, product_desc, mode)
+            # E模式需要傳入group_df以支持Phase 3邏輯
+            if mode == self.mode_e:
+                recommendations = self._match_transfers_e_mode(sources, destinations, article, om, product_desc, group_df)
+            else:
+                recommendations = self.match_transfers(article, om, sources, destinations, product_desc, mode)
             
             # 更新全局轉出店鋪集合
             for rec in recommendations:
