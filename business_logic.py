@@ -46,9 +46,17 @@ class TransferLogic:
 
         # F模式特殊處理：Target優先接收，轉出可全數釋放
         if mode == self.mode_f:
+            if 'Target' in group_df.columns:
+                target_series = pd.to_numeric(group_df['Target'], errors='coerce')
+            else:
+                target_series = pd.Series(np.nan, index=group_df.index)
+
             # ND類型：全數轉出
             nd_sources = group_df[group_df['RP Type'] == 'ND']
             for _, row in nd_sources.iterrows():
+                target_value = target_series.loc[row.name]
+                if pd.notna(target_value) and target_value > 0:
+                    continue
                 net_stock = int(row['SaSa Net Stock'])
                 if net_stock > 0:
                     sources.append({
@@ -69,6 +77,9 @@ class TransferLogic:
             max_sold_qty = rf_sources['Effective Sold Qty'].max() if not rf_sources.empty else 0
 
             for _, row in rf_sources.iterrows():
+                target_value = target_series.loc[row.name]
+                if pd.notna(target_value) and target_value > 0:
+                    continue
                 net_stock = int(row['SaSa Net Stock'])
                 effective_sold = int(row['Effective Sold Qty'])
 
