@@ -26,7 +26,8 @@ class DataProcessor:
         self.optional_columns = [
             'Article Description',  # 商品描述
             'Article Long Text (60 Chars)',  # 商品長描述
-            'ALL'  # E模式：強制轉出標記（不分大小寫）
+            'ALL',  # E模式：強制轉出標記（不分大小寫）
+            'Target'  # F模式：目標接收數量（不分大小寫）
         ]
         
         self.integer_columns = [
@@ -68,6 +69,18 @@ class DataProcessor:
                 # 創建空的ALL欄位，用於後續邏輯判斷
                 df['ALL'] = ""
                 logger.info("未找到*ALL*欄位，自動創建空欄位")
+
+            # 處理Target欄位：無論大小寫，都轉換為標準化的'Target'欄位
+            target_column_names = [col for col in df.columns if col.upper() == 'TARGET']
+            if target_column_names:
+                for col in target_column_names:
+                    if col != 'Target':
+                        df['Target'] = df[col]
+                        df = df.drop(columns=[col])
+                logger.info("找到Target欄位用於F模式")
+            else:
+                df['Target'] = ""
+                logger.info("未找到Target欄位，自動創建空欄位")
             
             # 處理商品描述欄位
             if 'Article Description' not in df.columns and 'Article Long Text (60 Chars)' in df.columns:

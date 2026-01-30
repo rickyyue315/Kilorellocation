@@ -1,6 +1,6 @@
 """
 庫存調貨建議系統 v1.9.9 - Streamlit應用程序
-支持四模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)
+支持六模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
 """
 
 import streamlit as st
@@ -43,13 +43,14 @@ with st.sidebar:
     **開發者: Ricky** 
     
     **核心功能：**  
-    - ✅ 五模式系統
-    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/C模式(重點補0)/D模式(清貨轉貨)/E模式(強制轉出)
+    - ✅ 六模式系統
+    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/C模式(重點補0)/D模式(清貨轉貨)/E模式(強制轉出)/F模式(目標優化)
     - ✅ ND/RF類型智慧識別
     - ✅ 優先順序調貨匹配
     - ✅ RF轉出限制控制
     - ✅ D模式特殊功能：避免1件餘貨
     - ✅ E模式特殊功能：標記商品強制轉出
+    - ✅ F模式特殊功能：Target目標接收優先
     - ✅ 統計分析和圖表
     - ✅ Excel格式匯出
     """)
@@ -67,9 +68,9 @@ with st.sidebar:
     st.sidebar.header("模式選擇")
     transfer_mode = st.radio(
         "選擇轉貨模式",
-        ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0", "D: 清貨轉貨", "E: 強制轉出"],
+        ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0", "D: 清貨轉貨", "E: 強制轉出", "F: 目標優化"],
         key='transfer_mode',
-        help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品，C模式重點補充庫存為0或1的店鋪，D模式針對ND店鋪無銷售記錄時的清貨處理，E模式強制轉出標記為*ALL*的商品。"
+        help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品，C模式重點補充庫存為0或1的店鋪，D模式針對ND店鋪無銷售記錄時的清貨處理，E模式強制轉出標記為*ALL*的商品，F模式使用Target數字優先滿足接收目標。"
     )
     
     # 模式說明
@@ -81,12 +82,14 @@ with st.sidebar:
         - **C模式(重點補0)**：主要針對接收店鋪，當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
         - **D模式(清貨轉貨)**：針對ND類型且無銷售記錄的店鋪進行清貨，避免1件餘貨
         - **E模式(強制轉出)**：針對標記為*ALL*的商品行，全數強制轉出。接收店鋪為RF，上限為Safety Stock的2倍。優先同OM配對，跨OM時HD不能轉到HA/HB/HC
+        - **F模式(目標優化)**：Target欄位填數字作為優先接收目標；其他店鋪按C模式補0需求計算；允許跨OM配對，HD不能轉到HA/HB/HC
         
         **轉出類型判斷：**
         - 如果轉出店鋪轉出後, 剩餘庫存不會低過Safety stock, 轉出類型定位為RF過剩轉出
         - 如果轉出店鋪轉出後, 剩餘庫存會低過Safety stock, 轉出類型定位為RF加強轉出
         - D模式特殊：ND店鋪無銷售記錄時，轉出類型為ND清貨轉出
         - E模式特殊：所有轉出為E模式強制轉出
+        - F模式特殊：Target數字優先接收
         
         **接收條件：**
         - SaSa Net Stock + Pending Received < Safety Stock，便需要進行調撥接收
@@ -111,7 +114,7 @@ if transfer_mode in ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0", "D: 
     - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
     - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
     """)
-else:  # E: 強制轉出
+elif transfer_mode == "E: 強制轉出":
     st.info("""
     ✅ **必需欄位（E 模式）：**
     - 基本欄位：Article, Article Description, OM, RP Type, Site, **ALL**（標記商品）
@@ -120,6 +123,16 @@ else:  # E: 強制轉出
     
     ⚠️ **特殊要求：**
     - **ALL 欄位**：請在要強制轉出的商品行填寫任意非空值（例如：*、Y、ALL 等），E 模式只會處理標記的商品
+    """)
+else:  # F: 目標優化
+    st.info("""
+    ✅ **必需欄位（F 模式）：**
+    - 基本欄位：Article, Article Description, OM, RP Type, Site, **Target**（目標接收數量）
+    - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
+    - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
+    
+    ⚠️ **特殊要求：**
+    - **Target 欄位**：填數字代表該店鋪的優先接收目標數量；未填Target的店鋪會按C模式補0需求計算
     """)
 
 uploaded_file = st.file_uploader(
@@ -194,8 +207,10 @@ if uploaded_file is not None:
                     mode_name = "重點補0"
                 elif transfer_mode == "D: 清貨轉貨":
                     mode_name = "清貨轉貨"
-                else:  # E: 強制轉出
+                elif transfer_mode == "E: 強制轉出":
                     mode_name = "強制轉出"
+                else:  # F: 目標優化
+                    mode_name = "目標優化"
                 
                 # 創建業務邏輯對象
                 transfer_logic = TransferLogic()
