@@ -10,6 +10,7 @@ import tempfile
 from datetime import datetime
 import logging
 from io import BytesIO
+import time
 
 # 導入自定義模組
 from data_processor import DataProcessor
