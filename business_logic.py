@@ -588,6 +588,11 @@ class TransferLogic:
         for priority_level in [1, 2]:
             priority_dests = [d for d in temp_destinations if d['priority'] == priority_level]
             
+            # 對priority=1（Target店鋪）：按needed_qty降序排序，優先滿足需求量大的
+            # 對priority=2（補0店鋪）：保持原順序
+            if priority_level == 1:
+                priority_dests.sort(key=lambda x: x['needed_qty'], reverse=True)
+            
             for dest in priority_dests:
                 if dest['needed_qty'] <= 0 or remaining_demand <= 0:
                     continue
@@ -601,6 +606,10 @@ class TransferLogic:
                     if dest['site'] in transfer_sites:
                         continue
                     if dest.get('rp_type') == 'ND':
+                        continue
+
+                    # priority=2（補0店鋪）：限制同OM配對
+                    if priority_level == 2 and source['om'] != dest['om']:
                         continue
 
                     # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
