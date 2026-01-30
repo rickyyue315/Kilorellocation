@@ -1,5 +1,5 @@
 """
-業務邏輯模組 v1.9.9
+業務邏輯模組 v2.1.1
 實現調貨規則、源/目的地識別和匹配算法
 支持六模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v1.9.7"""
+    """調貨業務邏輯類 v2.1.1"""
     
     def __init__(self):
         self.transfer_recommendations = []

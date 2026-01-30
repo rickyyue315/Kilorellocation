@@ -1,7 +1,7 @@
 """
-數據預處理模組 v1.9.1
+數據預處理模組 v2.1.1
 處理Excel文件讀取、數據清理和驗證
-支持雙模式系統：A(保守轉貨)/B(加強轉貨)
+支持六模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
 """
 
 import pandas as pd
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DataProcessor:
-    """數據預處理類 v1.9.1"""
+    """數據預處理類 v2.1.1"""
     
     def __init__(self):
         self.required_columns = [

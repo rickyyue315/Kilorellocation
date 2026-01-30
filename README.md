@@ -1,8 +1,8 @@
-# KiLo 庫存調貨建議系統 v1.9.9
+# KiLo 庫存調貨建議系統 v2.1.1
 
 ## 系統概述
 
-KiLo 庫存調貨建議系統 v1.9.9 是一個基於 Streamlit 的智能庫存調配管理系統。專為零售運營設計，根據庫存、銷量、安全庫存和 MOQ 等數據，自動生成跨店鋪商品調貨建議，優化庫存分布並滿足銷售需求。
+KiLo 庫存調貨建議系統 v2.1.1 是一個基於 Streamlit 的智能庫存調配管理系統。專為零售運營設計，根據庫存、銷量、安全庫存和 MOQ 等數據，自動生成跨店鋪商品調貨建議，優化庫存分布並滿足銷售需求。
 
 本系統採用**五模式設計**，靈活應對不同轉貨場景：
 - **A 模式(保守轉貨)**：優先保護安全庫存，20% 轉出上限
@@ -453,10 +453,10 @@ transfer_qty = min(轉出方可轉出, 接收方需求)
 
 ```
 KiLo Reallocation/
-├── app.py                          # Streamlit Web UI 主程序 (v1.9.9)
-├── business_logic.py               # 調貨業務邏輯模組 (v1.9.9)
-├── data_processor.py               # 數據預處理和驗證 (v1.8.1)
-├── excel_generator.py              # Excel 報告生成器 (v1.8)
+├── app.py                          # Streamlit Web UI 主程序 (v2.1.1)
+├── business_logic.py               # 調貨業務邏輯模組 (v2.1.1)
+├── data_processor.py               # 數據預處理和驗證 (v2.1.1)
+├── excel_generator.py              # Excel 報告生成器 (v2.1.1)
 ├── Geminiapp.py                    # 遺留實現版本（不維護）
 ├── install_dependencies.py         # 依賴安裝腳本
 ├── requirements.txt                # 依賴包清單
@@ -473,10 +473,10 @@ KiLo Reallocation/
 
 | 模組 | 功能 | 版本 | 依賴 |
 |------|------|------|------|
-| `app.py` | Streamlit UI、用戶交互、結果展示 | v1.9.9 | streamlit, pandas, matplotlib, seaborn |
-| `business_logic.py` | 轉出/接收識別、優先級匹配、調貨算法 | v1.9.9 | pandas, numpy |
-| `data_processor.py` | Excel 讀取、數據驗證、類型轉換、預處理 | v1.8.1 | pandas, openpyxl |
-| `excel_generator.py` | Excel 報告生成、格式化輸出 | v1.8 | xlsxwriter, pandas |
+| `app.py` | Streamlit UI、用戶交互、結果展示 | v2.1.1 | streamlit, pandas, matplotlib, seaborn |
+| `business_logic.py` | 轉出/接收識別、優先級匹配、調貨算法 | v2.1.1 | pandas, numpy |
+| `data_processor.py` | Excel 讀取、數據驗證、類型轉換、預處理 | v2.1.1 | pandas, openpyxl |
+| `excel_generator.py` | Excel 報告生成、格式化輸出 | v2.1.1 | xlsxwriter, pandas |
 
 ### 依賴包
 

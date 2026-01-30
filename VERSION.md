@@ -1,5 +1,59 @@
 # 版本更新記錄
 
+## v2.1.1 (2026-01-30)
+
+### 新增功能
+- **新增F模式：目標優化**
+  - 針對Target欄位填數字作為優先接收目標
+  - 其他店鋪按C模式補0需求計算
+  - 支持跨OM配對，HD不能轉到HA/HB/HC
+  - 更新系統為六模式系統：A/B/C/D/E/F
+
+### 業務邏輯更新
+- **F模式(目標優化)**：
+  - 轉出條件：
+    - ND類型：全數轉出
+    - RF類型：可忽視最小庫存要求，但保護最高銷量店鋪
+  - 轉出類型：F模式ND轉出 / F模式RF轉出
+  - 接收條件：
+    - Target數字：優先接收目標
+    - 未標Target的店鋪：按C模式重點補0
+  - 優先級邏輯：
+    - Target數字優先接收
+    - 其他店鋪按C模式補0需求計算
+  - HD限制：
+    - HD店鋪的轉出絕對不能到HA/HB/HC店鋪
+
+### 技術更新
+- 更新 `data_processor.py`：
+  - 在 optional_columns 中添加 'Target' 欄位
+  - 修改 `read_excel_file` 方法，能夠讀取並標準化 *Target* 欄位
+  - 自動創建空 Target 欄位（若上傳文件中不存在）
+  - 添加日誌記錄 *Target* 欄位的識別狀態
+
+- 更新 `business_logic.py`：
+  - 添加 `self.mode_f = "目標優化"`
+  - 修改 `identify_sources` 方法，添加F模式的轉出識別邏輯
+  - 修改 `identify_destinations` 方法，添加F模式的接收邏輯（Target優先+C模式補0）
+  - 修改 `match_transfers` 方法，增加F模式路由到專用匹配方法
+  - 新增 `_match_transfers_f_mode` 方法，實現F模式的Target優先和跨OM限制邏輯
+  - 更新 `generate_transfer_recommendations` 方法的模式驗證，支持F模式
+  - 更新所有相關方法的文檔字符串
+
+- 更新 `app.py`：
+  - 更新頁面標題為 "庫存調貨建議系統 v2.1.1"
+  - 更新模式選擇，添加 "F: 目標優化" 選項
+  - 更新模式說明，添加F模式的詳細說明
+  - 更新模式名稱轉換邏輯，支持F模式
+
+### 重要說明
+- *Target* 欄位識別不分大小寫，系統會自動標準化為 'Target'
+- F模式上傳的Excel文件需要包含 *Target*、Target 或其他大小寫組合的欄位
+- F模式下，Target數字優先接收，未標Target的店鋪會按C模式補0需求計算
+- HD和其他OM的限制規則遵循客戶的業務規則：HD不能轉到同一OM集群的其他OM
+
+---
+
 ## v1.9.9 (2026-01-29)
 
 ### 新增功能

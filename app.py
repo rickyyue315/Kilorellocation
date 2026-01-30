@@ -1,5 +1,5 @@
 """
-庫存調貨建議系統 v1.9.9 - Streamlit應用程序
+庫存調貨建議系統 v2.1.1 - Streamlit應用程序
 支持六模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
 """
 
@@ -30,7 +30,7 @@ plt.rcParams['axes.unicode_minus'] = False
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title="庫存調貨建議系統 v1.9.9",
+    page_title="庫存調貨建議系統 v2.1.1",
     page_icon="📦",
     layout="wide"
 )
@@ -39,7 +39,7 @@ st.set_page_config(
 with st.sidebar:
     st.header("系統資訊")
     st.info(""" 
-    **版本：v1.9.9** 
+    **版本：v2.1.1** 
     **開發者: Ricky** 
     
     **核心功能：**  
@@ -99,7 +99,7 @@ with st.sidebar:
         """)
 
 # 3. 頁面頭部
-st.title("📦 庫存調貨建議系統 v1.9.9")
+st.title("📦 庫存調貨建議系統 v2.1.1")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -597,7 +597,7 @@ if uploaded_file is not None:
 st.sidebar.markdown("---")
 st.sidebar.subheader("系統信息")
 st.sidebar.markdown(f"""
-版本: v1.9.9  
+版本: v2.1.1  
 更新時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """)
 
