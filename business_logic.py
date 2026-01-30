@@ -561,7 +561,7 @@ class TransferLogic:
                                article: str, product_desc: str) -> List[Dict]:
         """
         F模式特殊匹配邏輯：
-        1. Target數字優先接收
+        1. Target數字優先接收（priority=1先完全滿足）
         2. 允許跨OM配對
         3. HD店鋪不能轉到HA/HB/HC
         4. 嚴格避免同一SKU的轉出店鋪同時接收
@@ -572,6 +572,9 @@ class TransferLogic:
         temp_sources = [s.copy() for s in sources]
         temp_destinations = [d.copy() for d in destinations]
 
+        # 按priority排序destinations，確保Target店鋪（priority=1）優先
+        temp_destinations.sort(key=lambda x: x['priority'])
+
         # 先將所有source sites加入transfer_sites，避免同時接收
         transfer_sites = set([s['site'] for s in temp_sources if s['transferable_qty'] > 0])
 
@@ -581,75 +584,79 @@ class TransferLogic:
         total_needed = sum([int(d.get('needed_qty', 0)) for d in temp_destinations])
         remaining_demand = total_needed
 
-        for source in temp_sources:
-            if source['transferable_qty'] <= 0 or remaining_demand <= 0:
-                continue
-
-            for dest in temp_destinations:
-                if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0 or remaining_demand <= 0:
+        # 分階段匹配：先處理priority=1（Target店鋪），再處理priority=2（補0店鋪）
+        for priority_level in [1, 2]:
+            priority_dests = [d for d in temp_destinations if d['priority'] == priority_level]
+            
+            for dest in priority_dests:
+                if dest['needed_qty'] <= 0 or remaining_demand <= 0:
                     continue
-
-                if source['site'] == dest['site']:
-                    continue
-                if dest['site'] in transfer_sites:
-                    continue
-                if dest.get('rp_type') == 'ND':
-                    continue
-
-                # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                source_site = source['site']
-                is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
-                if is_source_hd:
-                    dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
-                    if dest_site_upper.startswith(('HA', 'HB', 'HC')):
+                
+                for source in temp_sources:
+                    if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0 or remaining_demand <= 0:
                         continue
 
-                transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_demand)
-                if transfer_qty <= 0:
-                    continue
+                    if source['site'] == dest['site']:
+                        continue
+                    if dest['site'] in transfer_sites:
+                        continue
+                    if dest.get('rp_type') == 'ND':
+                        continue
 
-                receive_site_key = f"{dest['site']}_{article}"
-                current_received_qty = received_qty_by_site.get(receive_site_key, 0)
+                    # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
+                    source_site = source['site']
+                    is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
+                    if is_source_hd:
+                        dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
+                        if dest_site_upper.startswith(('HA', 'HB', 'HC')):
+                            continue
 
-                recommendation = {
-                    'Article': article,
-                    'Product Desc': product_desc,
-                    'Transfer OM': source['om'],
-                    'Transfer Site': source['site'],
-                    'Receive OM': dest['om'],
-                    'Receive Site': dest['site'],
-                    'Transfer Qty': transfer_qty,
-                    'Original Stock': source['original_stock'],
-                    'After Transfer Stock': source['original_stock'] - transfer_qty,
-                    'Safety Stock': 0,
-                    'MOQ': 0,
-                    'Source Priority': source['priority'],
-                    'Destination Priority': dest['priority'],
-                    'Source Type': source['source_type'],
-                    'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, self.mode_f),
-                    'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                    'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                    'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
-                    'Receive Original Stock': dest.get('current_stock', 0)
-                }
+                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_demand)
+                    if transfer_qty <= 0:
+                        continue
 
-                if 'target_qty' in dest:
-                    recommendation['Target Qty'] = dest['target_qty']
+                    receive_site_key = f"{dest['site']}_{article}"
+                    current_received_qty = received_qty_by_site.get(receive_site_key, 0)
 
-                recommendation['Cumulative Received Qty'] = current_received_qty + transfer_qty
+                    recommendation = {
+                        'Article': article,
+                        'Product Desc': product_desc,
+                        'Transfer OM': source['om'],
+                        'Transfer Site': source['site'],
+                        'Receive OM': dest['om'],
+                        'Receive Site': dest['site'],
+                        'Transfer Qty': transfer_qty,
+                        'Original Stock': source['original_stock'],
+                        'After Transfer Stock': source['original_stock'] - transfer_qty,
+                        'Safety Stock': 0,
+                        'MOQ': 0,
+                        'Source Priority': source['priority'],
+                        'Destination Priority': dest['priority'],
+                        'Source Type': source['source_type'],
+                        'Destination Type': dest['dest_type'],
+                        'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, self.mode_f),
+                        'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
+                        'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
+                        'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
+                        'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
+                        'Receive Original Stock': dest.get('current_stock', 0)
+                    }
 
-                recommendations.append(recommendation)
+                    if 'target_qty' in dest:
+                        recommendation['Target Qty'] = dest['target_qty']
 
-                received_qty_by_site[receive_site_key] = current_received_qty + transfer_qty
+                    recommendation['Cumulative Received Qty'] = current_received_qty + transfer_qty
 
-                source['transferable_qty'] -= transfer_qty
-                dest['needed_qty'] -= transfer_qty
-                remaining_demand -= transfer_qty
+                    recommendations.append(recommendation)
 
-                if dest.get('target_qty') is not None and received_qty_by_site[receive_site_key] >= dest['target_qty']:
-                    dest['needed_qty'] = 0
+                    received_qty_by_site[receive_site_key] = current_received_qty + transfer_qty
+
+                    source['transferable_qty'] -= transfer_qty
+                    dest['needed_qty'] -= transfer_qty
+                    remaining_demand -= transfer_qty
+
+                    if dest.get('target_qty') is not None and received_qty_by_site[receive_site_key] >= dest['target_qty']:
+                        dest['needed_qty'] = 0
 
         return recommendations
     
