@@ -5,14 +5,10 @@
 
 import streamlit as st
 import pandas as pd
-import numpy as np
 import os
 import tempfile
 from datetime import datetime
 import logging
-import matplotlib.pyplot as plt
-import seaborn as sns
-import time
 from io import BytesIO
 
 # 導入自定義模組
@@ -23,10 +19,6 @@ from excel_generator import ExcelGenerator
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# 設置matplotlib中文字體
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False
 
 # 1. 頁面配置
 st.set_page_config(
@@ -378,189 +370,6 @@ if uploaded_file is not None:
                         st.dataframe(dest_df)
                 
                 st.markdown("---")
-                
-                # 顯示統計圖表
-                st.subheader("OM Transfer vs Receive Analysis Chart")
-                
-                # 創建OM Transfer vs Receive Analysis圖表
-                fig, ax = plt.subplots(figsize=(12, 8))
-                
-                # 準備圖表數據
-                om_stats = statistics.get('om_stats', {})
-                if om_stats:
-                    om_names = list(om_stats.keys())
-                    transfer_qtys = [stats['total_qty'] for stats in om_stats.values()]
-                    
-                    # 創建橫條圖
-                    y_pos = np.arange(len(om_names))
-                    
-                    if mode_name == "保守轉貨":
-                        # A模式圖表
-                        source_type_stats = statistics.get('source_type_stats', {})
-                        nd_qtys = []
-                        rf_excess_qtys = []
-                        
-                        for om in om_names:
-                            # 計算每個OM的ND和RF轉出數量
-                            nd_qty = 0
-                            rf_excess_qty = 0
-                            
-                            for rec in recommendations:
-                                if rec['Transfer OM'] == om:
-                                    if rec.get('Source Type') == 'ND轉出':
-                                        nd_qty += rec['Transfer Qty']
-                                    elif rec.get('Source Type') == 'RF過剩轉出':
-                                        rf_excess_qty += rec['Transfer Qty']
-                            
-                            nd_qtys.append(nd_qty)
-                            rf_excess_qtys.append(rf_excess_qty)
-                        
-                        # 繪製四條形圖
-                        width = 0.2
-                        ax.barh(y_pos + width*1.5, nd_qtys, width, label='ND Transfer Out', color='skyblue')
-                        ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
-                        
-                    elif mode_name == "加強轉貨":
-                        # B模式圖表
-                        source_type_stats = statistics.get('source_type_stats', {})
-                        nd_qtys = []
-                        rf_excess_qtys = []
-                        rf_enhanced_qtys = []
-                        
-                        for om in om_names:
-                            # 計算每個OM的ND和RF轉出數量
-                            nd_qty = 0
-                            rf_excess_qty = 0
-                            rf_enhanced_qty = 0
-                            
-                            for rec in recommendations:
-                                if rec['Transfer OM'] == om:
-                                    if rec.get('Source Type') == 'ND轉出':
-                                        nd_qty += rec['Transfer Qty']
-                                    elif rec.get('Source Type') == 'RF過剩轉出':
-                                        rf_excess_qty += rec['Transfer Qty']
-                                    elif rec.get('Source Type') == 'RF加強轉出':
-                                        rf_enhanced_qty += rec['Transfer Qty']
-                            
-                            nd_qtys.append(nd_qty)
-                            rf_excess_qtys.append(rf_excess_qty)
-                            rf_enhanced_qtys.append(rf_enhanced_qty)
-                        
-                        # 繪製五條形圖
-                        width = 0.15
-                        ax.barh(y_pos + width*1.5, nd_qtys, width, label='ND Transfer Out', color='skyblue')
-                        ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
-                        ax.barh(y_pos - width*0.5, rf_enhanced_qtys, width, label='RF Enhanced Transfer Out', color='orange')
-                    
-                    elif mode_name == "重點補0":
-                        # C模式圖表
-                        source_type_stats = statistics.get('source_type_stats', {})
-                        nd_qtys = []
-                        rf_excess_qtys = []
-                        rf_enhanced_qtys = []
-                        
-                        for om in om_names:
-                            # 計算每個OM的ND和RF轉出數量
-                            nd_qty = 0
-                            rf_excess_qty = 0
-                            rf_enhanced_qty = 0
-                            
-                            for rec in recommendations:
-                                if rec['Transfer OM'] == om:
-                                    if rec.get('Source Type') == 'ND轉出':
-                                        nd_qty += rec['Transfer Qty']
-                                    elif rec.get('Source Type') == 'RF過剩轉出':
-                                        rf_excess_qty += rec['Transfer Qty']
-                                    elif rec.get('Source Type') == 'RF加強轉出':
-                                        rf_enhanced_qty += rec['Transfer Qty']
-                            
-                            nd_qtys.append(nd_qty)
-                            rf_excess_qtys.append(rf_excess_qty)
-                            rf_enhanced_qtys.append(rf_enhanced_qty)
-                        
-                        # 繪製五條形圖
-                        width = 0.15
-                        ax.barh(y_pos + width*1.5, nd_qtys, width, label='ND Transfer Out', color='skyblue')
-                        ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
-                        ax.barh(y_pos - width*0.5, rf_enhanced_qtys, width, label='RF Enhanced Transfer Out', color='orange')
-                    
-                    else:
-                        # D模式圖表
-                        source_type_stats = statistics.get('source_type_stats', {})
-                        nd_qtys = []
-                        rf_excess_qtys = []
-                        nd_clearance_qtys = []
-                        
-                        for om in om_names:
-                            # 計算每個OM的ND和RF轉出數量
-                            nd_qty = 0
-                            rf_excess_qty = 0
-                            nd_clearance_qty = 0
-                            
-                            for rec in recommendations:
-                                if rec['Transfer OM'] == om:
-                                    if rec.get('Source Type') == 'ND轉出':
-                                        nd_qty += rec['Transfer Qty']
-                                    elif rec.get('Source Type') == 'RF過剩轉出':
-                                        rf_excess_qty += rec['Transfer Qty']
-                                    elif rec.get('Source Type') == 'ND清貨轉出':
-                                        nd_clearance_qty += rec['Transfer Qty']
-                            
-                            nd_qtys.append(nd_qty)
-                            rf_excess_qtys.append(rf_excess_qty)
-                            nd_clearance_qtys.append(nd_clearance_qty)
-                        
-                        # 繪製六條形圖
-                        width = 0.12
-                        ax.barh(y_pos + width*1.5, nd_qtys, width, label='ND Transfer Out', color='skyblue')
-                        ax.barh(y_pos + width*0.5, rf_excess_qtys, width, label='RF Excess Transfer Out', color='lightgreen')
-                        ax.barh(y_pos - width*0.5, nd_clearance_qtys, width, label='ND Clearance Transfer Out', color='red')
-                    
-                    # 計算接收類型數據
-                    urgent_qtys = []
-                    potential_qtys = []
-                    zero_stock_qtys = []
-                    
-                    for om in om_names:
-                        # 計算每個OM的緊急、潛在缺貨和重點補0接收數量
-                        urgent_qty = 0
-                        potential_qty = 0
-                        zero_stock_qty = 0
-                        
-                        for rec in recommendations:
-                            if rec['Receive OM'] == om:
-                                if rec.get('Destination Type') == '緊急缺貨補貨':
-                                    urgent_qty += rec['Transfer Qty']
-                                elif rec.get('Destination Type') == '潛在缺貨補貨':
-                                    potential_qty += rec['Transfer Qty']
-                                elif rec.get('Destination Type') == '重點補0':
-                                    zero_stock_qty += rec['Transfer Qty']
-                        
-                        urgent_qtys.append(urgent_qty)
-                        potential_qtys.append(potential_qty)
-                        zero_stock_qtys.append(zero_stock_qty)
-                    
-                    # 繪製接收類型
-                    width = 0.2 if mode_name == "保守轉貨" else 0.15
-                    ax.barh(y_pos - width*1.5, urgent_qtys, width, label='Urgent Shortage Receive', color='salmon')
-                    ax.barh(y_pos - width*2.5, potential_qtys, width, label='Potential Shortage Receive', color='gold')
-                    
-                    # C模式增加重點補0接收類型
-                    if mode_name == "重點補0":
-                        ax.barh(y_pos - width*3.5, zero_stock_qtys, width, label='Zero Stock Receive', color='purple')
-                    
-                    # 設置圖表標籤和標題
-                    ax.set_yticks(y_pos)
-                    ax.set_yticklabels(om_names)
-                    ax.invert_yaxis()  # 標籤從上到下
-                    ax.set_xlabel('Transfer Quantity')
-                    ax.set_title(f'OM Transfer vs Receive Analysis ({mode_name})')
-                    ax.legend()
-                    
-                    # 顯示圖表
-                    st.pyplot(fig)
-                else:
-                    st.info("沒有足夠的數據生成圖表")
                 
                 st.success("分析完成！您現在可以下載建議。")
                 
