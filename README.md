@@ -132,6 +132,11 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
 - `Last Month Sold Qty`：上月銷量
 - `MTD Sold Qty`：本月銷量
 
+**模式專用欄位：**
+- `ALL`：E 模式（強制轉出）必需，標記要強制轉出的商品行
+- `Target`：F 模式（目標優化）必需，接收目標數量
+- `Type`：B2 模式（附加B特別模式）必需，用於 Type=L 特殊轉出規則
+
 系統會自動計算：
 - `Effective Sold Qty` = `Last Month Sold Qty` + `MTD Sold Qty`（有效銷量）
 - 總庫存 = `SaSa Net Stock` + `Pending Received`
@@ -144,8 +149,11 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
 |------|------|--------|--------|------|
 | **A** | 保守轉貨 | 20% | 風險厭惡 | 優先保護安全庫存，轉出後 ≥ 安全庫存 |
 | **B** | 加強轉貨 | 50% | 滯銷品清理 | 積極轉出，可能低於安全庫存 |
+| **B2** | 附加B特別模式 | 50% (RF) / 全轉出(Type=L且銷量≤2) | 特殊Type店鋪 | ND全轉出；Type=L且銷量≤2全轉出；銷量>2回到B模式 |
 | **C** | 重點補0 | 30% / 3 件上限 | 零庫存補貨 | 重點補充庫存 ≤ 1 的店鋪 |
 | **D** | 清貨轉貨 | N/A | ND 清貨 | ND 無銷售清貨，避免 1 件餘貨 |
+| **E** | 強制轉出 | 全數轉出 | 強制清貨 | 只處理標記 ALL 的商品行，接收上限為安全庫存 2 倍 |
+| **F** | 目標優化 | 視目標 | 目標導向補貨 | Target 目標優先接收，其餘按補0邏輯 |
 
 ### 3. 系統數據預處理
 
@@ -167,8 +175,8 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
 系統呈現：
 - 調貨建議統計（轉出總量、接收總量、涉及店鋪數等）
 - 調貨建議詳情表格
-- 轉出類型分布（RF 過剩 vs RF 加強 vs ND 轉出）
-- 接收優先級分布（緊急缺貨 vs 潛在缺貨 vs 重點補0）
+- 轉出類型分布（RF 過剩 / RF 加強 / ND 轉出 / Type L全轉出 / E模式強制轉出 / F模式轉出）
+- 接收優先級分布（緊急缺貨 / 潛在缺貨 / 重點補0 / E模式接收 / F模式目標接收）
 
 ### 6. 下載結果
 
@@ -200,8 +208,11 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
 **轉出上限規則**
 - A 模式：min(基礎可轉出, 庫存 × 20%, 最少 2 件)
 - B 模式：min(基礎可轉出, 庫存 × 50%, 最少 2 件)
+- B2 模式：RF 同 B 模式；Type=L 且銷量≤2 全數轉出（銷量>2回到B模式）
 - C 模式：min(基礎可轉出, 庫存 × 30%, 最多 3 件)
 - D 模式：針對 ND 無銷售清貨，特殊避免 1 件餘貨邏輯
+- E 模式：只處理 ALL 標記行，全數轉出
+- F 模式：ND可全數轉出；RF依Target/補0需求調整
 
 **同源限制**
 - 同一 Article+OM 組合中，高銷量 RF 店鋪受保護（不能轉出）
@@ -420,7 +431,7 @@ transfer_qty = min(轉出方可轉出, 接收方需求)
    - D 模式：確保有 ND 店鋪無銷售記錄的商品
 
 4. **模式選擇問題**
-   - 確認選擇了正確的轉貨模式（A/B/C/D）
+  - 確認選擇了正確的轉貨模式（A/B/B2/C/D/E/F）
    - 不同模式適用於不同場景，選擇應符合業務需求
    - 嘗試用不同模式重新分析，比較結果
 

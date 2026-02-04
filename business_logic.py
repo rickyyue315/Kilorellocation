@@ -38,7 +38,7 @@ class TransferLogic:
 
         Args:
             group_df: 按Article和OM分組的DataFrame
-            mode: 轉貨模式（保守轉貨、加強轉貨、重點補0、清貨轉貨、強制轉出或目標優化）
+            mode: 轉貨模式（保守轉貨、加強轉貨、附加B(特別模式)、重點補0、清貨轉貨、強制轉出或目標優化）
 
         Returns:
             轉出候選店鋪列表
@@ -176,6 +176,11 @@ class TransferLogic:
 
             type_l_sources = group_df[(type_series == 'L') & (group_df['RP Type'] == 'RF')]
             for _, row in type_l_sources.iterrows():
+                last_month_sold = int(row['Last Month Sold Qty'])
+                mtd_sold = int(row['MTD Sold Qty'])
+                if max(last_month_sold, mtd_sold) > 2:
+                    continue
+
                 net_stock = int(row['SaSa Net Stock'])
                 if net_stock > 0:
                     sources.append({
@@ -187,8 +192,8 @@ class TransferLogic:
                         'original_stock': net_stock,
                         'effective_sold_qty': int(row['Effective Sold Qty']),
                         'source_type': 'Type L全轉出',
-                        'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                        'mtd_sold_qty': int(row['MTD Sold Qty'])
+                        'last_month_sold_qty': last_month_sold,
+                        'mtd_sold_qty': mtd_sold
                     })
 
         # 優先級2：RF類型轉出
@@ -200,7 +205,10 @@ class TransferLogic:
         for _, row in rf_sources.iterrows():
             if mode == self.mode_b_special and type_series is not None:
                 if type_series.loc[row.name] == 'L':
-                    continue
+                    last_month_sold = int(row['Last Month Sold Qty'])
+                    mtd_sold = int(row['MTD Sold Qty'])
+                    if max(last_month_sold, mtd_sold) <= 2:
+                        continue
             total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
             safety_stock = int(row['Safety Stock'])
             effective_sold = int(row['Effective Sold Qty'])
@@ -321,7 +329,7 @@ class TransferLogic:
         
         Args:
             group_df: 按Article和OM分組的DataFrame
-            mode: 轉貨模式（保守轉貨、加強轉貨、重點補0、清貨轉貨、強制轉出或目標優化）
+            mode: 轉貨模式（保守轉貨、加強轉貨、附加B(特別模式)、重點補0、清貨轉貨、強制轉出或目標優化）
             
         Returns:
             接收候選店鋪列表
@@ -1344,7 +1352,7 @@ class TransferLogic:
         
         Args:
             df: 預處理後的DataFrame
-            mode: A模式(保守轉貨)、B模式(加強轉貨)、C模式(重點補0)、D模式(清貨轉貨)、E模式(強制轉出)或F模式(目標優化)
+            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E模式(強制轉出)或F模式(目標優化)
             
         Returns:
             調貨建議列表
