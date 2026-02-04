@@ -1,7 +1,7 @@
 """
 數據預處理模組 v2.1.1
 處理Excel文件讀取、數據清理和驗證
-支持六模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
+支持七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
 """
 
 import pandas as pd
@@ -27,7 +27,8 @@ class DataProcessor:
             'Article Description',  # 商品描述
             'Article Long Text (60 Chars)',  # 商品長描述
             'ALL',  # E模式：強制轉出標記（不分大小寫）
-            'Target'  # F模式：目標接收數量（不分大小寫）
+            'Target',  # F模式：目標接收數量（不分大小寫）
+            'Type'  # 附加B模式：Type欄位（不分大小寫）
         ]
         
         self.integer_columns = [
@@ -81,6 +82,18 @@ class DataProcessor:
             else:
                 df['Target'] = ""
                 logger.info("未找到Target欄位，自動創建空欄位")
+
+            # 處理Type欄位：無論大小寫，都轉換為標準化的'Type'欄位
+            type_column_names = [col for col in df.columns if col.upper() == 'TYPE']
+            if type_column_names:
+                for col in type_column_names:
+                    if col != 'Type':
+                        df['Type'] = df[col]
+                        df = df.drop(columns=[col])
+                logger.info("找到Type欄位用於附加B模式")
+            else:
+                df['Type'] = ""
+                logger.info("未找到Type欄位，自動創建空欄位")
             
             # 處理商品描述欄位
             if 'Article Description' not in df.columns and 'Article Long Text (60 Chars)' in df.columns:

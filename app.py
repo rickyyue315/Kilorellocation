@@ -1,6 +1,6 @@
 """
 庫存調貨建議系統 v2.1.1 - Streamlit應用程序
-支持六模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
+支持七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
 """
 
 import streamlit as st
@@ -36,8 +36,8 @@ with st.sidebar:
     **開發者: Ricky** 
     
     **核心功能：**  
-    - ✅ 六模式系統
-    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/C模式(重點補0)/D模式(清貨轉貨)/E模式(強制轉出)/F模式(目標優化)
+    - ✅ 七模式系統
+    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/B2模式(附加B特別模式)/C模式(重點補0)/D模式(清貨轉貨)/E模式(強制轉出)/F模式(目標優化)
     - ✅ ND/RF類型智慧識別
     - ✅ 優先順序調貨匹配
     - ✅ RF轉出限制控制
@@ -61,7 +61,7 @@ with st.sidebar:
     st.sidebar.header("模式選擇")
     transfer_mode = st.radio(
         "選擇轉貨模式",
-        ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0", "D: 清貨轉貨", "E: 強制轉出", "F: 目標優化"],
+        ["A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "C: 重點補0", "D: 清貨轉貨", "E: 強制轉出", "F: 目標優化"],
         key='transfer_mode',
         help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品，C模式重點補充庫存為0或1的店鋪，D模式針對ND店鋪無銷售記錄時的清貨處理，E模式強制轉出標記為*ALL*的商品，F模式使用Target數字優先滿足接收目標。"
     )
@@ -72,6 +72,7 @@ with st.sidebar:
         **轉貨模式：**
         - **A模式(保守轉貨)**：轉出後剩餘庫存不低於安全庫存，轉出類型為RF過剩轉出
         - **B模式(加強轉貨)**：轉出後剩餘庫存可能低於安全庫存，轉出類型為RF加強轉出
+        - **B2模式(附加B特別模式)**：ND店鋪全轉出；Type=L全轉出(含RF)；其餘RF依B模式規則
         - **C模式(重點補0)**：主要針對接收店鋪，當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
         - **D模式(清貨轉貨)**：針對ND類型且無銷售記錄的店鋪進行清貨，避免1件餘貨
         - **E模式(強制轉出)**：針對標記為*ALL*的商品行，全數強制轉出。接收店鋪為RF，上限為Safety Stock的2倍。優先同OM配對，跨OM時HD不能轉到HA/HB/HC
@@ -89,6 +90,7 @@ with st.sidebar:
         - C模式特殊條件：當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
         - D模式特殊規則：避免1件餘貨，確保轉出後剩餘庫存為0件或≥2件
         - E模式特殊規則：所有RF店鋪可接收，上限為Safety Stock的2倍
+        - B2模式特殊規則：接收上限為Safety Stock的2倍，並累計追蹤接收量
         """)
 
 # 3. 頁面頭部
@@ -106,6 +108,16 @@ if transfer_mode in ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0", "D: 
     - 基本欄位：Article, Article Description, OM, RP Type, Site
     - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
     - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
+    """)
+elif transfer_mode == "B2: 附加B(特別模式)":
+    st.info("""
+    ✅ **必需欄位（B2 模式）：**
+    - 基本欄位：Article, Article Description, OM, RP Type, Site, **Type**
+    - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
+    - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
+
+    ⚠️ **特殊要求：**
+    - **Type 欄位**：Type=L 的店鋪將被全轉出（即使是RF）
     """)
 elif transfer_mode == "E: 強制轉出":
     st.info("""
@@ -163,6 +175,15 @@ if uploaded_file is not None:
             st.error(f"❌ {str(e)}")
             os.unlink(tmp_file_path)
             st.stop()
+
+        # B2模式：必須有Type欄位（不分大小寫）
+        if transfer_mode == "B2: 附加B(特別模式)":
+            original_columns = processing_stats['original_stats'].get('columns', [])
+            has_type_column = any(col.upper() == 'TYPE' for col in original_columns)
+            if not has_type_column:
+                st.error("❌ B2模式必須包含Type欄位（不分大小寫）。請確認Excel欄位後再上傳。")
+                os.unlink(tmp_file_path)
+                st.stop()
         
         # 清理臨時文件
         os.unlink(tmp_file_path)
@@ -196,6 +217,8 @@ if uploaded_file is not None:
                     mode_name = "保守轉貨"
                 elif transfer_mode == "B: 加強轉貨":
                     mode_name = "加強轉貨"
+                elif transfer_mode == "B2: 附加B(特別模式)":
+                    mode_name = "附加B(特別模式)"
                 elif transfer_mode == "C: 重點補0":
                     mode_name = "重點補0"
                 elif transfer_mode == "D: 清貨轉貨":
