@@ -33,7 +33,6 @@ with st.sidebar:
     st.header("系統資訊")
     st.info(""" 
     **版本：v2.1.1** 
-    **開發者: Ricky** 
     
     **核心功能：**  
     - ✅ 七模式系統
