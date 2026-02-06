@@ -177,14 +177,15 @@ class DataProcessor:
         # 處理字符串欄位
         for col in self.string_columns:
             if col in df_processed.columns:
-                # 填充空值為空字符串
-                df_processed[col] = df_processed[col].fillna("").astype(str)
+                # 填充空值為空字符串，並去除前後空白
+                df_processed[col] = df_processed[col].fillna("").astype(str).str.strip()
         
         # 驗證RP Type欄位值
         if 'RP Type' in df_processed.columns:
             invalid_rp_types = ~df_processed['RP Type'].isin(['ND', 'RF'])
             if invalid_rp_types.any():
-                logger.warning(f"發現無效的RP Type值，已自動修正: {df_processed.loc[invalid_rp_types, 'RP Type'].unique()}")
+                invalid_values = df_processed.loc[invalid_rp_types, 'RP Type'].unique()
+                logger.warning(f"發現無效的RP Type值: {invalid_values}，請檢查原始數據，已自動修正為RF")
                 df_processed.loc[invalid_rp_types, 'RP Type'] = 'RF'  # 默認設為RF
         
         logger.info("數據類型轉換完成")

@@ -1,7 +1,7 @@
 """
 Excel輸出模組 v2.1.1
 生成調貨建議和統計摘要的Excel文件
-支持六模式系統：A(保守轉貨)/B(加強轉貨)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
+支持七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
 增加詳細Notes分類資訊
 """
 
@@ -112,12 +112,12 @@ class ExcelGenerator:
         worksheet.set_column('J:J', 18)  # Transfer Safety Stock
         worksheet.set_column('K:K', 12)  # Transfer MOQ
         worksheet.set_column('L:L', 25)  # Remark - 簡潔的轉出→接收映射
-        worksheet.set_column('M:M', 18)  # Transfer Site Last Month Sold Qty
-        worksheet.set_column('N:N', 15)  # Transfer Site MTD Sold Qty
-        worksheet.set_column('O:O', 18)  # Receive Site Last Month Sold Qty
-        worksheet.set_column('P:P', 15)  # Receive Site MTD Sold Qty
-        worksheet.set_column('Q:Q', 15)  # Receive Original Stock
-        worksheet.set_column('R:R', 75)  # Notes - 600像素約等於75字符
+        worksheet.set_column('M:M', 75)  # Notes - 600像素約等於75字符
+        worksheet.set_column('N:N', 18)  # Transfer Site Last Month Sold Qty
+        worksheet.set_column('O:O', 15)  # Transfer Site MTD Sold Qty
+        worksheet.set_column('P:P', 18)  # Receive Site Last Month Sold Qty
+        worksheet.set_column('Q:Q', 15)  # Receive Site MTD Sold Qty
+        worksheet.set_column('R:R', 15)  # Receive Original Stock
         
         # 添加標題格式
         header_format = workbook.add_format({
@@ -156,14 +156,13 @@ class ExcelGenerator:
         # 應用數據格式
         for row_num in range(1, len(df) + 1):
             for col_num in range(len(df.columns)):
-                if col_num == 17:  # Notes欄位 (第R列，索引為17)
+                if col_num == 12:  # Notes欄位 (第M列，索引為12)
                     # 設置Notes欄位自動換行和更適合的高度
                     worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], notes_format)
                 else:
                     worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], data_format)
                     
-        # 設置Notes欄位自動換行
-        worksheet.set_column('Q:Q', 60)  # Notes欄位寬度
+        # 設置標題行高度和數據行高度
         worksheet.set_row(0, 40)  # 標題行高度
         for row_num in range(1, len(df) + 1):
             worksheet.set_row(row_num, 60)  # 數據行高度，特別是Notes欄位
