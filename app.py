@@ -404,20 +404,12 @@ if uploaded_file is not None:
                 
                 # 讀取Excel文件
                 with open(excel_path, "rb") as file:
-                    excel_data = file.read()
-                
-                # 清理暫存Excel文件
-                try:
-                    os.unlink(excel_path)
-                except OSError:
-                    pass
-                
-                st.download_button(
-                    label="📥 下載調貨建議 (Excel)",
-                    data=excel_data,
-                    file_name=excel_generator.output_filename,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                    st.download_button(
+                        label="📥 下載調貨建議 (Excel)",
+                        data=file.read(),
+                        file_name=excel_generator.output_filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
                 
                 progress_bar.progress(100, text="處理完畢！")
             else:
@@ -446,6 +438,6 @@ st.sidebar.markdown(f"""
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888; font-size: 12px; padding: 20px;">
-庫存調貨建議系統 Reallocation Calculator (2026) - For RP team (Build up by Ricky Yue)
+庫存調貨建議系統 Reallocation Calculator (2026) - For RP team
 </div>
 """, unsafe_allow_html=True)
