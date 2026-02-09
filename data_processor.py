@@ -1,7 +1,8 @@
 """
-數據預處理模組 v2.1.1
+數據預處理模組 v2.2.0
 處理Excel文件讀取、數據清理和驗證
 支持七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
+新增：預設店舖資料（OM、Type等），當用戶上傳的Excel缺少這些資料時自動填充
 """
 
 import pandas as pd
@@ -13,8 +14,100 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# 預設店舖資料（來自 stores-template.csv）
+# 當用戶上傳的Excel缺少OM或Type資料時，系統會根據Site自動填充這些預設值
+# ============================================================================
+DEFAULT_STORE_DATA = {
+    'HA02': {'shop': '駱克', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'S', 'om': 'Ivy', 'type': 'M'},
+    'HA06': {'shop': '北角', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Ivy', 'type': 'M'},
+    'HA15': {'shop': '新中環', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A3', 'size': 'L', 'om': 'Ivy', 'type': 'M'},
+    'HA19': {'shop': '康山', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Violet', 'type': 'L'},
+    'HA20': {'shop': '新香港仔', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Queenie', 'type': 'L'},
+    'HA21': {'shop': '柴灣新翠', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'S', 'om': 'Candy', 'type': 'L'},
+    'HA46': {'shop': '莊士敦道2', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'S', 'om': 'Queenie', 'type': 'M'},
+    'HA30': {'shop': '禮頓中心', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'L', 'om': 'Ivy', 'type': 'M'},
+    'HA32': {'shop': '皇室堡', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'L', 'om': 'Queenie', 'type': 'M'},
+    'HA33': {'shop': '羅素街8號', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'S', 'om': 'Queenie', 'type': 'T'},
+    'HA37': {'shop': '新信德', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'XS', 'om': 'Queenie', 'type': 'M'},
+    'HA39': {'shop': '金百利', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A3', 'size': 'M', 'om': 'Queenie', 'type': 'T'},
+    'HA40': {'shop': '新山頂', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'S', 'om': 'Candy', 'type': 'T'},
+    'HA42': {'shop': '啟超道', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B1', 'size': 'S', 'om': 'Queenie', 'type': 'T'},
+    'HA43': {'shop': '德己立街2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Ivy', 'type': 'M'},
+    'HA44': {'shop': '黃竹坑', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Queenie', 'type': 'M'},
+    'HA45': {'shop': '合和商場', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'L', 'om': 'Queenie', 'type': 'M'},
+    'HB01': {'shop': '加連威', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'S', 'om': 'Ivy', 'type': 'T'},
+    'HB10': {'shop': '彌敦88', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A3', 'size': 'L', 'om': 'Ivy', 'type': 'T'},
+    'HB11': {'shop': '德福', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
+    'HB12': {'shop': '黃埔', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
+    'HB24': {'shop': '始創', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Eva', 'type': 'M'},
+    'HB25': {'shop': '奧海城', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Candy', 'type': 'L'},
+    'HB29': {'shop': '重慶站', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A2', 'size': 'XL', 'om': 'Ivy', 'type': 'T'},
+    'HB30': {'shop': '淘大', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Hippo', 'type': 'L'},
+    'HB38': {'shop': '新港', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Candy', 'type': 'T'},
+    'HB41': {'shop': '九龍城', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'M', 'om': 'Hippo', 'type': 'L'},
+    'HB49': {'shop': '新蒲崗', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Hippo', 'type': 'L'},
+    'HB56': {'shop': '旺角160', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Eva', 'type': 'T'},
+    'HB62': {'shop': '油塘', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'L', 'om': 'Violet', 'type': 'L'},
+    'HB63': {'shop': '佐敦道31', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Ivy', 'type': 'M'},
+    'HB66': {'shop': 'PopCorn', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Ivy', 'type': 'M'},
+    'HB68': {'shop': '新都城', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'S', 'om': 'Ivy', 'type': 'L'},
+    'HB69': {'shop': '西九龍', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Violet', 'type': 'L'},
+    'HB72': {'shop': '黃大仙', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
+    'HB75': {'shop': '東港城2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Ivy', 'type': 'L'},
+    'HB77': {'shop': '新樂富', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'XS', 'om': 'Hippo', 'type': 'L'},
+    'HB80': {'shop': '新世紀Moko', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Eva', 'type': 'M'},
+    'HB83': {'shop': '新加拿芬道', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B1', 'size': 'L', 'om': 'Ivy', 'type': 'T'},
+    'HB86': {'shop': '新都會駅', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'S', 'om': 'Violet', 'type': 'L'},
+    'HB87': {'shop': '西九高鐵站', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B1', 'size': 'XS', 'om': 'Hippo', 'type': 'T'},
+    'HB91': {'shop': '南昌站V Walk', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'XS', 'om': 'Violet', 'type': 'L'},
+    'HB93': {'shop': '新好望角', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A3', 'size': 'M', 'om': 'Violet', 'type': 'T'},
+    'HB94': {'shop': '康城', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Ivy', 'type': 'L'},
+    'HB95': {'shop': '觀塘APM2', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'S', 'om': 'Violet', 'type': 'M'},
+    'HB96': {'shop': '啟德', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
+    'HB97': {'shop': '新旺角文華', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A2', 'size': 'M', 'om': 'Violet', 'type': 'T'},
+    'HB98': {'shop': '星光行2', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B1', 'size': 'M', 'om': 'Candy', 'type': 'T'},
+    'HBA2': {'shop': '廣東道2', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B1', 'size': 'M', 'om': 'Hippo', 'type': 'T'},
+    'HBA3': {'shop': '荷里活廣場2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Hippo', 'type': 'L'},
+    'HBA4': {'shop': '中港城2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Candy', 'type': 'T'},
+    'HC02': {'shop': '荃灣', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Eva', 'type': 'L'},
+    'HC05': {'shop': '上水', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Candy', 'type': 'T'},
+    'HC13': {'shop': '沙田中心', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Queenie', 'type': 'M'},
+    'HC15': {'shop': '悅來坊', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Eva', 'type': 'M'},
+    'HC19': {'shop': '錦薈坊', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
+    'HC25': {'shop': '新青衣', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'L', 'om': 'Candy', 'type': 'L'},
+    'HC26': {'shop': '沙田第一城', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Candy', 'type': 'L'},
+    'HC27': {'shop': '大埔超級城', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Queenie', 'type': 'L'},
+    'HC31': {'shop': '新屯門', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
+    'HC33': {'shop': '太和', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Queenie', 'type': 'L'},
+    'HC42': {'shop': '上水新都2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Candy', 'type': 'M'},
+    'HC44': {'shop': '新頌富', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Eva', 'type': 'L'},
+    'HC45': {'shop': '新馬鞍山', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Candy', 'type': 'L'},
+    'HC49': {'shop': '形點', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Eva', 'type': 'M'},
+    'HC51': {'shop': '新荃灣廣場', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'M', 'om': 'Eva', 'type': 'M'},
+    'HC55': {'shop': '新新都會', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'L', 'om': 'Eva', 'type': 'L'},
+    'HC60': {'shop': '新大埔新達', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Queenie', 'type': 'L'},
+    'HC61': {'shop': '如心廣場', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Eva', 'type': 'M'},
+    'HC62': {'shop': '新元朗', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'S', 'om': 'Eva', 'type': 'L'},
+    'HC63': {'shop': '新東涌', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Candy', 'type': 'M'},
+    'HC64': {'shop': '嘉湖', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Eva', 'type': 'L'},
+    'HC66': {'shop': '新沙田', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Queenie', 'type': 'M'},
+    'HC67': {'shop': '新V City', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
+    'HC68': {'shop': '新大圍', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'XS', 'om': 'Candy', 'type': 'L'},
+    'HC69': {'shop': '元朗廣場2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Eva', 'type': 'M'},
+    'HD02': {'shop': '高士德', 'regional': 'MO', 'class_1': 'B', 'class_2': 'B1', 'size': 'L', 'om': 'Windy', 'type': 'L'},
+    'HD03': {'shop': '議事亭', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A1', 'size': 'XL', 'om': 'Windy', 'type': 'T'},
+    'HD09': {'shop': '新威尼斯人', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A1', 'size': 'L', 'om': 'Windy', 'type': 'T'},
+    'HD11': {'shop': '新澳門廣場', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A2', 'size': 'L', 'om': 'Windy', 'type': 'T'},
+    'HD15': {'shop': '信達廣場', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A3', 'size': 'L', 'om': 'Windy', 'type': 'T'},
+    'HD16': {'shop': '澳門南灣中心', 'regional': 'MO', 'class_1': 'C', 'class_2': 'C1', 'size': 'L', 'om': 'Windy', 'type': 'T'},
+    'HD18': {'shop': '倫敦人', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A3', 'size': 'XL', 'om': 'Windy', 'type': 'T'},
+    'HD19': {'shop': '板樟堂', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A3', 'size': 'L', 'om': 'Windy', 'type': 'T'},
+    'HD20': {'shop': '澳門銀河2', 'regional': 'MO', 'class_1': 'B', 'class_2': 'B2', 'size': 'S', 'om': 'Windy', 'type': 'T'},
+}
+
 class DataProcessor:
-    """數據預處理類 v2.1.1"""
+    """數據預處理類 v2.2.0"""
     
     def __init__(self):
         self.required_columns = [
@@ -37,6 +130,89 @@ class DataProcessor:
         ]
         
         self.string_columns = ['OM', 'RP Type', 'Site']
+        
+        # 記錄填充統計
+        self.fill_stats = {
+            'om_filled': 0,
+            'type_filled': 0,
+            'sites_not_found': set()
+        }
+    
+    def get_store_default_info(self, site: str) -> Dict:
+        """
+        根據店舖編號獲取預設資料
+        
+        Args:
+            site: 店舖編號（如 HA02, HA06 等）
+            
+        Returns:
+            預設資料字典，如果找不到則返回空字典
+        """
+        # 標準化 site（去除前後空白，轉大寫）
+        site_normalized = str(site).strip().upper()
+        return DEFAULT_STORE_DATA.get(site_normalized, {})
+    
+    def fill_default_store_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        使用預設資料填充缺失的 OM 和 Type 欄位
+        
+        當用戶上傳的 Excel 缺少 OM 或 Type 資料時，
+        系統會根據 Site 欄位自動從 DEFAULT_STORE_DATA 中填充對應的預設值。
+        
+        Args:
+            df: 輸入 DataFrame
+            
+        Returns:
+            填充後的 DataFrame
+        """
+        df_filled = df.copy()
+        
+        # 重置填充統計
+        self.fill_stats = {
+            'om_filled': 0,
+            'type_filled': 0,
+            'sites_not_found': set()
+        }
+        
+        for idx, row in df_filled.iterrows():
+            site = row.get('Site', '')
+            if pd.isna(site) or site == '':
+                continue
+                
+            # 獲取預設資料
+            default_info = self.get_store_default_info(site)
+            
+            # 如果找不到預設資料，記錄下來
+            if not default_info:
+                self.fill_stats['sites_not_found'].add(site)
+                continue
+            
+            # 填充 OM（如果缺失或為空）
+            current_om = row.get('OM', '')
+            if pd.isna(current_om) or str(current_om).strip() == '':
+                default_om = default_info.get('om', '')
+                if default_om:
+                    df_filled.at[idx, 'OM'] = default_om
+                    self.fill_stats['om_filled'] += 1
+                    logger.debug(f"Site {site}: OM 填充為 {default_om}")
+            
+            # 填充 Type（如果缺失或為空）
+            current_type = row.get('Type', '')
+            if pd.isna(current_type) or str(current_type).strip() == '':
+                default_type = default_info.get('type', '')
+                if default_type:
+                    df_filled.at[idx, 'Type'] = default_type
+                    self.fill_stats['type_filled'] += 1
+                    logger.debug(f"Site {site}: Type 填充為 {default_type}")
+        
+        # 記錄填充統計
+        if self.fill_stats['om_filled'] > 0 or self.fill_stats['type_filled'] > 0:
+            logger.info(f"預設資料填充完成 - OM: {self.fill_stats['om_filled']} 筆, Type: {self.fill_stats['type_filled']} 筆")
+        
+        if self.fill_stats['sites_not_found']:
+            logger.warning(f"以下店舖在預設資料中找不到: {self.fill_stats['sites_not_found']}")
+        
+        return df_filled
     
     def read_excel_file(self, file_path: str) -> pd.DataFrame:
         """
@@ -314,6 +490,10 @@ class DataProcessor:
         # 數據類型轉換
         df = self.convert_data_types(df)
         
+        # 【新增】使用預設店舖資料填充缺失的 OM 和 Type
+        # 在數據類型轉換後執行，確保 Site 欄位已標準化
+        df = self.fill_default_store_data(df)
+        
         # 處理缺失值
         df = self.handle_missing_values(df)
         
@@ -327,7 +507,8 @@ class DataProcessor:
         processed_stats = {
             'total_rows': len(df),
             'columns': list(df.columns),
-            'data_types': df.dtypes.to_dict()
+            'data_types': df.dtypes.to_dict(),
+            'fill_stats': self.fill_stats  # 添加填充統計
         }
         
         logger.info("數據預處理完成")

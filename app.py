@@ -1,6 +1,7 @@
 """
-庫存調貨建議系統 v2.1.1 - Streamlit應用程序
+庫存調貨建議系統 v2.2.0 - Streamlit應用程序
 支持七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
+新增：預設店舖資料（OM、Type等），當用戶上傳的Excel缺少這些資料時自動填充
 """
 
 import streamlit as st
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title="庫存調貨建議系統 v2.1.1",
+    page_title="庫存調貨建議系統 v2.2.0",
     page_icon="📦",
     layout="wide"
 )
@@ -32,7 +33,8 @@ st.set_page_config(
 with st.sidebar:
     st.header("系統資訊")
     st.info(""" 
-    **版本：v2.1.1** 
+    **版本：v2.2.0** 
+    **開發者: Ricky** 
     
     **核心功能：**  
     - ✅ 七模式系統
@@ -43,6 +45,7 @@ with st.sidebar:
     - ✅ D模式特殊功能：避免1件餘貨
     - ✅ E模式特殊功能：標記商品強制轉出
     - ✅ F模式特殊功能：Target目標接收優先
+    - ✅ 預設店舖資料自動填充（OM、Type）
     - ✅ 統計分析和圖表
     - ✅ Excel格式匯出
     """)
@@ -93,7 +96,7 @@ with st.sidebar:
         """)
 
 # 3. 頁面頭部
-st.title("📦 庫存調貨建議系統 v2.1.1")
+st.title("📦 庫存調貨建議系統 v2.2.0")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -403,12 +406,20 @@ if uploaded_file is not None:
                 
                 # 讀取Excel文件
                 with open(excel_path, "rb") as file:
-                    st.download_button(
-                        label="📥 下載調貨建議 (Excel)",
-                        data=file.read(),
-                        file_name=excel_generator.output_filename,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                    excel_data = file.read()
+                
+                # 清理暫存Excel文件
+                try:
+                    os.unlink(excel_path)
+                except OSError:
+                    pass
+                
+                st.download_button(
+                    label="📥 下載調貨建議 (Excel)",
+                    data=excel_data,
+                    file_name=excel_generator.output_filename,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
                 
                 progress_bar.progress(100, text="處理完畢！")
             else:
@@ -429,7 +440,7 @@ if uploaded_file is not None:
 st.sidebar.markdown("---")
 st.sidebar.subheader("系統信息")
 st.sidebar.markdown(f"""
-版本: v2.1.1  
+版本: v2.2.0  
 更新時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """)
 
@@ -437,6 +448,6 @@ st.sidebar.markdown(f"""
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888; font-size: 12px; padding: 20px;">
-庫存調貨建議系統 Reallocation Calculator (2026) - For RP team
+庫存調貨建議系統 Reallocation Calculator (2026) - For RP team (Build up by Ricky Yue)
 </div>
 """, unsafe_allow_html=True)
