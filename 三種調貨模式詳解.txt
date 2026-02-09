@@ -94,7 +94,7 @@ actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stoc
 - 接收上限 = Safety Stock × 2
 - 依「緊急缺貨補貨 / 潛在缺貨補貨」優先級匹配
 
-**轉出類型：** `ND轉出`、`Type L全轉出`、`RF過剩轉出`、`RF加強轉出`
+**轉出類型：** `ND轉出`、`Local 店舖全轉出`、`RF過剩轉出`、`RF加強轉出`
 **接收類型：** 緊急缺貨補貨、潛在缺貨補貨
 
 ---
@@ -400,7 +400,7 @@ statistics = {
 | 轉出比例上限 | 20% | 50% | 50%(RF) / 全轉出(Type=L且銷量≤2) | 30% | 無限制 | **無限制(全數)** | 視Target/補0需求 |
 | 轉出數量上限 | 無限制 | 無限制 | Type=L可全轉出 | 最多3件 | 全部庫存 | **全部庫存** | 依Target/補0需求 |
 | 安全庫存保護 | 嚴格保護 | 可下探 | 可下探 | 可下探 | 不適用(ND) | **無保護** | 依目標/補0 |
-| 轉出類型 | RF過剩轉出 | RF過剩+RF加強轉出 | ND轉出/Type L全轉出/RF過剩/加強 | RF過剩+RF加強轉出 | ND清貨轉出 | **E模式強制轉出** | F模式ND/RF轉出 |
+| 轉出類型 | RF過剩轉出 | RF過剩+RF加強轉出 | ND轉出/Local 店舖全轉出/RF過剩/加強 | RF過剩+RF加強轉出 | ND清貨轉出 | **E模式強制轉出** | F模式ND/RF轉出 |
 | 接收上限 | Safety Stock | Safety Stock | **Safety Stock × 2** | Safety Stock | Safety Stock | **Safety Stock × 2** | 依Target/補0 |
 | 特殊功能 | 無 | 無 | Type=L特殊規則 | 累計接收追蹤 | 避免1件餘貨 | 標記驅動+OM優先級 | Target優先接收 |
 | 主要目標 | 平衡庫存 | 最大化調貨 | 特殊Type店鋪處理 | 重點補貨 | 清貨處理 | 強制轉移特定商品 | 目標導向補貨 |

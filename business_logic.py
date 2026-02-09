@@ -195,7 +195,7 @@ class TransferLogic:
                         'priority': 2,
                         'original_stock': net_stock,
                         'effective_sold_qty': int(row['Effective Sold Qty']),
-                        'source_type': 'Type L全轉出',
+                        'source_type': 'Local店舖全轉出',
                         'last_month_sold_qty': last_month_sold,
                         'mtd_sold_qty': mtd_sold
                     })
@@ -697,38 +697,48 @@ class TransferLogic:
         # 記錄已經作為轉出店鋪的站點，避免它們同時作為接收店鋪
         transfer_sites = set()
         
+        # 記錄已經作為接收店鋪的站點，避免它們同時作為轉出店鋪
+        receive_sites = set()
+        
         # 記錄接收店鋪的累計接收數量
         received_qty_by_site = {}
         
         # 按優先級順序進行匹配
         # 1. ND轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site, mode)
+                               article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site, mode,
+                               receive_sites=receive_sites)
         
         # 2. ND轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 1, 2, transfer_sites, received_qty_by_site, mode)
+                               article, om, product_desc, 1, 2, transfer_sites, received_qty_by_site, mode,
+                               receive_sites=receive_sites)
         
         # 3. RF過剩轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出',
+                               receive_sites=receive_sites)
         
         # 4. RF過剩轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出',
+                               receive_sites=receive_sites)
         
         # 5. RF加強轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出',
+                               receive_sites=receive_sites)
         
         # 6. RF加強轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF加強轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF加強轉出',
+                               receive_sites=receive_sites)
         
         # 7. C模式特殊處理：RF轉出 -> 重點補0
         if mode == self.mode_c:
             self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                   article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, None, '重點補0')
+                                   article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, None, '重點補0',
+                                   receive_sites=receive_sites)
         
         return recommendations
 
@@ -749,39 +759,48 @@ class TransferLogic:
         temp_destinations = [d.copy() for d in destinations]
 
         transfer_sites = set()
+        receive_sites = set()
         received_qty_by_site = {}
 
         # 1. ND轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations,
-                               article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site, mode)
+                               article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site, mode,
+                               receive_sites=receive_sites)
 
         # 2. ND轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations,
-                               article, om, product_desc, 1, 2, transfer_sites, received_qty_by_site, mode)
+                               article, om, product_desc, 1, 2, transfer_sites, received_qty_by_site, mode,
+                               receive_sites=receive_sites)
 
-        # 3. Type L全轉出 -> 緊急缺貨
+        # 3. Local店舖全轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations,
-                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'Type L全轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'Local店舖全轉出',
+                               receive_sites=receive_sites)
 
-        # 4. Type L全轉出 -> 潛在缺貨
+        # 4. Local店舖全轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations,
-                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'Type L全轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'Local店舖全轉出',
+                               receive_sites=receive_sites)
 
         # 5. RF過剩轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations,
-                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出',
+                               receive_sites=receive_sites)
 
         # 6. RF過剩轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations,
-                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出',
+                               receive_sites=receive_sites)
 
         # 7. RF加強轉出 -> 緊急缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations,
-                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出')
+                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出',
+                               receive_sites=receive_sites)
 
         # 8. RF加強轉出 -> 潛在缺貨
         self._match_by_priority(temp_sources, temp_destinations, recommendations,
-                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF加強轉出')
+                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF加強轉出',
+                               receive_sites=receive_sites)
 
         return recommendations
 
@@ -1286,7 +1305,8 @@ class TransferLogic:
                           transfer_sites: set, received_qty_by_site: Dict,
                           mode: str,
                           source_type_filter: Optional[str] = None,
-                          dest_type_filter: Optional[str] = None):
+                          dest_type_filter: Optional[str] = None,
+                          receive_sites: set = None):
         """
         按指定優先級進行匹配
         
@@ -1303,7 +1323,10 @@ class TransferLogic:
             received_qty_by_site: 接收店鋪的累計接收數量字典
             source_type_filter: 轉出類型過濾器（可選）
             dest_type_filter: 接收類型過濾器（可選）
+            receive_sites: 已經作為接收店鋪的站點集合（可選，防止接收店同時做轉出）
         """
+        if receive_sites is None:
+            receive_sites = set()
         # 篩選指定優先級的源和目的地
         filtered_sources = [s for s in sources if s['priority'] == source_priority and s['transferable_qty'] > 0]
         
@@ -1331,6 +1354,10 @@ class TransferLogic:
                 
                 # 避免轉出店鋪同時作為接收店鋪
                 if dest['site'] in transfer_sites:
+                    continue
+                
+                # 避免已接收的店鋪同時作為轉出店鋪（防止同一SKU下接收店又做轉出）
+                if source['site'] in receive_sites:
                     continue
                 
                 # 防禦性檢查：確保接收店鋪不是ND類型（ND店鋪在所有模式下都只能轉出，不能接收）
@@ -1445,6 +1472,9 @@ class TransferLogic:
                 if not source_added_to_transfer:
                     transfer_sites.add(source['site'])
                     source_added_to_transfer = True
+                
+                # 將接收店鋪添加到接收集合（防止已接收的店舖再做轉出）
+                receive_sites.add(dest['site'])
                 
                 # 更新接收店鋪的累計接收數量
                 received_qty_by_site[receive_site_key] = current_received_qty + transfer_qty
@@ -1799,8 +1829,8 @@ class TransferLogic:
         elif source['source_type'] == 'F模式RF轉出':
             remaining_after_transfer = source['original_stock'] - transfer_qty
             notes_parts.append(f"【轉出分析: F模式RF轉出，可忽視最小庫存要求，轉出後剩餘庫存({remaining_after_transfer})件】")
-        elif source['source_type'] == 'Type L全轉出':
-            notes_parts.append("【轉出分析: Type=L 全轉出（附加B特別模式），可全數轉出】")
+        elif source['source_type'] == 'Local店舖全轉出':
+            notes_parts.append("【轉出分析: Local店舖全轉出（附加B特別模式），可全數轉出】")
         elif source['source_type'] == 'RF過剩轉出':
             remaining_after_transfer = source['original_stock'] - transfer_qty
             notes_parts.append(f"【轉出分析: RF過剩轉出，轉出後剩餘庫存({remaining_after_transfer})仍高於安全庫存({source.get('safety_stock', 'N/A')})】")

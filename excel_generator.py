@@ -228,7 +228,7 @@ class ExcelGenerator:
         worksheet.merge_range('A1:B1', '調貨建議統計摘要', title_format)
         
         # KPI橫幅
-        worksheet.write('A3', '總調貨建議數量', kpi_format)
+        worksheet.write('A3', '總調貨建議行數', kpi_format)
         worksheet.write('B3', statistics.get('total_recommendations', 0), kpi_value_format)
         
         worksheet.write('A4', '總調貨件數', kpi_format)

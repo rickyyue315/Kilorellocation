@@ -175,7 +175,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
 系統呈現：
 - 調貨建議統計（轉出總量、接收總量、涉及店鋪數等）
 - 調貨建議詳情表格
-- 轉出類型分布（RF 過剩 / RF 加強 / ND 轉出 / Type L全轉出 / E模式強制轉出 / F模式轉出）
+- 轉出類型分布（RF 過剩 / RF 加強 / ND 轉出 / Local 店舖全轉出 / E模式強制轉出 / F模式轉出）
 - 接收優先級分布（緊急缺貨 / 潛在缺貨 / 重點補0 / E模式接收 / F模式目標接收）
 
 ### 6. 下載結果
