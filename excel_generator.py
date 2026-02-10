@@ -255,17 +255,19 @@ class ExcelGenerator:
         
         # 按OM統計
         worksheet.write(f'A{row}', '按OM統計', header_format)
-        worksheet.write(f'B{row}', '總調貨件數', header_format)
-        worksheet.write(f'C{row}', '調貨行數', header_format)
-        worksheet.write(f'D{row}', '涉及Article數量', header_format)
+        worksheet.write(f'B{row}', '轉出件數', header_format)
+        worksheet.write(f'C{row}', '接收件數', header_format)
+        worksheet.write(f'D{row}', '調貨行數', header_format)
+        worksheet.write(f'E{row}', '涉及Article數量', header_format)
         
         om_stats = statistics.get('om_stats', {})
         for om, stats in om_stats.items():
             row += 1
             worksheet.write(f'A{row}', om, data_format)
-            worksheet.write(f'B{row}', stats['total_qty'], data_format)
-            worksheet.write(f'C{row}', stats['count'], data_format)
-            worksheet.write(f'D{row}', stats['article_count'], data_format)
+            worksheet.write(f'B{row}', stats.get('transfer_qty', stats.get('total_qty', 0)), data_format)
+            worksheet.write(f'C{row}', stats.get('receive_qty', 0), data_format)
+            worksheet.write(f'D{row}', stats['count'], data_format)
+            worksheet.write(f'E{row}', stats['article_count'], data_format)
         
         # 空白行
         row += 2
@@ -302,6 +304,7 @@ class ExcelGenerator:
         worksheet.set_column('B:B', 12)
         worksheet.set_column('C:C', 12)
         worksheet.set_column('D:D', 12)
+        worksheet.set_column('E:E', 12)
         
         # 設置行高
         worksheet.set_row(0, 25)  # 標題行
