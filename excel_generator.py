@@ -153,19 +153,14 @@ class ExcelGenerator:
             'align': 'left'
         })
         
-        # 應用數據格式
-        for row_num in range(1, len(df) + 1):
-            for col_num in range(len(df.columns)):
-                if col_num == 12:  # Notes欄位 (第M列，索引為12)
-                    # 設置Notes欄位自動換行和更適合的高度
-                    worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], notes_format)
-                else:
-                    worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], data_format)
-                    
-        # 設置標題行高度和數據行高度
-        worksheet.set_row(0, 40)  # 標題行高度
-        for row_num in range(1, len(df) + 1):
-            worksheet.set_row(row_num, 60)  # 數據行高度，特別是Notes欄位
+        # 應用數據格式（使用列格式避免逐格寫入，提高效能）
+        worksheet.set_column('A:L', None, data_format)
+        worksheet.set_column('M:M', 75, notes_format)
+        worksheet.set_column('N:R', None, data_format)
+
+        # 設置標題行高度與預設行高（避免逐行設定）
+        worksheet.set_row(0, 40)
+        worksheet.set_default_row(22)
     
     def create_summary_dashboard_sheet(self, writer, statistics: Dict):
         """
