@@ -446,71 +446,72 @@ class TransferLogic:
 
         # B2模式特殊處理：接收上限為Safety Stock的2倍，且累計追蹤
         if mode == self.mode_b_special:
-            max_sold_qty = rf_destinations['Effective Sold Qty'].max() if not rf_destinations.empty else 0
+            if 'Type' in rf_destinations.columns:
+                type_series = rf_destinations['Type'].astype(str).str.upper()
+            else:
+                type_series = pd.Series("", index=rf_destinations.index)
 
-            for _, row in rf_destinations.iterrows():
+            for idx, row in rf_destinations.iterrows():
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
                 safety_stock = int(row['Safety Stock'])
                 max_can_receive = max(safety_stock * 2, 3)
 
                 if total_available >= max_can_receive:
                     continue
-
-                # 優先級1：緊急缺貨補貨
-                is_no_stock = row['SaSa Net Stock'] == 0
-                has_sales_history = row['Effective Sold Qty'] > 0
-
-                if is_no_stock and has_sales_history:
-                    needed_qty = min(safety_stock, max_can_receive - total_available)
-                    if needed_qty > 0:
-                        destinations.append({
-                            'site': row['Site'],
-                            'om': row['OM'],
-                            'rp_type': row['RP Type'],
-                            'needed_qty': needed_qty,
-                            'priority': 1,
-                            'current_stock': row['SaSa Net Stock'],
-                            'pending_received': row['Pending Received'],
-                            'safety_stock': row['Safety Stock'],
-                            'moq': row['MOQ'],
-                            'effective_sold_qty': row['Effective Sold Qty'],
-                            'dest_type': '緊急缺貨補貨',
-                            'target_qty': max_can_receive,
-                            'received_qty': 0,
-                            'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                            'mtd_sold_qty': int(row['MTD Sold Qty']),
-                            'max_receive_qty': max_can_receive
-                        })
+                if total_available >= safety_stock:
                     continue
 
-                # 優先級2：潛在缺貨補貨
-                is_insufficient_stock = total_available < row['Safety Stock']
-                is_highest_sold = row['Effective Sold Qty'] == max_sold_qty
+                sales_total = int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])
+                store_type = type_series.loc[idx]
 
-                if is_insufficient_stock and is_highest_sold:
-                    needed_qty = row['Safety Stock'] - total_available
-                    needed_qty = min(needed_qty, max_can_receive - total_available)
-                    if needed_qty > 0:
-                        destinations.append({
-                            'site': row['Site'],
-                            'om': row['OM'],
-                            'rp_type': row['RP Type'],
-                            'needed_qty': needed_qty,
-                            'priority': 2,
-                            'current_stock': row['SaSa Net Stock'],
-                            'pending_received': row['Pending Received'],
-                            'safety_stock': row['Safety Stock'],
-                            'moq': row['MOQ'],
-                            'effective_sold_qty': row['Effective Sold Qty'],
-                            'dest_type': '潛在缺貨補貨',
-                            'target_qty': max_can_receive,
-                            'received_qty': 0,
-                            'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                            'mtd_sold_qty': int(row['MTD Sold Qty']),
-                            'max_receive_qty': max_can_receive
-                        })
+                if store_type == 'T':
+                    if sales_total > 0:
+                        priority = 1
+                        dest_type = '遊客區店舖 高銷量優先'
+                    else:
+                        priority = 3
+                        dest_type = '遊客區店舖 Safety優先'
+                elif store_type == 'M':
+                    if sales_total > 0:
+                        priority = 2
+                        dest_type = '混合型店舖 高銷量優先'
+                    else:
+                        priority = 4
+                        dest_type = '混合型店舖 Safety優先'
+                else:
+                    priority = 4
+                    dest_type = '其他類型 Safety優先'
 
-            destinations.sort(key=lambda x: x['priority'])
+                needed_qty = safety_stock - total_available
+                needed_qty = min(needed_qty, max_can_receive - total_available)
+                if needed_qty <= 0:
+                    continue
+
+                destinations.append({
+                    'site': row['Site'],
+                    'om': row['OM'],
+                    'rp_type': row['RP Type'],
+                    'needed_qty': needed_qty,
+                    'priority': priority,
+                    'current_stock': row['SaSa Net Stock'],
+                    'pending_received': row['Pending Received'],
+                    'safety_stock': row['Safety Stock'],
+                    'moq': row['MOQ'],
+                    'effective_sold_qty': row['Effective Sold Qty'],
+                    'dest_type': dest_type,
+                    'target_qty': max_can_receive,
+                    'received_qty': 0,
+                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                    'mtd_sold_qty': int(row['MTD Sold Qty']),
+                    'max_receive_qty': max_can_receive
+                })
+
+            def b2_sort_key(item: Dict) -> Tuple[int, int, int]:
+                if item['priority'] in (1, 2):
+                    return (item['priority'], -int(item.get('effective_sold_qty', 0)), 0)
+                return (item['priority'], -int(item.get('safety_stock', 0)), 0)
+
+            destinations.sort(key=b2_sort_key)
             return destinations
         
         # D模式特殊處理：放寬接收條件，不要求最高銷量限制
