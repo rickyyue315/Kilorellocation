@@ -1,7 +1,7 @@
 """
-Excel輸出模組 v2.1.1
+Excel輸出模組 v2.3.0
 生成調貨建議和統計摘要的Excel文件
-支持七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
+支持九模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
 增加詳細Notes分類資訊
 """
 
@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ExcelGenerator:
-    """Excel輸出類 v2.1.1"""
+    """Excel輸出類 v2.3.0"""
     
     def __init__(self):
         self.output_filename = ""

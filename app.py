@@ -1,6 +1,6 @@
 """
-庫存調貨建議系統 v2.2.2 - Streamlit應用程序
-支持八模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
+庫存調貨建議系統 v2.3.0 - Streamlit應用程序
+支持九模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
 新增：預設店舖資料（OM、Type等），當用戶上傳的Excel缺少這些資料時自動填充
 """
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title="庫存調貨建議系統 v2.2.2",
+    page_title="庫存調貨建議系統 v2.3.0",
     page_icon="📦",
     layout="wide"
 )
@@ -32,13 +32,13 @@ st.set_page_config(
 # 2. 側邊欄設計
 with st.sidebar:
     st.header("系統資訊")
-    st.info(""" 
-    **版本：v2.2.2** 
-    **開發者: Ricky** 
+    st.info("""
+    **版本：v2.3.0**
+    **開發者: Ricky**
     
-    **核心功能：**  
-    - ✅ 八模式系統
-    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/B2模式(附加B特別模式)/B3模式(附加B跨OM特別模式)/C模式(重點補0)/D模式(清貨轉貨)/E模式(強制轉出)/F模式(目標優化)
+    **核心功能：**
+    - ✅ 九模式系統
+    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/B2模式(附加B特別模式)/B3模式(附加B跨OM特別模式)/C模式(重點補0)/C2模式(附加C跨OM重點補0)/D模式(清貨轉貨)/E模式(強制轉出)/F模式(目標優化)
     - ✅ ND/RF類型智慧識別
     - ✅ 優先順序調貨匹配
     - ✅ RF轉出限制控制
@@ -47,6 +47,7 @@ with st.sidebar:
     - ✅ F模式特殊功能：Target目標接收優先
     - ✅ B2模式特殊功能：接收端依遊客區/混合型店舖優先排序
     - ✅ B3模式特殊功能：允許跨OM配對（HD不能轉到HA/HB/HC；Windy轉出只能到Windy）
+    - ✅ C2模式特殊功能：C模式重點補0邏輯+跨OM配對（HD不能轉到HA/HB/HC；Windy轉出只能到Windy）
     - ✅ 預設店舖資料自動填充（OM、Type）
     - ✅ 統計分析和圖表
     - ✅ Excel格式匯出
@@ -55,7 +56,7 @@ with st.sidebar:
     st.sidebar.header("操作指引")
     st.sidebar.markdown("""
     1. **上傳 Excel 文件**：點擊瀏覽文件或拖放文件到上傳區域。
-    2. **選擇轉貨模式**：在側邊欄選擇轉貨模式（A/B/B2/B3/C/D/E/F）。
+    2. **選擇轉貨模式**：在側邊欄選擇轉貨模式（A/B/B2/B3/C/C2/D/E/F）。
     3. **啟動分析**：點擊「生成調貨建議」按鈕開始處理。
     4. **查看結果**：在主頁面查看KPI、建議和圖表。
     5. **下載報告**：點擊下載按鈕獲取 Excel 報告。
@@ -65,9 +66,9 @@ with st.sidebar:
     st.sidebar.header("模式選擇")
     transfer_mode = st.radio(
         "選擇轉貨模式",
-        ["A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B3: 附加B(跨OM特別模式)", "C: 重點補0", "D: 清貨轉貨", "E: 強制轉出", "F: 目標優化"],
+        ["A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B3: 附加B(跨OM特別模式)", "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E: 強制轉出", "F: 目標優化"],
         key='transfer_mode',
-        help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品，B2模式在B模式基礎上加入Type=L全轉出（若銷量>2則回到B模式），並依Type T(遊客區)/Type M(混合型)的銷量與安全庫存排序接收優先級；B3模式參照B2但允許跨OM配對，且HD不能轉到HA/HB/HC、Windy轉出只能到Windy；C模式重點補充庫存為0或1的店鋪，D模式針對ND店鋪無銷售記錄時的清貨處理，E模式強制轉出標記為*ALL*的商品，F模式使用Target數字優先滿足接收目標。"
+        help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品，B2模式在B模式基礎上加入Type=L全轉出（若銷量>2則回到B模式），並依Type T(遊客區)/Type M(混合型)的銷量與安全庫存排序接收優先級；B3模式參照B2但允許跨OM配對，且HD不能轉到HA/HB/HC、Windy轉出只能到Windy；C模式重點補充庫存為0或1的店鋪，C2模式參照C但允許跨OM配對且HD不能轉到HA/HB/HC、Windy轉出只能到Windy；D模式針對ND店鋪無銷售記錄時的清貨處理，E模式強制轉出標記為*ALL*的商品，F模式使用Target數字優先滿足接收目標。"
     )
     
     # 模式說明
@@ -79,6 +80,7 @@ with st.sidebar:
         - **B2模式(附加B特別模式)**：ND店鋪全轉出；Type=L在銷量≤2時全轉出(含RF)，若銷量>2則回到B模式；其餘RF依B模式規則；接收端依遊客區/混合型店舖優先級排序
         - **B3模式(附加B跨OM特別模式)**：參照B2，但允許跨OM配對；HD不能轉到HA/HB/HC；Windy轉出只能到Windy，Windy可接收其他OM
         - **C模式(重點補0)**：主要針對接收店鋪，當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
+        - **C2模式(附加C跨OM重點補0)**：參照C模式的轉出/接收邏輯，但允許跨OM配對；HD不能轉到HA/HB/HC；Windy轉出只能到Windy，Windy可接收其他OM
         - **D模式(清貨轉貨)**：針對ND類型且無銷售記錄的店鋪進行清貨，避免1件餘貨
         - **E模式(強制轉出)**：針對標記為*ALL*的商品行，全數強制轉出。接收店鋪為RF，上限為Safety Stock的2倍。優先同OM配對，跨OM時HD不能轉到HA/HB/HC
         - **F模式(目標優化)**：Target欄位填數字作為優先接收目標；其他店鋪按C模式補0需求計算；允許跨OM配對，HD不能轉到HA/HB/HC
@@ -92,15 +94,16 @@ with st.sidebar:
         
         **接收條件：**
         - SaSa Net Stock + Pending Received < Safety Stock，便需要進行調撥接收
-        - C模式特殊條件：當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
+        - C/C2模式特殊條件：當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
         - D模式特殊規則：避免1件餘貨，確保轉出後剩餘庫存為0件或≥2件
         - E模式特殊規則：所有RF店鋪可接收，上限為Safety Stock的2倍
         - B2模式特殊規則：接收上限為Safety Stock的2倍，並累計追蹤接收量；接收優先級：遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
         - B3模式特殊規則：在B2規則上允許跨OM配對；HD不能轉到HA/HB/HC；Windy轉出只能到Windy
+        - C2模式特殊規則：在C模式規則上允許跨OM配對；HD不能轉到HA/HB/HC；Windy轉出只能到Windy
         """)
 
 # 3. 頁面頭部
-st.title("📦 庫存調貨建議系統 v2.2.1")
+st.title("📦 庫存調貨建議系統 v2.3.0")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -108,9 +111,9 @@ st.markdown("---")
 st.header("1. 資料上傳")
 
 # 根據模式顯示所需欄位提示
-if transfer_mode in ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0", "D: 清貨轉貨"]:
+if transfer_mode in ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨"]:
     st.info("""
-    ✅ **必需欄位（A-D 模式）：**
+    ✅ **必需欄位（A/B/C/C2/D 模式）：**
     - 基本欄位：Article, Article Description, OM, RP Type, Site
     - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
     - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
@@ -230,6 +233,8 @@ if uploaded_file is not None:
                     mode_name = "附加B3(跨OM特別模式)"
                 elif transfer_mode == "C: 重點補0":
                     mode_name = "重點補0"
+                elif transfer_mode == "C2: 附加C(跨OM重點補0)":
+                    mode_name = "附加C2(跨OM重點補0)"
                 elif transfer_mode == "D: 清貨轉貨":
                     mode_name = "清貨轉貨"
                 elif transfer_mode == "E: 強制轉出":
@@ -448,7 +453,7 @@ if uploaded_file is not None:
 st.sidebar.markdown("---")
 st.sidebar.subheader("系統信息")
 st.sidebar.markdown(f"""
-版本: v2.2.0  
+版本: v2.3.0
 更新時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """)
 
