@@ -106,6 +106,15 @@ with st.sidebar:
 st.title("📦 庫存調貨建議系統 v2.3.0")
 st.markdown("---")
 
+# 邏輯圖解展示
+with st.expander("📊 查看調貨邏輯圖解 (Logic Diagrams)", expanded=False):
+    try:
+        with open('transfer_logic_diagrams.md', 'r', encoding='utf-8') as f:
+            logic_content = f.read()
+        st.markdown(logic_content)
+    except FileNotFoundError:
+        st.warning("找不到邏輯圖解文件 (transfer_logic_diagrams.md)")
+
 # 4. 主要區塊
 # 4.1. 資料上傳區塊
 st.header("1. 資料上傳")
