@@ -1,7 +1,7 @@
 """
-åº«å­˜調貨建議ç³»çµ± v2.4.0 - Streamlitæ‡‰ç”¨ç¨‹åº
-æ”¯æŒåä¸€模式ç³»çµ±ï¼šA(ä¿å®ˆ轉貨)/B(åŠ å¼·轉貨)/B2(é™„åŠ Bç‰¹åˆ¥模式)/B3(é™„åŠ Bè·¨OMç‰¹åˆ¥模式)/C(é‡é»žè£œ0)/C2(é™„åŠ Cè·¨OMé‡é»žè£œ0)/D(æ¸…貨轉貨)/E1(å¼·åˆ¶轉å‡º)/E2(å¼·åˆ¶轉å‡ºè·¨OM)/F(ç›®æ¨™å„ªåŒ–)
-æ–°å¢žï¼šé è¨­åº—èˆ–è³‡æ–™ï¼ˆOMã€Typeç­‰ï¼‰ï¼Œç•¶ç”¨æˆ¶ä¸Šå‚³çš„Excelç¼ºå°‘é€™äº›è³‡æ–™æ™‚è‡ªå‹•å¡«å……
+庫存調貨建議系統 v2.4.0 - Streamlit應用程序
+支持十一模式ç³»çµ±ï¼šA(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加Bè·¨OM特別模式)/C(重點補0)/C2(附加Cè·¨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E2(強制轉出跨OM)/F(目標優化)
+新增:預設店舖資料(OM、Type等),當用戶上傳的Excel缺少這些資料時自動填充
 """
 
 import streamlit as st
@@ -13,7 +13,17 @@ import logging
 from io import BytesIO
 import time
 
-# å°Žå…¥è‡ªå®šç¾©æ¨¡çµ„
+try:
+    from streamlit.delta_generator import DeltaGenerator
+except Exception:
+    DeltaGenerator = None
+
+try:
+    import ftfy
+except Exception:
+    ftfy = None
+
+# 導入自定義模組
 from data_processor import DataProcessor
 from business_logic import TransferLogic
 from excel_generator import ExcelGenerator
@@ -22,15 +32,99 @@ from excel_generator import ExcelGenerator
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 1. é é¢é…ç½®
+
+def _fix_mojibake_text(value):
+    if not isinstance(value, str) or not value:
+        return value
+    if ftfy is None:
+        return value
+    try:
+        return ftfy.fix_text(value)
+    except Exception:
+        return value
+
+
+def _fix_mojibake_value(value):
+    if isinstance(value, str):
+        return _fix_mojibake_text(value)
+    if isinstance(value, list):
+        return [_fix_mojibake_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_fix_mojibake_value(item) for item in value)
+    return value
+
+
+def _patch_streamlit_text_rendering():
+    if DeltaGenerator is None or ftfy is None:
+        return
+
+    patch_rules = {
+        'markdown': {'arg_indexes': [0], 'kw_keys': []},
+        'title': {'arg_indexes': [0], 'kw_keys': []},
+        'header': {'arg_indexes': [0], 'kw_keys': []},
+        'subheader': {'arg_indexes': [0], 'kw_keys': []},
+        'text': {'arg_indexes': [0], 'kw_keys': []},
+        'caption': {'arg_indexes': [0], 'kw_keys': []},
+        'code': {'arg_indexes': [0], 'kw_keys': []},
+        'info': {'arg_indexes': [0], 'kw_keys': []},
+        'warning': {'arg_indexes': [0], 'kw_keys': []},
+        'error': {'arg_indexes': [0], 'kw_keys': []},
+        'success': {'arg_indexes': [0], 'kw_keys': []},
+        'button': {'arg_indexes': [0], 'kw_keys': []},
+        'download_button': {'arg_indexes': [0], 'kw_keys': []},
+        'file_uploader': {'arg_indexes': [0], 'kw_keys': []},
+        'checkbox': {'arg_indexes': [0], 'kw_keys': []},
+        'radio': {'arg_indexes': [0, 1], 'kw_keys': ['options']},
+        'selectbox': {'arg_indexes': [0, 1], 'kw_keys': ['options']},
+        'multiselect': {'arg_indexes': [0, 1], 'kw_keys': ['options']},
+        'tabs': {'arg_indexes': [0], 'kw_keys': []},
+        'expander': {'arg_indexes': [0], 'kw_keys': []},
+        'metric': {'arg_indexes': [0, 2], 'kw_keys': ['label', 'delta']}
+    }
+
+    def make_wrapper(method_name, original, arg_indexes, kw_keys):
+        def wrapper(self, *args, **kwargs):
+            args = list(args)
+
+            if method_name == 'write':
+                args = [_fix_mojibake_value(arg) for arg in args]
+            else:
+                for index in arg_indexes:
+                    if index < len(args):
+                        args[index] = _fix_mojibake_value(args[index])
+
+            for key in kw_keys:
+                if key in kwargs:
+                    kwargs[key] = _fix_mojibake_value(kwargs[key])
+
+            return original(self, *args, **kwargs)
+
+        wrapper._kilo_mojibake_patched = True
+        return wrapper
+
+    write_original = getattr(DeltaGenerator, 'write', None)
+    if write_original is not None and not getattr(write_original, '_kilo_mojibake_patched', False):
+        setattr(DeltaGenerator, 'write', make_wrapper('write', write_original, [], []))
+
+    for method_name, rule in patch_rules.items():
+        original = getattr(DeltaGenerator, method_name, None)
+        if original is None or getattr(original, '_kilo_mojibake_patched', False):
+            continue
+        wrapped = make_wrapper(method_name, original, rule['arg_indexes'], rule['kw_keys'])
+        setattr(DeltaGenerator, method_name, wrapped)
+
+
+_patch_streamlit_text_rendering()
+
+# 1. 頁面配置
 st.set_page_config(
-    page_title="åº«å­˜調貨建議ç³»çµ± v2.4.0",
-    page_icon="ðŸ“¦",
+    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.4.0"),
+    page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# é…è‰²æ–¹æ¡ˆï¼ˆæ·ºè‰²模式ï¼‰
+# 配色方案(淺色模式ï¼‰
 theme = {
     'bg_primary': '#FFFFFF',
     'bg_secondary': '#F8F9FA',
@@ -53,29 +147,29 @@ theme = {
     'shadow': 'rgba(0,0,0,0.05)'
 }
 
-# æ‡‰ç”¨è‡ªå®šç¾©CSSæ¨£å¼
+# 應用自定義CSS樣式
 st.markdown(f"""
 <style>
-    /* å…¨å±€æ¨£å¼ */
+    /* 全局樣式 */
     .stApp {{
         background-color: {theme['bg_primary']};
         color: {theme['text_primary']};
     }}
     
-    /* å´é‚Šæ¬„ */
+    /* 側邊欄 */
     section[data-testid="stSidebar"] {{
         background-color: {theme['bg_secondary']};
         border-right: 1px solid {theme['border']};
     }}
     
-    /* æ¨™é¡Œå„ªåŒ– */
+    /* 標題優化 */
     h1, h2, h3 {{
         color: {theme['text_primary']};
         font-weight: 600;
         letter-spacing: -0.5px;
     }}
     
-    /* ä¸»æŒ‰éˆ•æ¨£å¼ */
+    /* 主按鈕樣式 */
     .stButton > button {{
         background: linear-gradient(135deg, {theme['accent']} 0%, {theme['accent_hover']} 100%);
         color: white;
@@ -94,7 +188,7 @@ st.markdown(f"""
         box-shadow: 0 6px 20px {theme['shadow']};
     }}
     
-    /* å¡ç‰‡æ¨£å¼ */
+    /* 卡片樣式 */
     .info-card {{
         background: {theme['bg_secondary']};
         border: 1px solid {theme['border']};
@@ -104,7 +198,7 @@ st.markdown(f"""
         box-shadow: 0 2px 8px {theme['shadow']};
     }}
     
-    /* ä¸Šå‚³å€åŸŸ */
+    /* 上傳區域 */
     .uploadedFile {{
         background: {theme['bg_secondary']};
         border: 2px dashed {theme['border']};
@@ -112,19 +206,19 @@ st.markdown(f"""
         padding: 20px;
     }}
     
-    /* æ•¸æ“šè¡¨æ ¼ */
+    /* 數據表格 */
     .dataframe {{
         background: {theme['bg_secondary']};
         border-radius: 8px;
     }}
     
-    /* Metricå¡ç‰‡ */
+    /* Metric卡片 */
     div[data-testid="stMetricValue"] {{
         color: {theme['accent']};
         font-weight: 700;
     }}
     
-    /* æˆåŠŸ/éŒ¯èª¤è¨Šæ¯ */
+    /* 成功/錯誤訊息 */
     .stSuccess {{
         background-color: {theme['success_bg']} !important;
         color: {theme['success_text']} !important;
@@ -173,7 +267,7 @@ st.markdown(f"""
         color: #DC3545 !important;
     }}
     
-    /* ç¢ºä¿æ‰€æœ‰æ–‡å­—éƒ½æœ‰è¶³å¤ å°æ¯”åº¦ */
+    /* 確保所有文字都有足夠對比度 */
     p, span, div, label {{
         color: {theme['text_primary']};
     }}
@@ -182,12 +276,12 @@ st.markdown(f"""
         color: {theme['text_primary']};
     }}
     
-    /* ç²¾ç°¡é€²åº¦æ¢ */
+    /* 精簡進度條 */
     .stProgress > div > div {{
         background-color: {theme['accent']};
     }}
     
-    /* ä¸‹è¼‰æŒ‰éˆ• */
+    /* 下載按鈕 */
     .stDownloadButton > button {{
         background: {theme['success']};
         color: white;
@@ -199,305 +293,309 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# 2. å´é‚Šæ¬„è¨­è¨ˆ
+# 2. 側邊欄設計
 with st.sidebar:
-    st.markdown("### ðŸ“¦ ç³»çµ±è³‡è¨Š")
+    st.markdown("### 📦 系統資訊")
     st.markdown("""
     <div class="info-card">
-    <b>ç‰ˆæœ¬</b>: v2.4.0<br>
-    <b>é–‹ç™¼è€…</b>: Ricky
+    <b>版本</b>: v2.4.0<br>
+    <b>開發者</b>: Ricky
     </div>
     """, unsafe_allow_html=True)
     
-    with st.expander("ðŸ’¡ æ ¸å¿ƒåŠŸèƒ½", expanded=False):
+    with st.expander("💡 核心功能", expanded=False):
         st.markdown("""
-        **ä¹模式æ™ºèƒ½調貨ç³»çµ±ï¼š**
-        - âœ… A模式(ä¿å®ˆ轉貨) / B模式(åŠ å¼·轉貨)
-        - âœ… B2模式(é™„åŠ Bç‰¹åˆ¥模式) / B3模式(é™„åŠ Bè·¨OMç‰¹åˆ¥模式)
-        - âœ… C模式(é‡é»žè£œ0) / C2模式(é™„åŠ Cè·¨OMé‡é»žè£œ0)
-        - âœ… D模式(æ¸…貨轉貨) / E1模式(å¼·åˆ¶轉å‡º) / E2模式(å¼·åˆ¶轉å‡ºè·¨OM) / F模式(ç›®æ¨™å„ªåŒ–)
+        **九模式æ™ºèƒ½調貨系統:**
+        - ✅ A模式(保守轉貨) / B模式(加強轉貨)
+        - ✅ B2模式(附加B特別模式) / B3模式(附加Bè·¨OM特別模式)
+        - ✅ C模式(重點補0) / C2模式(附加Cè·¨OM重點補0)
+        - ✅ D模式(清貨轉貨) / E1模式(強制轉出) / E2模式(強制轉出跨OM) / F模式(目標優化)
         
-        **æ™ºèƒ½è­˜åˆ¥èˆ‡åŒ¹é…ï¼š**
-        - âœ… ND/RFé¡žåž‹æ™ºæ…§è­˜åˆ¥
-        - âœ… å„ªå…ˆé †åº調貨åŒ¹é…
-        - âœ… RF轉å‡ºé™åˆ¶æŽ§åˆ¶
-        - âœ… è·¨OMé…å°æ”¯æ´ï¼ˆB3/C2/E/F模式ï¼‰
+        **智能識別與匹配:**
+        - ✅ ND/RF類型智慧識別
+        - ✅ 優先順序調貨匹配
+        - ✅ RF轉出限制控制
+        - ✅ è·¨OM配對支援(B3/C2/E/F模式ï¼‰
         
-        **ç‰¹æ®ŠåŠŸèƒ½ï¼š**
-        - âœ… D模式ï¼šé¿å…1ä»¶é¤˜貨
-        - âœ… E1模式ï¼šæ¨™è¨˜å•†å“å¼·åˆ¶轉å‡ºï¼ˆåƒ…åŒOMï¼‰
-        - âœ… E2模式ï¼šæ¨™è¨˜å•†å“å¼·åˆ¶轉å‡ºï¼ˆè·¨OMï¼‰
-        - âœ… F模式ï¼šTargetç›®æ¨™æŽ¥æ”¶å„ªå…ˆ
-        - âœ… B2模式ï¼šæŽ¥æ”¶ç«¯ä¾éŠå®¢å€/æ··åˆåž‹åº—èˆ–å„ªå…ˆæŽ’åº
-        - âœ… B3/C2模式ï¼šè·¨OMé…å°è¦å‰‡ï¼ˆHDä¸èƒ½轉åˆ°HA/HB/HCï¼›Windy轉å‡ºåªèƒ½åˆ°Windyï¼‰
+        **特殊功能:**
+        - ✅ D模式ï¼šé¿å…1件餘貨
+        - ✅ E1模式ï¼šæ¨™è¨˜å•†å"å¼·åˆ¶轉出(僅同OM)
+        - ✅ E2模式ï¼šæ¨™è¨˜å•†å"å¼·åˆ¶轉出(跨OM)
+        - ✅ F模式ï¼šTarget目標接收優先
+        - ✅ B2模式ï¼šæŽ¥æ"¶ç«¯ä¾éŠå®¢å€/混合型店舖優先排序
+        - ✅ B3/C2模式ï¼šè·¨OM配對規則(HD不能轉到HA/HB/HCï¼›Windy轉出只能到Windy)
         
-        **è‡ªå‹•åŒ–åŠŸèƒ½ï¼š**
-        - âœ… é è¨­åº—èˆ–è³‡æ–™è‡ªå‹•å¡«å……ï¼ˆOMã€Typeï¼‰
-        - âœ… çµ±è¨ˆåˆ†æžå’Œåœ–è¡¨
-        - âœ… Excelæ ¼å¼åŒ¯å‡º
+        **自動化功能:**
+        - ✅ 預設店舖資料自動填充(OM、Type)
+        - ✅ 統計分析和圖表
+        - ✅ Excel格式匯出
         """)
     
     st.markdown("---")
     
-    with st.expander("ðŸŽ¯ æ“ä½œæŒ‡å¼•", expanded=False):
+    with st.expander("🎯 操作指引", expanded=False):
         st.markdown("""
-        **å®Œæ•´æ“ä½œæµç¨‹ï¼š**
+        **完整操作流程:**
         
-        1. **ä¸Šå‚³ Excel æ–‡ä»¶**
-           - é»žæ“Šç€è¦½æ–‡ä»¶æˆ–æ‹–æ”¾æ–‡ä»¶åˆ°ä¸Šå‚³å€åŸŸ
-           - ç¢ºä¿åŒ…å«æ‰€æœ‰å¿…éœ€æ¬„ä½
+        1. **上傳 Excel 文件**
+           - 點擊瀏覽文件或拖放文件到上傳區域
+           - 確保包含所有必需欄位
         
-        2. **é¸æ“‡轉貨模式**
-           - åœ¨å´é‚Šæ¬„é¸æ“‡é©åˆçš„轉貨模式ï¼ˆA/B/B2/B3/C/C2/D/E/Fï¼‰
-           - æŸ¥çœ‹模式èªªæ˜Žäº†è§£å„模式ç‰¹é»ž
+        2. **選擇轉貨模式**
+           - 在側邊欄選擇適合的轉貨模式ï¼ˆA/B/B2/B3/C/C2/D/E/F)
+           - 查看模式èªªæ˜Žäº†è§£å"模式ç‰¹é»ž
         
-        3. **å•Ÿå‹•åˆ†æž**
-           - é»žæ“Šã€Œç”Ÿæˆ調貨建議ã€æŒ‰éˆ•é–‹å§‹è™•ç†
-           - ç³»çµ±æœƒè‡ªå‹•é€²è¡Œæ•¸æ“šé©—è­‰å’Œåˆ†æž
+        3. **啟動分析**
+           - 點擊「生成調貨建議」按鈕開始處理
+           - 系統會自動進行數據驗證和分析
         
-        4. **æŸ¥çœ‹çµæžœ**
-           - åœ¨ä¸»é é¢æŸ¥çœ‹KPIã€調貨建議å’Œçµ±è¨ˆåœ–è¡¨
-           - å±•é–‹è©³ç´°çµ±è¨ˆäº†è§£æ›´å¤šä¿¡æ¯
+        4. **查看結果**
+           - 在主頁面查看KPI、調貨建議和統計圖表
+           - 展開詳細統計了解更多信息
         
-        5. **ä¸‹è¼‰å ±å‘Š**
-           - é»žæ“Šä¸‹è¼‰æŒ‰éˆ•ç²å– Excel å ±å‘Š
-           - å ±å‘ŠåŒ…å«å®Œæ•´çš„調貨建議å’Œçµ±è¨ˆä¿¡æ¯
+        5. **下載報告**
+           - 點擊下載按鈕獲取 Excel 報告
+           - 報告包含完整的調貨建議和統計信息
         """)
     
     st.markdown("---")
     
-    # 模式é¸æ“‡
-    st.markdown("### âš™ï¸ 模式é¸æ“‡")
+    # 模式選擇
+    st.markdown("### ⚙️ 模式選擇")
     transfer_mode = st.radio(
-        "é¸æ“‡轉貨模式",
-        ["A: ä¿å®ˆ轉貨", "B: åŠ å¼·轉貨", "B2: é™„åŠ B(ç‰¹åˆ¥模式)", "B3: é™„åŠ B(è·¨OMç‰¹åˆ¥模式)", 
-         "C: é‡é»žè£œ0", "C2: é™„åŠ C(è·¨OMé‡é»žè£œ0)", "D: æ¸…貨轉貨", "E1: å¼·åˆ¶轉å‡º", "E2: å¼·åˆ¶轉å‡º(è·¨OM)", "F: ç›®æ¨™å„ªåŒ–"],
+        "選擇轉貨模式",
+        [
+            "A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B3: 附加B(跨OM特別模式)",
+            "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E1: 強制轉出", "E2: 強制轉出(跨OM)", "F: 目標優化"
+        ],
         key='transfer_mode',
-        help="é¸æ“‡é©åˆçš„調貨模式"
+        help="選擇適合的調貨模式"
     )
+    transfer_mode = _fix_mojibake_text(transfer_mode)
+    mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
     
-    # ç²¾ç°¡模式èªªæ˜Ž
+    # 精簡模式說明
     mode_descriptions = {
-        "A: ä¿å®ˆ轉貨": "轉å‡ºå¾Œä¿ç•™å®‰å…¨åº«å­˜",
-        "B: åŠ å¼·轉貨": "ç©æ¥µè™•ç†æ»¯éŠ·å“",
-        "B2: é™„åŠ B(ç‰¹åˆ¥模式)": "B模式 + Type=Lå…¨轉å‡º",
-        "B3: é™„åŠ B(è·¨OMç‰¹åˆ¥模式)": "B2 + è·¨OMé…å°",
-        "C: é‡é»žè£œ0": "è£œå……åº«å­˜â‰¤1çš„åº—幫",
-        "C2: é™„åŠ C(è·¨OMé‡é»žè£œ0)": "C模式 + è·¨OMé…å°",
-        "D: æ¸…貨轉貨": "æ¸…ç†ç„¡éŠ·å”®NDåº—幫",
-        "E1: å¼·åˆ¶轉å‡º": "æ¨™è¨˜å•†å“å¼·åˆ¶轉å‡ºï¼ˆåƒ…åŒOMï¼‰",
-        "E2: å¼·åˆ¶轉å‡º(è·¨OM)": "æ¨™è¨˜å•†å“å¼·åˆ¶轉å‡ºï¼ˆå¯è·¨OMï¼‰",
-        "F: ç›®æ¨™å„ªåŒ–": "ä¾Targetç›®æ¨™åˆ†é…"
+        "A: 保守轉貨": "轉出後保留安全庫存",
+        "B: 加強轉貨": "積極處理滯銷品",
+        "B2: 附加B(特別模式)": "B模式 + Type=L全轉出",
+        "B3: 附加B(跨OM特別模式)": "B2 + 跨OM配對",
+        "C: 重點補0": "補充庫存≤1的店幫",
+        "C2: 附加C(跨OM重點補0)": "C模式 + 跨OM配對",
+        "D: 清貨轉貨": "清理無銷售ND店幫",
+        "E1: 強制轉出": "標記商品強制轉出(僅同OM)",
+        "E2: 強制轉出(跨OM)": "標記商品強制轉出(可跨OM)",
+        "F: 目標優化": "依Target目標分配"
     }
     
     st.caption(mode_descriptions[transfer_mode])
     
-    with st.expander("ðŸ“‹ è©³ç´°模式èªªæ˜Ž", expanded=False):
+    with st.expander("📋 詳細模式èªªæ˜Ž", expanded=False):
         st.markdown("""
         ### 轉貨模式è©³è§£
         
-        **A模式(ä¿å®ˆ轉貨)**
-        - 轉å‡ºå¾Œå‰©é¤˜åº«å­˜ä¸ä½Žæ–¼å®‰å…¨åº«å­˜
-        - 轉å‡ºé¡žåž‹ç‚ºRFéŽå‰©轉å‡º
-        - é©åˆä¿å®ˆåž‹調貨ç­–ç•¥
+        **A模式(保守轉貨)**
+        - 轉出後剩餘庫存不低於安全庫存
+        - 轉出類型為RF過剩轉出
+        - 適合保守型調貨ç­–ç•¥
         
-        **B模式(åŠ å¼·轉貨)**
-        - 轉å‡ºå¾Œå‰©é¤˜åº«å­˜å¯èƒ½ä½Žæ–¼å®‰å…¨åº«å­˜
-        - 轉å‡ºé¡žåž‹ç‚ºRFåŠ å¼·轉å‡º
-        - æ›´ç©æ¥µåœ°è™•ç†æ»¯éŠ·å“
+        **B模式(加強轉貨)**
+        - 轉出後剩餘庫存可能低於安全庫存
+        - 轉出類型為RF加強轉出
+        - 更積極地處理滯銷品
         
-        **B2模式(é™„åŠ Bç‰¹åˆ¥模式)**
-        - NDåº—幫å…¨轉å‡º
-        - Type=Låœ¨éŠ·é‡â‰¤2æ™‚å…¨轉å‡º(å«RF)ï¼Œè‹¥éŠ·é‡>2å‰‡å›žåˆ°B模式
-        - å…¶é¤˜RFä¾B模式è¦å‰‡
-        - æŽ¥æ”¶ç«¯ä¾éŠå®¢å€/æ··åˆåž‹åº—èˆ–å„ªå…ˆç´šæŽ’åº
-        - æŽ¥æ”¶ä¸Šé™ç‚ºSafety Stockçš„2å€
+        **B2模式(附加B特別模式)**
+        - ND店幫å…¨轉出
+        - Type=L在銷量≤2時全轉出(含RF),若銷量>2則回到B模式
+        - 其餘RF依B模式è¦å‰‡
+        - 接收端依遊客區/混合型店舖優先級排序
+        - 接收上限為Safety Stock的2倍
         
-        **B3模式(é™„åŠ Bè·¨OMç‰¹åˆ¥模式)**
-        - åƒç…§B2ï¼Œä½†å…è¨±è·¨OMé…å°
-        - HDä¸èƒ½轉åˆ°HA/HB/HC
-        - Windy轉å‡ºåªèƒ½åˆ°Windyï¼ŒWindyå¯æŽ¥æ”¶å…¶ä»–OM
+        **B3模式(附加Bè·¨OM特別模式)**
+        - 參照B2,但允許跨OM配對
+        - HD不能轉到HA/HB/HC
+        - Windy轉出只能到Windy,Windy可接收其他OM
         
-        **C模式(é‡é»žè£œ0)**
-        - ä¸»è¦é‡å°æŽ¥æ”¶åº—幫
-        - ç•¶(SaSa Net Stock+Pending Received)â‰¤1æ™‚
-        - è£œå……è‡³è©²åº—幫çš„Safetyæˆ–MOQ+1çš„æ•¸é‡(å–æœ€ä½Žå€¼)
+        **C模式(重點補0)**
+        - 主要針對接收店幫
+        - 當(SaSa Net Stock+Pending Received)≤1時
+        - 補充至該店幫çš"Safety或MOQ+1的數量(取最低值)
         
-        **C2模式(é™„åŠ Cè·¨OMé‡é»žè£œ0)**
-        - åƒç…§C模式çš„轉å‡º/æŽ¥æ”¶é‚è¼¯
-        - å…è¨±è·¨OMé…å°
-        - HDä¸èƒ½轉åˆ°HA/HB/HC
-        - Windy轉å‡ºåªèƒ½åˆ°Windyï¼ŒWindyå¯æŽ¥æ”¶å…¶ä»–OM
+        **C2模式(附加Cè·¨OM重點補0)**
+        - 參照C模式çš"轉出/接收邏輯
+        - 允許跨OM配對
+        - HD不能轉到HA/HB/HC
+        - Windy轉出只能到Windy,Windy可接收其他OM
         
-        **D模式(æ¸…貨轉貨)**
-        - é‡å°NDé¡žåž‹ä¸”ç„¡éŠ·å”®è¨˜éŒ„çš„åº—幫é€²è¡Œæ¸…貨
-        - é¿å…1ä»¶é¤˜貨ï¼Œç¢ºä¿轉å‡ºå¾Œå‰©é¤˜åº«å­˜ç‚º0ä»¶æˆ–â‰¥2ä»¶
-        - 轉å‡ºé¡žåž‹ç‚ºNDæ¸…貨轉å‡º
+        **D模式(清貨轉貨)**
+        - 針對ND類型且無銷售記錄的店幫進行清貨
+        - 避免1件餘貨,確保轉出後剩餘庫存為0件或≥2ä»¶
+        - 轉出類型為ND清貨轉出
         
-        **E1模式(å¼·åˆ¶轉å‡º)**
-        - é‡å°æ¨™è¨˜ç‚º*ALL*çš„å•†å“è¡Œï¼Œå…¨æ•¸å¼·åˆ¶轉å‡º
-        - æŽ¥æ”¶åº—幫ç‚ºRFï¼Œä¸Šé™ç‚ºSafety Stockçš„2å€
-        - **åƒ…åŒOMé…å°**ï¼ŒHDä¸èƒ½轉åˆ°HA/HB/HC
-        - 轉å‡ºé¡žåž‹ç‚ºE模式å¼·åˆ¶轉å‡º
+        **E1模式(強制轉出)**
+        - 針對標記為*ALL*的商品行,全數強制轉出
+        - 接收店幫為RF,上限為Safety Stockçš"2倍
+        - **僅同OM配對**,HD不能轉到HA/HB/HC
+        - 轉出類型為E模式å¼·åˆ¶轉出
         
-        **E2模式(å¼·åˆ¶轉å‡ºè·¨OM)**
-        - é‡å°æ¨™è¨˜ç‚º*ALL*çš„å•†å“è¡Œï¼Œå…¨æ•¸å¼·åˆ¶轉å‡º
-        - æŽ¥æ”¶åº—幫ç‚ºRFï¼Œä¸Šé™ç‚ºSafety Stockçš„2å€
-        - å„ªå…ˆåŒOMé…å°ï¼Œ**å¯è·¨OM**ï¼ŒHDä¸èƒ½轉åˆ°HA/HB/HC
-        - 轉å‡ºé¡žåž‹ç‚ºE模式å¼·åˆ¶轉å‡º
+        **E2模式(強制轉出跨OM)**
+        - 針對標記為*ALL*的商品行,全數強制轉出
+        - 接收店幫為RF,上限為Safety Stockçš"2倍
+        - 優先同OM配對,**可跨OM**,HD不能轉到HA/HB/HC
+        - 轉出類型為E模式å¼·åˆ¶轉出
         
-        **F模式(ç›®æ¨™å„ªåŒ–)**
-        - Targetæ¬„ä½å¡«æ•¸å­—ä½œç‚ºå„ªå…ˆæŽ¥æ”¶ç›®æ¨™
-        - å…¶ä»–åº—幫æŒ‰C模式è£œ0éœ€æ±‚è¨ˆ算
-        - å…è¨±è·¨OMé…å°ï¼ŒHDä¸èƒ½轉åˆ°HA/HB/HC
+        **F模式(目標優化)**
+        - Target欄位填數字作為優先接收目標
+        - 其他店幫按C模式è£œ0需求計算
+        - 允許跨OM配對,HD不能轉到HA/HB/HC
         
         ---
         
-        ### 轉å‡ºé¡žåž‹åˆ¤æ–·
+        ### 轉出類型判斷
         
-        - **RFéŽå‰©轉å‡º**ï¼š轉å‡ºå¾Œå‰©é¤˜åº«å­˜ä¸æœƒä½Žæ–¼Safety Stock
-        - **RFåŠ å¼·轉å‡º**ï¼š轉å‡ºå¾Œå‰©é¤˜åº«å­˜æœƒä½Žæ–¼Safety Stock
-        - **NDæ¸…貨轉å‡º**ï¼šD模式ç‰¹æ®Šï¼ŒNDåº—幫ç„¡éŠ·å”®è¨˜éŒ„æ™‚
-        - **E模式å¼·åˆ¶轉å‡º**ï¼šE1/E2模式ç‰¹æ®Šï¼Œæ¨™è¨˜å•†å“å¼·åˆ¶轉å‡º
+        - **RF過剩轉出**:轉出後剩餘庫存不會低於Safety Stock
+        - **RF加強轉出**:轉出後剩餘庫存會低於Safety Stock
+        - **ND清貨轉出**:D模式ç‰¹æ®Šï¼ŒND店幫無銷售記錄時
+        - **E模式å¼·åˆ¶轉出**:E1/E2模式ç‰¹æ®Šï¼Œæ¨™è¨˜å•†å"å¼·åˆ¶轉出
         
-        ### æŽ¥æ”¶æ¢ä»¶èªªæ˜Ž
+        ### 接收條件說明
         
-        **ä¸€èˆ¬æ¢ä»¶ï¼š**
-        - SaSa Net Stock + Pending Received < Safety Stock æ™‚éœ€è¦調æ’¥æŽ¥æ”¶
+        **一般條件:**
+        - SaSa Net Stock + Pending Received < Safety Stock 時需要調撥接收
         
-        **ç‰¹æ®Šæ¢ä»¶ï¼š**
-        - C/C2模式ï¼šç•¶(SaSa Net Stock+Pending Received)â‰¤1æ™‚ï¼Œè£œå……è‡³Safetyæˆ–MOQ+1(å–æœ€ä½Žå€¼)
-        - D模式ï¼šé¿å…1ä»¶é¤˜貨è¦å‰‡
-        - E1模式ï¼šæ‰€æœ‰RFåº—幫å¯æŽ¥æ”¶ï¼Œä¸Šé™ç‚ºSafety Stockçš„2å€ï¼ˆåƒ…åŒOMï¼‰
-        - E2模式ï¼šæ‰€æœ‰RFåº—幫å¯æŽ¥æ”¶ï¼Œä¸Šé™ç‚ºSafety Stockçš„2å€ï¼ˆå¯è·¨OMï¼‰
-        - B2/B3模式ï¼šæŽ¥æ”¶ä¸Šé™ç‚ºSafety Stockçš„2å€ï¼Œä¸¦ç´¯è¨ˆè¿½è¹¤æŽ¥æ”¶é‡
-        - æŽ¥æ”¶å„ªå…ˆç´šï¼ˆB2/B3ï¼‰ï¼šéŠå®¢å€åº—èˆ–é«˜éŠ·é‡ â†’ æ··åˆåž‹åº—èˆ–é«˜éŠ·é‡ â†’ éŠå®¢å€åº—èˆ–é«˜Safety â†’ æ··åˆåž‹åº—èˆ–é«˜Safety
+        **特殊條件:**
+        - C/C2模式ï¼šç•¶(SaSa Net Stock+Pending Received)≤1時,補充至Safety或MOQ+1(取最低值)
+        - D模式ï¼šé¿å…1件餘貨規則
+        - E1模式ï¼šæ‰€æœ‰RF店幫可接收,上限為Safety Stockçš"2倍(僅同OM)
+        - E2模式ï¼šæ‰€æœ‰RF店幫可接收,上限為Safety Stockçš"2倍(可跨OM)
+        - B2/B3模式ï¼šæŽ¥æ"¶ä¸Šé™ç'ºSafety Stockçš"2倍,並累計追蹤接收量
+        - 接收優先級(B2/B3):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
         """)
     
     st.markdown("---")
-    st.caption(f"æ›´æ–°æ™‚é–“: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    st.caption(f"更新時間: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-# 3. é é¢é ­éƒ¨
-st.title("ðŸ“¦ åº«å­˜調貨建議ç³»çµ±")
+# 3. 頁面頭部
+st.title("📦 庫存調貨建議系統")
 st.caption("v2.4.0 | Intelligent Inventory Reallocation System")
 st.markdown("---")
 
-# 4. ä¸»è¦å€å¡Š
-# 4.1. è³‡æ–™ä¸Šå‚³å€å¡Š
-st.markdown("### ðŸ“‚ è³‡æ–™ä¸Šå‚³")
+# 4. 主要區塊
+# 4.1. 資料上傳區塊
+st.markdown("### 📂 資料上傳")
 
-# æ ¹æ“š模式é¡¯ç¤ºè©³ç´°æ¬„ä½èªªæ˜Ž
-if transfer_mode in ["A: ä¿å®ˆ轉貨", "B: åŠ å¼·轉貨", "C: é‡é»žè£œ0", "C2: é™„åŠ C(è·¨OMé‡é»žè£œ0)", "D: æ¸…貨轉貨"]:
-    with st.expander("ðŸ“‹ å¿…éœ€æ¬„ä½èªªæ˜Ž", expanded=False):
+# 根據模式é¡¯ç¤ºè©³ç´°æ¬"位說明
+if mode_code in ["A", "B", "C", "C2", "D"]:
+    with st.expander("📋 必需欄位說明", expanded=False):
         st.markdown("""
-        **åŸºæœ¬æ¬„ä½ï¼š**
+        **基本欄位:**
         - Article, Article Description, OM, RP Type, Site
         
-        **åº«å­˜æ¬„ä½ï¼š**
+        **庫存欄位:**
         - SaSa Net Stock, Pending Received, Safety Stock, MOQ
         
-        **éŠ·é‡æ¬„ä½ï¼š**
+        **銷量欄位:**
         - Last Month Sold Qty, MTD Sold Qty
         """)
-elif transfer_mode in ["B2: é™„åŠ B(ç‰¹åˆ¥模式)", "B3: é™„åŠ B(è·¨OMç‰¹åˆ¥模式)"]:
-    with st.expander("ðŸ“‹ å¿…éœ€æ¬„ä½èªªæ˜Ž", expanded=False):
+elif mode_code in ["B2", "B3"]:
+    with st.expander("📋 必需欄位說明", expanded=False):
         st.markdown("""
-        **åŸºæœ¬æ¬„ä½ï¼š**
+        **基本欄位:**
         - Article, Article Description, OM, RP Type, Site, **Type**
         
-        **åº«å­˜æ¬„ä½ï¼š**
+        **庫存欄位:**
         - SaSa Net Stock, Pending Received, Safety Stock, MOQ
         
-        **éŠ·é‡æ¬„ä½ï¼š**
+        **銷量欄位:**
         - Last Month Sold Qty, MTD Sold Qty
         
-        **âš ï¸ ç‰¹æ®Šè¦æ±‚ï¼š**
-        - **Type æ¬„ä½**ï¼šType=L ä¸”éŠ·é‡â‰¤2 çš„åº—幫å°‡è¢«å…¨轉å‡ºï¼ˆå³ä½¿æ˜¯RFï¼‰ï¼›è‹¥éŠ·é‡>2 å‰‡æŒ‰B模式è™•ç†
-        - **Type èªªæ˜Ž**ï¼šType=T ç‚ºéŠå®¢å€åº—èˆ–ã€Type=M ç‚ºæ··åˆåž‹åº—èˆ–ï¼›B2/B3æŽ¥æ”¶å„ªå…ˆç´šä»¥æ­¤æŽ’åº
+        **⚠️ 特殊要求:**
+        - **Type 欄位**:Type=L 且銷量≤2 的店幫將被全轉出(即使是RF);若銷量>2 則按B模式è™•理
+        - **Type 說明**:Type=T 為遊客區店舖、Type=M 為混合型店舖;B2/B3接收優先級以此排序
         """)
-elif transfer_mode in ["E1: å¼·åˆ¶轉å‡º", "E2: å¼·åˆ¶轉å‡º(è·¨OM)"]:
-    with st.expander("ðŸ“‹ å¿…éœ€æ¬„ä½èªªæ˜Ž", expanded=False):
+elif mode_code in ["E1", "E2"]:
+    with st.expander("📋 必需欄位說明", expanded=False):
         st.markdown("""
-        **åŸºæœ¬æ¬„ä½ï¼š**
-        - Article, Article Description, OM, RP Type, Site, **ALL**ï¼ˆæ¨™è¨˜å•†å“ï¼‰
+        **基本欄位:**
+        - Article, Article Description, OM, RP Type, Site, **ALL**(標記商品)
         
-        **åº«å­˜æ¬„ä½ï¼š**
+        **庫存欄位:**
         - SaSa Net Stock, Pending Received, Safety Stock, MOQ
         
-        **éŠ·é‡æ¬„ä½ï¼š**
+        **銷量欄位:**
         - Last Month Sold Qty, MTD Sold Qty
         
-        **âš ï¸ ç‰¹æ®Šè¦æ±‚ï¼š**
-        - **ALL æ¬„ä½**ï¼šè«‹åœ¨è¦å¼·åˆ¶轉å‡ºçš„å•†å“è¡Œå¡«å¯«ä»»æ„éžç©ºå€¼ï¼ˆä¾‹å¦‚ï¼š*ã€Yã€ALL ç­‰ï¼‰
-        - E1/E2 模式åªæœƒè™•ç†æ¨™è¨˜çš„å•†å“
-        - E1 模式åƒ…åŒOMé…å°ï¼ŒE2 模式å¯è·¨OMé…å°
+        **⚠️ 特殊要求:**
+        - **ALL 欄位**:請在要強制轉出的商品行填寫任意非空值(例如:*、Y、ALL 等)
+        - E1/E2 模式åªæœƒè™•理標記的商品
+        - E1 模式åƒ…同OM配對,E2 模式å¯è·¨OM配對
         """)
-else:  # F: ç›®æ¨™å„ªåŒ–
-    with st.expander("ðŸ“‹ å¿…éœ€æ¬„ä½èªªæ˜Ž", expanded=False):
+else:  # F: 目標優化
+    with st.expander("📋 必需欄位說明", expanded=False):
         st.markdown("""
-        **åŸºæœ¬æ¬„ä½ï¼š**
-        - Article, Article Description, OM, RP Type, Site, **Target**ï¼ˆç›®æ¨™æŽ¥æ”¶æ•¸é‡ï¼‰
+        **基本欄位:**
+        - Article, Article Description, OM, RP Type, Site, **Target**(目標接收數量)
         
-        **åº«å­˜æ¬„ä½ï¼š**
+        **庫存欄位:**
         - SaSa Net Stock, Pending Received, Safety Stock, MOQ
         
-        **éŠ·é‡æ¬„ä½ï¼š**
+        **銷量欄位:**
         - Last Month Sold Qty, MTD Sold Qty
         
-        **âš ï¸ ç‰¹æ®Šè¦æ±‚ï¼š**
-        - **Target æ¬„ä½**ï¼šå¡«æ•¸å­—ä»£è¡¨è©²åº—幫çš„å„ªå…ˆæŽ¥æ”¶ç›®æ¨™æ•¸é‡
-        - æœªå¡«Targetçš„åº—幫æœƒæŒ‰C模式è£œ0éœ€æ±‚è¨ˆ算
+        **⚠️ 特殊要求:**
+        - **Target 欄位**:填數字代表該店幫的優先接收目標數量
+        - 未填Target的店幫會按C模式è£œ0需求計算
         """)
 
 uploaded_file = st.file_uploader(
-    "æ‹–æ”¾æˆ–é»žæ“Šä¸Šå‚³ Excel æ–‡ä»¶",
+    "拖放或點擊上傳 Excel 文件",
     type=["xlsx", "xls"],
-    help="æ”¯æ´ .xlsx å’Œ .xls æ ¼å¼"
+    help="支援 .xlsx 和 .xls 格式"
 )
 
 if uploaded_file is not None:
-    progress_bar = st.progress(0, text="æº–å‚™é–‹å§‹è™•ç†æ–‡ä»¶...")
+    progress_bar = st.progress(0, text="準備開始處理文件...")
     try:
-        # æ–‡ä»¶ä¸Šå‚³é©—è­‰
-        progress_bar.progress(10, text="æ­£åœ¨é©—è­‰æ–‡ä»¶æ ¼å¼...")
+        # 文件上傳驗證
+        progress_bar.progress(10, text="正在驗證文件格式...")
         
-        # å‰µå»ºè‡¨æ™‚æ–‡ä»¶
+        # 創建臨時文件
         with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
             tmp_file.write(uploaded_file.getvalue())
             tmp_file_path = tmp_file.name
         
-        # æ•¸æ“šé è™•ç†
-        progress_bar.progress(25, text="æ–‡ä»¶è®€å–æˆåŠŸï¼æ­£åœ¨é€²è¡Œæ•¸æ“šé è™•ç†...")
+        # 數據預處理
+        progress_bar.progress(25, text="文件讀取成功!正在進行數據預處理...")
         processor = DataProcessor()
         
-        # é©—è­‰æ–‡ä»¶æ ¼å¼
+        # 驗證文件格式
         file_valid, error_msg = processor.validate_file_format(uploaded_file)
         if not file_valid:
-            st.error(f"æ–‡ä»¶æ ¼å¼é©—è­‰å¤±æ•—: {error_msg}")
+            st.error(f"文件格式驗證失敗: {error_msg}")
             os.unlink(tmp_file_path)
             st.stop()
         
         try:
             df, processing_stats = processor.preprocess_data(tmp_file_path)
-            progress_bar.progress(60, text="æ•¸æ“šé è™•ç†å®Œæˆï¼")
+            progress_bar.progress(60, text="數據預處理完成!")
         except ValueError as e:
-            st.error(f"âŒ {str(e)}")
+            st.error(f"❌ {str(e)}")
             os.unlink(tmp_file_path)
             st.stop()
 
-        # B2/B3模式ï¼šå¿…é ˆæœ‰Typeæ¬„ä½ï¼ˆä¸åˆ†å¤§å°å¯«ï¼‰
-        if transfer_mode in ["B2: é™„åŠ B(ç‰¹åˆ¥模式)", "B3: é™„åŠ B(è·¨OMç‰¹åˆ¥模式)"]:
+        # B2/B3模式ï¼šå¿…須有Type欄位(不分大小寫)
+        if mode_code in ["B2", "B3"]:
             original_columns = processing_stats['original_stats'].get('columns', [])
             has_type_column = any(col.upper() == 'TYPE' for col in original_columns)
             if not has_type_column:
-                st.error("âŒ B2/B3模式å¿…é ˆåŒ…å«Typeæ¬„ä½ï¼ˆä¸åˆ†å¤§å°å¯«ï¼‰ã€‚è«‹ç¢ºèªExcelæ¬„ä½å¾Œå†ä¸Šå‚³ã€‚")
+                st.error("❌ B2/B3模式å¿…須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
                 os.unlink(tmp_file_path)
                 st.stop()
         
-        # 清†è‡¨æ™‚æ–‡ä»¶
+        # 清†è‡¨æ™'文件
         os.unlink(tmp_file_path)
         
-        st.success("檔案上傳èˆ‡æ•¸æ“šé è™•ç†æˆåŠŸï¼")
+        st.success("檔案上傳與數據預處理成功!")
         
         # 4.2. 資料查覽模塊
         st.markdown("### 📊 資料查覽")
@@ -509,116 +607,109 @@ if uploaded_file is not None:
         with col3:
             st.metric("店鋪數", df['Site'].nunique())
         
-        st.markdown("**資料樣本ï¼ˆå‰ 10 è¡Œï¼‰**")
+        st.markdown("**資料樣本ï¼ˆå‰ 10 行)**")
         st.dataframe(df.head(10), use_container_width=True)
         
-        # 4.3. åˆ†æžæŒ‰éˆ•å€å¡Š
+        # 4.3. 分析按鈕區塊
         st.markdown("---")
-        st.markdown("### 🚀 åˆ†æžèˆ‡建議")
+        st.markdown("### 🚀 分析與建議")
         
-        st.info(f"當前模式ï¼š**{transfer_mode}**")
+        st.info(f"當前模式：**{transfer_mode}**")
         
-        if st.button("ðŸŽ¯ ç”Ÿæˆ調貨建議", type="primary", use_container_width=True):
-            progress_bar.progress(70, text="æ­£åœ¨åˆ†æžæ•¸æ“šä¸¦ç”Ÿæˆ建議...")
-            with st.spinner("æ¼”算æ³•é‹è¡Œä¸­ï¼Œè«‹ç¨å€™..."):
-                # 轉æ›模式åç¨±
-                if transfer_mode == "A: ä¿å®ˆ轉貨":
-                    mode_name = "ä¿å®ˆ轉貨"
-                elif transfer_mode == "B: åŠ å¼·轉貨":
-                    mode_name = "åŠ å¼·轉貨"
-                elif transfer_mode == "B2: é™„åŠ B(ç‰¹åˆ¥模式)":
-                    mode_name = "é™„åŠ B(ç‰¹åˆ¥模式)"
-                elif transfer_mode == "B3: é™„åŠ B(è·¨OMç‰¹åˆ¥模式)":
-                    mode_name = "é™„åŠ B3(è·¨OMç‰¹åˆ¥模式)"
-                elif transfer_mode == "C: é‡é»žè£œ0":
-                    mode_name = "é‡é»žè£œ0"
-                elif transfer_mode == "C2: é™„åŠ C(è·¨OMé‡é»žè£œ0)":
-                    mode_name = "é™„åŠ C2(è·¨OMé‡é»žè£œ0)"
-                elif transfer_mode == "D: æ¸…貨轉貨":
-                    mode_name = "æ¸…貨轉貨"
-                elif transfer_mode == "E1: å¼·åˆ¶轉å‡º":
-                    mode_name = "å¼·åˆ¶轉å‡º"
-                elif transfer_mode == "E2: å¼·åˆ¶轉å‡º(è·¨OM)":
-                    mode_name = "å¼·åˆ¶轉å‡º(è·¨OM)"
-                else:  # F: ç›®æ¨™å„ªåŒ–
-                    mode_name = "ç›®æ¨™å„ªåŒ–"
+        if st.button("🎯 生成調貨建議", type="primary", use_container_width=True):
+            progress_bar.progress(70, text="正在分析數據並生成建議...")
+            with st.spinner("演算法運行中，請稍候..."):
+                # 轉換模式名稱
+                mode_name_map = {
+                    "A": "保守轉貨",
+                    "B": "加強轉貨",
+                    "B2": "附加B(特別模式)",
+                    "B3": "附加B3(跨OM特別模式)",
+                    "C": "重點補0",
+                    "C2": "附加C2(跨OM重點補0)",
+                    "D": "清貨轉貨",
+                    "E1": "強制轉出",
+                    "E2": "強制轉出(跨OM)",
+                    "F": "目標優化"
+                }
+                mode_name = mode_name_map.get(mode_code, "目標優化")
                 
-                # å‰µå»ºæ¥­å‹™é‚è¼¯å°è±¡
+                # 創建業務邏輯對象
                 transfer_logic = TransferLogic()
                 
-                # ç”Ÿæˆ調貨建議
+                # 生成調貨建議
                 recommendations = transfer_logic.generate_transfer_recommendations(df, mode_name)
                 
-                # åŸ·è¡Œè³ªé‡æª¢æŸ¥
+                # 執行質量檢查
                 quality_passed = transfer_logic.perform_quality_checks(df)
                 
-                # ç²å–çµ±è¨ˆä¿¡æ¯
+                # 獲取統計信息
                 statistics = transfer_logic.get_transfer_statistics()
                 
-                time.sleep(1)  # æ¨¡æ“¬è€—æ™‚æ“ä½œ
+                time.sleep(1)  # 模擬耗時操作
                 
-            progress_bar.progress(90, text="åˆ†æžå®Œæˆï¼æ­£åœ¨æº–å‚™çµæžœå±•ç¤º...")
+            progress_bar.progress(90, text="分析完成!正在準備結果展示...")
             
             if quality_passed:
-                st.success("è³ªé‡æª¢æŸ¥é€šéŽï¼")
+                st.success("質量檢查通過!")
             else:
-                st.error("è³ªé‡æª¢æŸ¥å¤±æ•—ï¼Œè«‹æŸ¥çœ‹éŒ¯èª¤ä¿¡æ¯")
+                st.error("質量檢查失敗,請查看錯誤信息")
                 
-                # é¡¯ç¤ºéŒ¯èª¤ä¿¡æ¯
-                with st.expander("è³ªé‡æª¢æŸ¥éŒ¯èª¤è©³æƒ…"):
+                # 顯示錯誤信息
+                with st.expander("質量檢查錯誤詳情"):
                     for error in transfer_logic.quality_errors:
                         st.error(error)
             
             if recommendations:
-                # 4.4. çµæžœå±•ç¤ºå€å¡Š
+                # 4.4. 結果展示區塊
                 st.markdown("---")
-                st.markdown("### ðŸ“ˆ åˆ†æžçµæžœ")
+                st.markdown("### 📈 分析結果")
                 
-                # KPI æŒ‡æ¨™å¡
+                # KPI 指標卡
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("調貨建議", f"{statistics.get('total_recommendations', 0):,}")
-                col2.metric("調貨ä»¶æ•¸", f"{statistics.get('total_transfer_qty', 0):,}")
-                col3.metric("ç”¢å“æ•¸é‡", f"{statistics.get('unique_articles', 0):,}")
-                col4.metric("OMæ•¸é‡", f"{statistics.get('unique_oms', 0):,}")
+                col2.metric("調貨件數", f"{statistics.get('total_transfer_qty', 0):,}")
+                col3.metric("產品數量", f"{statistics.get('unique_articles', 0):,}")
+                col4.metric("OM數量", f"{statistics.get('unique_oms', 0):,}")
                 
                 st.markdown("")
                 
-                # 調貨建議è¡¨æ ¼
+                # 調貨建議表格
                 st.markdown("### 📋 調貨建議清單")
                 
-                # æº–å‚™é¡¯示數æ"š
+                # 準備顯示數æ"š
                 display_data = []
                 
-                # å‰µå»ºä¸€å€‹å­—å…¸ä¾†è·Ÿè¹¤æ¯å€‹åº—幫çš„ç´¯è¨ˆ轉å‡ºé‡
+                # 創建一個字典來跟蹤æ¯å€‹åº—幫的累計轉出é‡
                 cumulative_transfers = {}
                 
                 for rec in recommendations:
-                        # ç²å–轉å‡ºåº—幫çš„åŽŸå§‹æ•¸æ“š
+                        # 獲取轉出店幫的原始數據
                         source_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Transfer Site'])]
                         source_stock = source_data['SaSa Net Stock'].iloc[0] if not source_data.empty else 0
                         source_safety = source_data['Safety Stock'].iloc[0] if not source_data.empty else 0
                         source_moq = source_data['MOQ'].iloc[0] if not source_data.empty else 0
                         
-                        # ç²å–æŽ¥æ”¶åº—幫çš„åŽŸå§‹æ•¸æ“š
+                        # 獲取接收店幫的原始數據
                         dest_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Receive Site'])]
                         dest_stock = dest_data['SaSa Net Stock'].iloc[0] if not dest_data.empty else 0
                         dest_safety = dest_data['Safety Stock'].iloc[0] if not dest_data.empty else 0
                         dest_moq = dest_data['MOQ'].iloc[0] if not dest_data.empty else 0
                         
-                        # 資¨ˆ算æŽ¥æ”¶å¾Œçš„ç¸½貨é‡
+                        # 資¨ˆ算接收後的總貨量
                         dest_total_after = dest_stock + rec['Transfer Qty']
                         
-                        # å‰µå»ºåº—幫çš„å”¯ä¸€æ¨™è­˜ç¬¦
+                        # 創建店幫的唯一標識符
                         source_key = f"{rec['Article']}_{rec['Transfer Site']}"
                         
-                        # å¦‚æžœæ˜¯ç¬¬ä¸€æ¬¡轉å‡ºï¼Œåˆå§‹åŒ–ç´¯è¨ˆ轉å‡ºé‡
+                        # 如果是第一次轉出,初始化累計轉出量
                         if source_key not in cumulative_transfers:
                             cumulative_transfers[source_key] = 0
                         
-                        # æ›´æ–°ç´¯è¨ˆ轉å‡ºé‡
+                        # 更新累計轉出量
                         cumulative_transfers[source_key] += rec['Transfer Qty']
                         
-                        # 資¨ˆ算ç´¯æ¸›å¾Œçš„åº«å­˜
+                        # 資¨ˆ算累減後的庫存
                         source_after_transfer_stock = source_stock - cumulative_transfers[source_key]
                         
                         display_data.append({
@@ -641,17 +732,17 @@ if uploaded_file is not None:
                             'Destination Type': rec.get('Destination Type', '')
                         })
                     
-                # å‰µå»ºDataFrameä¸¦é¡¯ç¤º
+                # 創建DataFrame並顯示
                 rec_df = pd.DataFrame(display_data)
                 st.dataframe(rec_df, use_container_width=True)
                 
-                # çµ±è¨ˆåœ–è¡¨
-                with st.expander("ðŸ“Š è©³ç´°çµ±è¨ˆ", expanded=False):
+                # 統計圖表
+                with st.expander("📊 詳細統計", expanded=False):
                 
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        st.markdown("**æŒ‰ç”¢å“çµ±è¨ˆ**")
+                        st.markdown("**按產品統計**")
                         article_stats = statistics.get('article_stats', {})
                         if article_stats:
                             article_df = pd.DataFrame([
@@ -665,7 +756,7 @@ if uploaded_file is not None:
                             ])
                             st.dataframe(article_df, use_container_width=True)
                         
-                        st.markdown("**轉å‡ºé¡žåž‹åˆ†ä½ˆ**")
+                        st.markdown("**轉出類型分佈**")
                         source_type_stats = statistics.get('source_type_stats', {})
                         if source_type_stats:
                             source_df = pd.DataFrame([
@@ -679,7 +770,7 @@ if uploaded_file is not None:
                             st.dataframe(source_df, use_container_width=True)
                     
                     with col2:
-                        st.markdown("**æŒ‰ OM çµ±è¨ˆ**")
+                        st.markdown("**按 OM 統計**")
                         om_stats = statistics.get('om_stats', {})
                         if om_stats:
                             om_df = pd.DataFrame([
@@ -694,7 +785,7 @@ if uploaded_file is not None:
                             ])
                             st.dataframe(om_df, use_container_width=True)
                         
-                        st.markdown("**æŽ¥æ”¶é¡žåž‹åˆ†ä½ˆ**")
+                        st.markdown("**接收類型分佈**")
                         dest_type_stats = statistics.get('dest_type_stats', {})
                         if dest_type_stats:
                             dest_df = pd.DataFrame([
@@ -708,52 +799,52 @@ if uploaded_file is not None:
                             st.dataframe(dest_df, use_container_width=True)
                 
                 st.markdown("---")
-                st.success("âœ… åˆ†æžå®Œæˆï¼")
+                st.success("✅ 分析完成!")
                 
-                # ç”ŸæˆExcelæ–‡ä»¶
-                with st.spinner("ç”Ÿæˆ Excel æ–‡ä»¶..."):
+                # 生成Excel文件
+                with st.spinner("生成 Excel 文件..."):
                     excel_generator = ExcelGenerator()
                     excel_path = excel_generator.generate_excel_file(recommendations, statistics)
                 
-                # 資®€å–Excelæ–‡ä»¶
+                # 資®€å–Excel文件
                 with open(excel_path, "rb") as file:
                     excel_data = file.read()
                 
-                # 清†æš«å­˜Excelæ–‡ä»¶
+                # 清†æš«å­˜Excel文件
                 try:
                     os.unlink(excel_path)
                 except OSError:
                     pass
                 
                 st.download_button(
-                    label="ðŸ“¥ ä¸‹è¼‰ Excel å ±è¡¨",
+                    label="📥 下載 Excel 報表",
                     data=excel_data,
                     file_name=excel_generator.output_filename,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
                 
-                progress_bar.progress(100, text="è™•ç†å®Œç•¢ï¼")
+                progress_bar.progress(100, text="處理完畢!")
             else:
-                st.info("æ ¹æ“š當前è¦å‰‡ï¼Œæ²’æœ‰ç”Ÿæˆä»»ä½•調貨建議ã€‚")
-                progress_bar.progress(100, text="è™•ç†å®Œç•¢ï¼")
+                st.info("根據當前è¦å‰‡ï¼Œæ²'有生成任何調貨建議。")
+                progress_bar.progress(100, text="處理完畢!")
     
     except Exception as e:
-        st.error(f"è™•ç†æ–‡ä»¶æ™‚ç™¼ç”ŸéŒ¯èª¤: {e}")
-        if st.checkbox("é¡¯ç¤ºè©³ç´°éŒ¯èª¤è¿½è¹¤"):
+        st.error(f"處理文件時發生錯誤: {e}")
+        if st.checkbox("顯示詳細錯誤追蹤"):
             st.exception(e)
         if 'progress_bar' in locals():
-            progress_bar.progress(100, text="è™•ç†å¤±æ•—ï¼")
+            progress_bar.progress(100, text="處理失敗!")
         
-        # 清†è‡¨æ™‚æ–‡ä»¶
+        # 清†è‡¨æ™'文件
         if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
             os.unlink(tmp_file_path)
 
-# ç³»çµ±é è…³
+# 系統頁腳
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #6C757D; padding: 30px 0;">
-    <p style="margin: 0; font-size: 12px;">åº«å­˜調貨建議ç³»çµ± v2.4.0</p>
+    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.4.0</p>
     <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
 </div>
 """, unsafe_allow_html=True)
