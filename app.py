@@ -26,134 +26,423 @@ logger = logging.getLogger(__name__)
 st.set_page_config(
     page_title="庫存調貨建議系統 v2.3.0",
     page_icon="📦",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# 配色方案（淺色模式）
+theme = {
+    'bg_primary': '#FFFFFF',
+    'bg_secondary': '#F8F9FA',
+    'text_primary': '#212529',
+    'text_secondary': '#6C757D',
+    'accent': '#4A90E2',
+    'accent_hover': '#357ABD',
+    'success': '#28A745',
+    'success_bg': '#D4EDDA',
+    'success_text': '#155724',
+    'info': '#17A2B8',
+    'info_bg': '#D1ECF1',
+    'info_text': '#0C5460',
+    'warning': '#FFC107',
+    'warning_bg': '#FFF3CD',
+    'warning_text': '#856404',
+    'error_bg': '#F8D7DA',
+    'error_text': '#721C24',
+    'border': '#DEE2E6',
+    'shadow': 'rgba(0,0,0,0.05)'
+}
+
+# 應用自定義CSS樣式
+st.markdown(f"""
+<style>
+    /* 全局樣式 */
+    .stApp {{
+        background-color: {theme['bg_primary']};
+        color: {theme['text_primary']};
+    }}
+    
+    /* 側邊欄 */
+    section[data-testid="stSidebar"] {{
+        background-color: {theme['bg_secondary']};
+        border-right: 1px solid {theme['border']};
+    }}
+    
+    /* 標題優化 */
+    h1, h2, h3 {{
+        color: {theme['text_primary']};
+        font-weight: 600;
+        letter-spacing: -0.5px;
+    }}
+    
+    /* 主按鈕樣式 */
+    .stButton > button {{
+        background: linear-gradient(135deg, {theme['accent']} 0%, {theme['accent_hover']} 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 28px;
+        font-weight: 600;
+        font-size: 16px;
+        box-shadow: 0 4px 12px {theme['shadow']};
+        transition: all 0.3s ease;
+        width: 100%;
+    }}
+    
+    .stButton > button:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px {theme['shadow']};
+    }}
+    
+    /* 卡片樣式 */
+    .info-card {{
+        background: {theme['bg_secondary']};
+        border: 1px solid {theme['border']};
+        border-radius: 8px;
+        padding: 16px;
+        margin: 8px 0;
+        box-shadow: 0 2px 8px {theme['shadow']};
+    }}
+    
+    /* 上傳區域 */
+    .uploadedFile {{
+        background: {theme['bg_secondary']};
+        border: 2px dashed {theme['border']};
+        border-radius: 8px;
+        padding: 20px;
+    }}
+    
+    /* 數據表格 */
+    .dataframe {{
+        background: {theme['bg_secondary']};
+        border-radius: 8px;
+    }}
+    
+    /* Metric卡片 */
+    div[data-testid="stMetricValue"] {{
+        color: {theme['accent']};
+        font-weight: 700;
+    }}
+    
+    /* 成功/錯誤訊息 */
+    .stSuccess {{
+        background-color: {theme['success_bg']} !important;
+        color: {theme['success_text']} !important;
+        border-left: 4px solid {theme['success']};
+        border-radius: 6px;
+        padding: 12px 16px;
+    }}
+    
+    .stSuccess svg {{
+        color: {theme['success']} !important;
+    }}
+    
+    .stInfo {{
+        background-color: {theme['info_bg']} !important;
+        color: {theme['info_text']} !important;
+        border-left: 4px solid {theme['info']};
+        border-radius: 6px;
+        padding: 12px 16px;
+    }}
+    
+    .stInfo svg {{
+        color: {theme['info']} !important;
+    }}
+    
+    .stWarning {{
+        background-color: {theme['warning_bg']} !important;
+        color: {theme['warning_text']} !important;
+        border-left: 4px solid {theme['warning']};
+        border-radius: 6px;
+        padding: 12px 16px;
+    }}
+    
+    .stWarning svg {{
+        color: {theme['warning']} !important;
+    }}
+    
+    .stError {{
+        background-color: {theme['error_bg']} !important;
+        color: {theme['error_text']} !important;
+        border-left: 4px solid #DC3545;
+        border-radius: 6px;
+        padding: 12px 16px;
+    }}
+    
+    .stError svg {{
+        color: #DC3545 !important;
+    }}
+    
+    /* 確保所有文字都有足夠對比度 */
+    p, span, div, label {{
+        color: {theme['text_primary']};
+    }}
+    
+    .stMarkdown {{
+        color: {theme['text_primary']};
+    }}
+    
+    /* 精簡進度條 */
+    .stProgress > div > div {{
+        background-color: {theme['accent']};
+    }}
+    
+    /* 下載按鈕 */
+    .stDownloadButton > button {{
+        background: {theme['success']};
+        color: white;
+        border-radius: 8px;
+        padding: 12px 28px;
+        font-weight: 600;
+        box-shadow: 0 4px 12px {theme['shadow']};
+    }}
+</style>
+""", unsafe_allow_html=True)
 
 # 2. 側邊欄設計
 with st.sidebar:
-    st.header("系統資訊")
-    st.info("""
-    **版本：v2.3.0**
-    **開發者: Ricky**
+    st.markdown("### 📦 系統資訊")
+    st.markdown("""
+    <div class="info-card">
+    <b>版本</b>: v2.3.0<br>
+    <b>開發者</b>: Ricky
+    </div>
+    """, unsafe_allow_html=True)
     
-    **核心功能：**
-    - ✅ 九模式系統
-    - ✅ A模式(保守轉貨)/B模式(加強轉貨)/B2模式(附加B特別模式)/B3模式(附加B跨OM特別模式)/C模式(重點補0)/C2模式(附加C跨OM重點補0)/D模式(清貨轉貨)/E模式(強制轉出)/F模式(目標優化)
-    - ✅ ND/RF類型智慧識別
-    - ✅ 優先順序調貨匹配
-    - ✅ RF轉出限制控制
-    - ✅ D模式特殊功能：避免1件餘貨
-    - ✅ E模式特殊功能：標記商品強制轉出
-    - ✅ F模式特殊功能：Target目標接收優先
-    - ✅ B2模式特殊功能：接收端依遊客區/混合型店舖優先排序
-    - ✅ B3模式特殊功能：允許跨OM配對（HD不能轉到HA/HB/HC；Windy轉出只能到Windy）
-    - ✅ C2模式特殊功能：C模式重點補0邏輯+跨OM配對（HD不能轉到HA/HB/HC；Windy轉出只能到Windy）
-    - ✅ 預設店舖資料自動填充（OM、Type）
-    - ✅ 統計分析和圖表
-    - ✅ Excel格式匯出
-    """)
+    with st.expander("💡 核心功能", expanded=False):
+        st.markdown("""
+        **九模式智能調貨系統：**
+        - ✅ A模式(保守轉貨) / B模式(加強轉貨)
+        - ✅ B2模式(附加B特別模式) / B3模式(附加B跨OM特別模式)
+        - ✅ C模式(重點補0) / C2模式(附加C跨OM重點補0)
+        - ✅ D模式(清貨轉貨) / E模式(強制轉出) / F模式(目標優化)
+        
+        **智能識別與匹配：**
+        - ✅ ND/RF類型智慧識別
+        - ✅ 優先順序調貨匹配
+        - ✅ RF轉出限制控制
+        - ✅ 跨OM配對支援（B3/C2/E/F模式）
+        
+        **特殊功能：**
+        - ✅ D模式：避免1件餘貨
+        - ✅ E模式：標記商品強制轉出
+        - ✅ F模式：Target目標接收優先
+        - ✅ B2模式：接收端依遊客區/混合型店舖優先排序
+        - ✅ B3/C2模式：跨OM配對規則（HD不能轉到HA/HB/HC；Windy轉出只能到Windy）
+        
+        **自動化功能：**
+        - ✅ 預設店舖資料自動填充（OM、Type）
+        - ✅ 統計分析和圖表
+        - ✅ Excel格式匯出
+        """)
     
-    st.sidebar.header("操作指引")
-    st.sidebar.markdown("""
-    1. **上傳 Excel 文件**：點擊瀏覽文件或拖放文件到上傳區域。
-    2. **選擇轉貨模式**：在側邊欄選擇轉貨模式（A/B/B2/B3/C/C2/D/E/F）。
-    3. **啟動分析**：點擊「生成調貨建議」按鈕開始處理。
-    4. **查看結果**：在主頁面查看KPI、建議和圖表。
-    5. **下載報告**：點擊下載按鈕獲取 Excel 報告。
-    """)
+    st.markdown("---")
+    
+    with st.expander("🎯 操作指引", expanded=False):
+        st.markdown("""
+        **完整操作流程：**
+        
+        1. **上傳 Excel 文件**
+           - 點擊瀏覽文件或拖放文件到上傳區域
+           - 確保包含所有必需欄位
+        
+        2. **選擇轉貨模式**
+           - 在側邊欄選擇適合的轉貨模式（A/B/B2/B3/C/C2/D/E/F）
+           - 查看模式說明了解各模式特點
+        
+        3. **啟動分析**
+           - 點擊「生成調貨建議」按鈕開始處理
+           - 系統會自動進行數據驗證和分析
+        
+        4. **查看結果**
+           - 在主頁面查看KPI、調貨建議和統計圖表
+           - 展開詳細統計了解更多信息
+        
+        5. **下載報告**
+           - 點擊下載按鈕獲取 Excel 報告
+           - 報告包含完整的調貨建議和統計信息
+        """)
+    
+    st.markdown("---")
     
     # 模式選擇
-    st.sidebar.header("模式選擇")
+    st.markdown("### ⚙️ 模式選擇")
     transfer_mode = st.radio(
         "選擇轉貨模式",
-        ["A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B3: 附加B(跨OM特別模式)", "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E: 強制轉出", "F: 目標優化"],
+        ["A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B3: 附加B(跨OM特別模式)", 
+         "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E: 強制轉出", "F: 目標優化"],
         key='transfer_mode',
-        help="A模式優先保障安全庫存，B模式則更積極地處理滯銷品，B2模式在B模式基礎上加入Type=L全轉出（若銷量>2則回到B模式），並依Type T(遊客區)/Type M(混合型)的銷量與安全庫存排序接收優先級；B3模式參照B2但允許跨OM配對，且HD不能轉到HA/HB/HC、Windy轉出只能到Windy；C模式重點補充庫存為0或1的店鋪，C2模式參照C但允許跨OM配對且HD不能轉到HA/HB/HC、Windy轉出只能到Windy；D模式針對ND店鋪無銷售記錄時的清貨處理，E模式強制轉出標記為*ALL*的商品，F模式使用Target數字優先滿足接收目標。"
+        help="選擇適合的調貨模式"
     )
     
-    # 模式說明
-    with st.sidebar.expander("模式說明"):
+    # 精簡模式說明
+    mode_descriptions = {
+        "A: 保守轉貨": "轉出後保留安全庫存",
+        "B: 加強轉貨": "積極處理滯銷品",
+        "B2: 附加B(特別模式)": "B模式 + Type=L全轉出",
+        "B3: 附加B(跨OM特別模式)": "B2 + 跨OM配對",
+        "C: 重點補0": "補充庫存≤1的店鋪",
+        "C2: 附加C(跨OM重點補0)": "C模式 + 跨OM配對",
+        "D: 清貨轉貨": "清理無銷售ND店鋪",
+        "E: 強制轉出": "標記商品強制轉出",
+        "F: 目標優化": "依Target目標分配"
+    }
+    
+    st.caption(mode_descriptions[transfer_mode])
+    
+    with st.expander("📋 詳細模式說明", expanded=False):
         st.markdown("""
-        **轉貨模式：**
-        - **A模式(保守轉貨)**：轉出後剩餘庫存不低於安全庫存，轉出類型為RF過剩轉出
-        - **B模式(加強轉貨)**：轉出後剩餘庫存可能低於安全庫存，轉出類型為RF加強轉出
-        - **B2模式(附加B特別模式)**：ND店鋪全轉出；Type=L在銷量≤2時全轉出(含RF)，若銷量>2則回到B模式；其餘RF依B模式規則；接收端依遊客區/混合型店舖優先級排序
-        - **B3模式(附加B跨OM特別模式)**：參照B2，但允許跨OM配對；HD不能轉到HA/HB/HC；Windy轉出只能到Windy，Windy可接收其他OM
-        - **C模式(重點補0)**：主要針對接收店鋪，當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
-        - **C2模式(附加C跨OM重點補0)**：參照C模式的轉出/接收邏輯，但允許跨OM配對；HD不能轉到HA/HB/HC；Windy轉出只能到Windy，Windy可接收其他OM
-        - **D模式(清貨轉貨)**：針對ND類型且無銷售記錄的店鋪進行清貨，避免1件餘貨
-        - **E模式(強制轉出)**：針對標記為*ALL*的商品行，全數強制轉出。接收店鋪為RF，上限為Safety Stock的2倍。優先同OM配對，跨OM時HD不能轉到HA/HB/HC
-        - **F模式(目標優化)**：Target欄位填數字作為優先接收目標；其他店鋪按C模式補0需求計算；允許跨OM配對，HD不能轉到HA/HB/HC
+        ### 轉貨模式詳解
         
-        **轉出類型判斷：**
-        - 如果轉出店鋪轉出後, 剩餘庫存不會低過Safety stock, 轉出類型定位為RF過剩轉出
-        - 如果轉出店鋪轉出後, 剩餘庫存會低過Safety stock, 轉出類型定位為RF加強轉出
-        - D模式特殊：ND店鋪無銷售記錄時，轉出類型為ND清貨轉出
-        - E模式特殊：所有轉出為E模式強制轉出
-        - F模式特殊：Target數字優先接收
+        **A模式(保守轉貨)**
+        - 轉出後剩餘庫存不低於安全庫存
+        - 轉出類型為RF過剩轉出
+        - 適合保守型調貨策略
         
-        **接收條件：**
-        - SaSa Net Stock + Pending Received < Safety Stock，便需要進行調撥接收
-        - C/C2模式特殊條件：當(SaSa Net Stock+Pending Received)<=1時，補充至該店鋪的Safety或MOQ+1的數量(取最低值)
-        - D模式特殊規則：避免1件餘貨，確保轉出後剩餘庫存為0件或≥2件
-        - E模式特殊規則：所有RF店鋪可接收，上限為Safety Stock的2倍
-        - B2模式特殊規則：接收上限為Safety Stock的2倍，並累計追蹤接收量；接收優先級：遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
-        - B3模式特殊規則：在B2規則上允許跨OM配對；HD不能轉到HA/HB/HC；Windy轉出只能到Windy
-        - C2模式特殊規則：在C模式規則上允許跨OM配對；HD不能轉到HA/HB/HC；Windy轉出只能到Windy
+        **B模式(加強轉貨)**
+        - 轉出後剩餘庫存可能低於安全庫存
+        - 轉出類型為RF加強轉出
+        - 更積極地處理滯銷品
+        
+        **B2模式(附加B特別模式)**
+        - ND店鋪全轉出
+        - Type=L在銷量≤2時全轉出(含RF)，若銷量>2則回到B模式
+        - 其餘RF依B模式規則
+        - 接收端依遊客區/混合型店舖優先級排序
+        - 接收上限為Safety Stock的2倍
+        
+        **B3模式(附加B跨OM特別模式)**
+        - 參照B2，但允許跨OM配對
+        - HD不能轉到HA/HB/HC
+        - Windy轉出只能到Windy，Windy可接收其他OM
+        
+        **C模式(重點補0)**
+        - 主要針對接收店鋪
+        - 當(SaSa Net Stock+Pending Received)≤1時
+        - 補充至該店鋪的Safety或MOQ+1的數量(取最低值)
+        
+        **C2模式(附加C跨OM重點補0)**
+        - 參照C模式的轉出/接收邏輯
+        - 允許跨OM配對
+        - HD不能轉到HA/HB/HC
+        - Windy轉出只能到Windy，Windy可接收其他OM
+        
+        **D模式(清貨轉貨)**
+        - 針對ND類型且無銷售記錄的店鋪進行清貨
+        - 避免1件餘貨，確保轉出後剩餘庫存為0件或≥2件
+        - 轉出類型為ND清貨轉出
+        
+        **E模式(強制轉出)**
+        - 針對標記為*ALL*的商品行，全數強制轉出
+        - 接收店鋪為RF，上限為Safety Stock的2倍
+        - 優先同OM配對，跨OM時HD不能轉到HA/HB/HC
+        - 轉出類型為E模式強制轉出
+        
+        **F模式(目標優化)**
+        - Target欄位填數字作為優先接收目標
+        - 其他店鋪按C模式補0需求計算
+        - 允許跨OM配對，HD不能轉到HA/HB/HC
+        
+        ---
+        
+        ### 轉出類型判斷
+        
+        - **RF過剩轉出**：轉出後剩餘庫存不會低於Safety Stock
+        - **RF加強轉出**：轉出後剩餘庫存會低於Safety Stock
+        - **ND清貨轉出**：D模式特殊，ND店鋪無銷售記錄時
+        - **E模式強制轉出**：E模式特殊，標記商品強制轉出
+        
+        ### 接收條件說明
+        
+        **一般條件：**
+        - SaSa Net Stock + Pending Received < Safety Stock 時需要調撥接收
+        
+        **特殊條件：**
+        - C/C2模式：當(SaSa Net Stock+Pending Received)≤1時，補充至Safety或MOQ+1(取最低值)
+        - D模式：避免1件餘貨規則
+        - E模式：所有RF店鋪可接收，上限為Safety Stock的2倍
+        - B2/B3模式：接收上限為Safety Stock的2倍，並累計追蹤接收量
+        - 接收優先級（B2/B3）：遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
         """)
+    
+    st.markdown("---")
+    st.caption(f"更新時間: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
 # 3. 頁面頭部
-st.title("📦 庫存調貨建議系統 v2.3.0")
+st.title("📦 庫存調貨建議系統")
+st.caption("v2.3.0 | Intelligent Inventory Reallocation System")
 st.markdown("---")
 
 # 4. 主要區塊
 # 4.1. 資料上傳區塊
-st.header("1. 資料上傳")
+st.markdown("### 📂 資料上傳")
 
-# 根據模式顯示所需欄位提示
+# 根據模式顯示詳細欄位說明
 if transfer_mode in ["A: 保守轉貨", "B: 加強轉貨", "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨"]:
-    st.info("""
-    ✅ **必需欄位（A/B/C/C2/D 模式）：**
-    - 基本欄位：Article, Article Description, OM, RP Type, Site
-    - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
-    - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
-    """)
+    with st.expander("📋 必需欄位說明", expanded=False):
+        st.markdown("""
+        **基本欄位：**
+        - Article, Article Description, OM, RP Type, Site
+        
+        **庫存欄位：**
+        - SaSa Net Stock, Pending Received, Safety Stock, MOQ
+        
+        **銷量欄位：**
+        - Last Month Sold Qty, MTD Sold Qty
+        """)
 elif transfer_mode in ["B2: 附加B(特別模式)", "B3: 附加B(跨OM特別模式)"]:
-    st.info("""
-    ✅ **必需欄位（B2/B3 模式）：**
-    - 基本欄位：Article, Article Description, OM, RP Type, Site, **Type**
-    - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
-    - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
-
-    ⚠️ **特殊要求：**
-    - **Type 欄位**：Type=L 且銷量≤2 的店鋪將被全轉出（即使是RF）；若銷量>2 則按B模式處理
-    - **Type 說明**：Type=T 為遊客區店舖、Type=M 為混合型店舖；B2/B3接收優先級以此排序
-    """)
+    with st.expander("📋 必需欄位說明", expanded=False):
+        st.markdown("""
+        **基本欄位：**
+        - Article, Article Description, OM, RP Type, Site, **Type**
+        
+        **庫存欄位：**
+        - SaSa Net Stock, Pending Received, Safety Stock, MOQ
+        
+        **銷量欄位：**
+        - Last Month Sold Qty, MTD Sold Qty
+        
+        **⚠️ 特殊要求：**
+        - **Type 欄位**：Type=L 且銷量≤2 的店鋪將被全轉出（即使是RF）；若銷量>2 則按B模式處理
+        - **Type 說明**：Type=T 為遊客區店舖、Type=M 為混合型店舖；B2/B3接收優先級以此排序
+        """)
 elif transfer_mode == "E: 強制轉出":
-    st.info("""
-    ✅ **必需欄位（E 模式）：**
-    - 基本欄位：Article, Article Description, OM, RP Type, Site, **ALL**（標記商品）
-    - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
-    - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
-    
-    ⚠️ **特殊要求：**
-    - **ALL 欄位**：請在要強制轉出的商品行填寫任意非空值（例如：*、Y、ALL 等），E 模式只會處理標記的商品
-    """)
+    with st.expander("📋 必需欄位說明", expanded=False):
+        st.markdown("""
+        **基本欄位：**
+        - Article, Article Description, OM, RP Type, Site, **ALL**（標記商品）
+        
+        **庫存欄位：**
+        - SaSa Net Stock, Pending Received, Safety Stock, MOQ
+        
+        **銷量欄位：**
+        - Last Month Sold Qty, MTD Sold Qty
+        
+        **⚠️ 特殊要求：**
+        - **ALL 欄位**：請在要強制轉出的商品行填寫任意非空值（例如：*、Y、ALL 等）
+        - E 模式只會處理標記的商品
+        """)
 else:  # F: 目標優化
-    st.info("""
-    ✅ **必需欄位（F 模式）：**
-    - 基本欄位：Article, Article Description, OM, RP Type, Site, **Target**（目標接收數量）
-    - 庫存欄位：SaSa Net Stock, Pending Received, Safety Stock, MOQ
-    - 銷量欄位：Last Month Sold Qty, MTD Sold Qty
-    
-    ⚠️ **特殊要求：**
-    - **Target 欄位**：填數字代表該店鋪的優先接收目標數量；未填Target的店鋪會按C模式補0需求計算
-    """)
+    with st.expander("📋 必需欄位說明", expanded=False):
+        st.markdown("""
+        **基本欄位：**
+        - Article, Article Description, OM, RP Type, Site, **Target**（目標接收數量）
+        
+        **庫存欄位：**
+        - SaSa Net Stock, Pending Received, Safety Stock, MOQ
+        
+        **銷量欄位：**
+        - Last Month Sold Qty, MTD Sold Qty
+        
+        **⚠️ 特殊要求：**
+        - **Target 欄位**：填數字代表該店鋪的優先接收目標數量
+        - 未填Target的店鋪會按C模式補0需求計算
+        """)
 
 uploaded_file = st.file_uploader(
-    "請上傳包含庫存和銷量數據的 Excel 文件",
+    "拖放或點擊上傳 Excel 文件",
     type=["xlsx", "xls"],
-    help="必需欄位：Article, Article Description, OM, RP Type, Site, MOQ, SaSa Net Stock, Pending Received, Safety Stock, Last Month Sold Qty, MTD Sold Qty"
+    help="支援 .xlsx 和 .xls 格式"
 )
 
 if uploaded_file is not None:
@@ -201,25 +490,25 @@ if uploaded_file is not None:
         st.success("文件上傳與數據預處理成功！")
         
         # 4.2. 資料預覽區塊
-        with st.expander("基本統計和資料樣本展示", expanded=False):
-            st.subheader("資料基本統計")
+        with st.expander("📊 資料預覽", expanded=False):
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("總行數", processing_stats['processed_stats']['total_rows'])
             with col2:
-                st.metric("商品數量", df['Article'].nunique())
+                st.metric("商品數", df['Article'].nunique())
             with col3:
-                st.metric("店鋪數量", df['Site'].nunique())
+                st.metric("店鋪數", df['Site'].nunique())
             
-            st.subheader("資料樣本（前10行）")
-            st.dataframe(df.head(10))
+            st.markdown("**資料樣本（前 10 行）**")
+            st.dataframe(df.head(10), use_container_width=True)
         
         # 4.3. 分析按鈕區塊
-        st.header("2. 分析與建議")
+        st.markdown("---")
+        st.markdown("### 🚀 分析與建議")
         
-        st.info(f"當前選擇的模式為：**{transfer_mode}**")
+        st.info(f"當前模式：**{transfer_mode}**")
         
-        if st.button("🚀 生成調貨建議", type="primary"):
+        if st.button("🎯 生成調貨建議", type="primary", use_container_width=True):
             progress_bar.progress(70, text="正在分析數據並生成建議...")
             with st.spinner("演算法運行中，請稍候..."):
                 # 轉換模式名稱
@@ -270,150 +559,147 @@ if uploaded_file is not None:
             
             if recommendations:
                 # 4.4. 結果展示區塊
-                st.header("3. 分析結果")
+                st.markdown("---")
+                st.markdown("### 📈 分析結果")
                 
                 # KPI 指標卡
-                st.subheader("關鍵指標 (KPIs)")
                 col1, col2, col3, col4 = st.columns(4)
-                col1.metric("總調貨建議數量", statistics.get('total_recommendations', 0))
-                col2.metric("總調貨件數", statistics.get('total_transfer_qty', 0))
-                col3.metric("涉及產品數量", statistics.get('unique_articles', 0))
-                col4.metric("涉及OM數量", statistics.get('unique_oms', 0))
+                col1.metric("調貨建議", f"{statistics.get('total_recommendations', 0):,}")
+                col2.metric("調貨件數", f"{statistics.get('total_transfer_qty', 0):,}")
+                col3.metric("產品數量", f"{statistics.get('unique_articles', 0):,}")
+                col4.metric("OM數量", f"{statistics.get('unique_oms', 0):,}")
                 
-                st.markdown("---")
+                st.markdown("")
                 
                 # 調貨建議表格
-                st.subheader("調貨建議清單")
+                with st.expander("📋 調貨建議清單", expanded=True):
                 
-                # 準備顯示數據
-                display_data = []
-                
-                # 創建一個字典來跟蹤每個店鋪的累計轉出量
-                cumulative_transfers = {}
-                
-                for rec in recommendations:
-                    # 獲取轉出店鋪的原始數據
-                    source_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Transfer Site'])]
-                    source_stock = source_data['SaSa Net Stock'].iloc[0] if not source_data.empty else 0
-                    source_safety = source_data['Safety Stock'].iloc[0] if not source_data.empty else 0
-                    source_moq = source_data['MOQ'].iloc[0] if not source_data.empty else 0
+                    # 準備顯示數據
+                    display_data = []
                     
-                    # 獲取接收店鋪的原始數據
-                    dest_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Receive Site'])]
-                    dest_stock = dest_data['SaSa Net Stock'].iloc[0] if not dest_data.empty else 0
-                    dest_safety = dest_data['Safety Stock'].iloc[0] if not dest_data.empty else 0
-                    dest_moq = dest_data['MOQ'].iloc[0] if not dest_data.empty else 0
+                    # 創建一個字典來跟蹤每個店鋪的累計轉出量
+                    cumulative_transfers = {}
                     
-                    # 計算接收後的總貨量
-                    dest_total_after = dest_stock + rec['Transfer Qty']
+                    for rec in recommendations:
+                        # 獲取轉出店鋪的原始數據
+                        source_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Transfer Site'])]
+                        source_stock = source_data['SaSa Net Stock'].iloc[0] if not source_data.empty else 0
+                        source_safety = source_data['Safety Stock'].iloc[0] if not source_data.empty else 0
+                        source_moq = source_data['MOQ'].iloc[0] if not source_data.empty else 0
+                        
+                        # 獲取接收店鋪的原始數據
+                        dest_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Receive Site'])]
+                        dest_stock = dest_data['SaSa Net Stock'].iloc[0] if not dest_data.empty else 0
+                        dest_safety = dest_data['Safety Stock'].iloc[0] if not dest_data.empty else 0
+                        dest_moq = dest_data['MOQ'].iloc[0] if not dest_data.empty else 0
+                        
+                        # 計算接收後的總貨量
+                        dest_total_after = dest_stock + rec['Transfer Qty']
+                        
+                        # 創建店鋪的唯一標識符
+                        source_key = f"{rec['Article']}_{rec['Transfer Site']}"
+                        
+                        # 如果是第一次轉出，初始化累計轉出量
+                        if source_key not in cumulative_transfers:
+                            cumulative_transfers[source_key] = 0
+                        
+                        # 更新累計轉出量
+                        cumulative_transfers[source_key] += rec['Transfer Qty']
+                        
+                        # 計算累減後的庫存
+                        source_after_transfer_stock = source_stock - cumulative_transfers[source_key]
+                        
+                        display_data.append({
+                            'Article': rec['Article'],
+                            'Product Desc': rec['Product Desc'],
+                            'Transfer OM': rec['Transfer OM'],
+                            'Transfer Site': rec['Transfer Site'],
+                            'Transfer Qty': rec['Transfer Qty'],
+                            'Source Original Stock': source_stock,
+                            'Source After Transfer Stock': source_after_transfer_stock,
+                            'Source Safety Stock': source_safety,
+                            'Source MOQ': source_moq,
+                            'Receive OM': rec['Receive OM'],
+                            'Receive Site': rec['Receive Site'],
+                            'Receive Original Stock': dest_stock,
+                            'Receive Total After': dest_total_after,
+                            'Receive Safety Stock': dest_safety,
+                            'Receive MOQ': dest_moq,
+                            'Source Type': rec.get('Source Type', ''),
+                            'Destination Type': rec.get('Destination Type', '')
+                        })
                     
-                    # 創建店鋪的唯一標識符
-                    source_key = f"{rec['Article']}_{rec['Transfer Site']}"
-                    
-                    # 如果是第一次轉出，初始化累計轉出量
-                    if source_key not in cumulative_transfers:
-                        cumulative_transfers[source_key] = 0
-                    
-                    # 更新累計轉出量
-                    cumulative_transfers[source_key] += rec['Transfer Qty']
-                    
-                    # 計算累減後的庫存
-                    source_after_transfer_stock = source_stock - cumulative_transfers[source_key]
-                    
-                    display_data.append({
-                        'Article': rec['Article'],
-                        'Product Desc': rec['Product Desc'],
-                        'Transfer OM': rec['Transfer OM'],
-                        'Transfer Site': rec['Transfer Site'],
-                        'Transfer Qty': rec['Transfer Qty'],
-                        'Source Original Stock': source_stock,
-                        'Source After Transfer Stock': source_after_transfer_stock,
-                        'Source Safety Stock': source_safety,
-                        'Source MOQ': source_moq,
-                        'Receive OM': rec['Receive OM'],
-                        'Receive Site': rec['Receive Site'],
-                        'Receive Original Stock': dest_stock,
-                        'Receive Total After': dest_total_after,
-                        'Receive Safety Stock': dest_safety,
-                        'Receive MOQ': dest_moq,
-                        'Source Type': rec.get('Source Type', ''),
-                        'Destination Type': rec.get('Destination Type', '')
-                    })
-                
-                # 創建DataFrame並顯示
-                rec_df = pd.DataFrame(display_data)
-                st.dataframe(rec_df, use_container_width=True)
-                
-                st.markdown("---")
+                    # 創建DataFrame並顯示
+                    rec_df = pd.DataFrame(display_data)
+                    st.dataframe(rec_df, use_container_width=True)
                 
                 # 統計圖表
-                st.subheader("詳細統計分析 (Detailed Statistical Analysis)")
+                with st.expander("📊 詳細統計", expanded=False):
                 
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.write("#### 按產品統計 (Statistics by Article)")
-                    article_stats = statistics.get('article_stats', {})
-                    if article_stats:
-                        article_df = pd.DataFrame([
-                            {
-                                'Article': article,
-                                'Total Qty': stats['total_qty'],
-                                'Count': stats['count'],
-                                'OM Count': stats['om_count']
-                            }
-                            for article, stats in article_stats.items()
-                        ])
-                        st.dataframe(article_df)
+                    col1, col2 = st.columns(2)
                     
-                    st.write("#### 轉出類型分佈 (Transfer Type Distribution)")
-                    source_type_stats = statistics.get('source_type_stats', {})
-                    if source_type_stats:
-                        source_df = pd.DataFrame([
-                            {
-                                'Source Type': source_type,
-                                'Count': stats['count'],
-                                'Qty': stats['qty']
-                            }
-                            for source_type, stats in source_type_stats.items()
-                        ])
-                        st.dataframe(source_df)
-                
-                with col2:
-                    st.write("#### 按OM統計 (Statistics by OM)")
-                    om_stats = statistics.get('om_stats', {})
-                    if om_stats:
-                        om_df = pd.DataFrame([
-                            {
-                                'OM': om,
-                                'Transfer Qty': stats.get('transfer_qty', stats.get('total_qty', 0)),
-                                'Receive Qty': stats.get('receive_qty', 0),
-                                'Count': stats['count'],
-                                'Article Count': stats['article_count']
-                            }
-                            for om, stats in om_stats.items()
-                        ])
-                        st.dataframe(om_df)
+                    with col1:
+                        st.markdown("**按產品統計**")
+                        article_stats = statistics.get('article_stats', {})
+                        if article_stats:
+                            article_df = pd.DataFrame([
+                                {
+                                    'Article': article,
+                                    'Total Qty': stats['total_qty'],
+                                    'Count': stats['count'],
+                                    'OM Count': stats['om_count']
+                                }
+                                for article, stats in article_stats.items()
+                            ])
+                            st.dataframe(article_df, use_container_width=True)
+                        
+                        st.markdown("**轉出類型分佈**")
+                        source_type_stats = statistics.get('source_type_stats', {})
+                        if source_type_stats:
+                            source_df = pd.DataFrame([
+                                {
+                                    'Source Type': source_type,
+                                    'Count': stats['count'],
+                                    'Qty': stats['qty']
+                                }
+                                for source_type, stats in source_type_stats.items()
+                            ])
+                            st.dataframe(source_df, use_container_width=True)
                     
-                    st.write("#### 接收類型分佈 (Receive Type Distribution)")
-                    dest_type_stats = statistics.get('dest_type_stats', {})
-                    if dest_type_stats:
-                        dest_df = pd.DataFrame([
-                            {
-                                'Destination Type': dest_type,
-                                'Count': stats['count'],
-                                'Qty': stats['qty']
-                            }
-                            for dest_type, stats in dest_type_stats.items()
-                        ])
-                        st.dataframe(dest_df)
+                    with col2:
+                        st.markdown("**按 OM 統計**")
+                        om_stats = statistics.get('om_stats', {})
+                        if om_stats:
+                            om_df = pd.DataFrame([
+                                {
+                                    'OM': om,
+                                    'Transfer Qty': stats.get('transfer_qty', stats.get('total_qty', 0)),
+                                    'Receive Qty': stats.get('receive_qty', 0),
+                                    'Count': stats['count'],
+                                    'Article Count': stats['article_count']
+                                }
+                                for om, stats in om_stats.items()
+                            ])
+                            st.dataframe(om_df, use_container_width=True)
+                        
+                        st.markdown("**接收類型分佈**")
+                        dest_type_stats = statistics.get('dest_type_stats', {})
+                        if dest_type_stats:
+                            dest_df = pd.DataFrame([
+                                {
+                                    'Destination Type': dest_type,
+                                    'Count': stats['count'],
+                                    'Qty': stats['qty']
+                                }
+                                for dest_type, stats in dest_type_stats.items()
+                            ])
+                            st.dataframe(dest_df, use_container_width=True)
                 
                 st.markdown("---")
-                
-                st.success("分析完成！您現在可以下載建議。")
+                st.success("✅ 分析完成！")
                 
                 # 生成Excel文件
-                with st.spinner("正在生成Excel文件..."):
+                with st.spinner("生成 Excel 文件..."):
                     excel_generator = ExcelGenerator()
                     excel_path = excel_generator.generate_excel_file(recommendations, statistics)
                 
@@ -428,10 +714,11 @@ if uploaded_file is not None:
                     pass
                 
                 st.download_button(
-                    label="📥 下載調貨建議 (Excel)",
+                    label="📥 下載 Excel 報表",
                     data=excel_data,
                     file_name=excel_generator.output_filename,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
                 )
                 
                 progress_bar.progress(100, text="處理完畢！")
@@ -440,8 +727,9 @@ if uploaded_file is not None:
                 progress_bar.progress(100, text="處理完畢！")
     
     except Exception as e:
-        st.error(f"處理文件時發生嚴重錯誤: {e}")
-        st.exception(e)  # 顯示詳細的錯誤追蹤信息
+        st.error(f"處理文件時發生錯誤: {e}")
+        if st.checkbox("顯示詳細錯誤追蹤"):
+            st.exception(e)
         if 'progress_bar' in locals():
             progress_bar.progress(100, text="處理失敗！")
         
@@ -449,18 +737,11 @@ if uploaded_file is not None:
         if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
             os.unlink(tmp_file_path)
 
-# 系統信息
-st.sidebar.markdown("---")
-st.sidebar.subheader("系統信息")
-st.sidebar.markdown(f"""
-版本: v2.3.0
-更新時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-""")
-
-# 頁腳
+# 系統頁腳
 st.markdown("---")
 st.markdown("""
-<div style="text-align: center; color: #888; font-size: 12px; padding: 20px;">
-庫存調貨建議系統 Reallocation Calculator (2026) - For RP team (Build up by Ricky Yue)
+<div style="text-align: center; color: #6C757D; padding: 30px 0;">
+    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.3.0</p>
+    <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
 </div>
 """, unsafe_allow_html=True)
