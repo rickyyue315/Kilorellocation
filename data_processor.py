@@ -119,7 +119,7 @@ class DataProcessor:
         self.optional_columns = [
             'Article Description',  # 商品描述
             'Article Long Text (60 Chars)',  # 商品長描述
-            'ALL',  # E模式：強制轉出標記（不分大小寫）
+            'ALL',  # E1/E2模式：強制轉出標記（不分大小寫）
             'Target',  # F模式：目標接收數量（不分大小寫）
             'Type'  # 附加B模式：Type欄位（不分大小寫）
         ]
@@ -241,7 +241,7 @@ class DataProcessor:
                     if col != 'ALL':
                         df['ALL'] = df[col]
                         df = df.drop(columns=[col])
-                logger.info("找到*ALL*欄位用於E模式")
+                logger.info("找到*ALL*欄位用於E1/E2模式")
             else:
                 # 創建空的ALL欄位，用於後續邏輯判斷
                 df['ALL'] = ""
