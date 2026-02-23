@@ -31,20 +31,24 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Emergency Replenishment: SaSa Net Stock = 0 and Effective Sold Qty > 0
 - Potential Replenishment: Total Available < Safety Stock and highest Effective Sold Qty
 - Priority Zero Replenishment: Total Available <= 1 (Mode C/C2 only)
-- B2 special destinations (Type T / Type M):
+- B2/B3 special destinations (Type T / Type M):
   - Type T High Sales, Type M High Sales
   - Type T Safety, Type M Safety
+- E Mode Reception: RF stores, cap = Safety Stock * 2 (E1/E1b/E2 modes)
+- F Mode Target Reception: Target priority (F mode)
 
 ## Source types (labels used in output)
 - ND Transfer
 - ND Clearance Transfer (Mode D only)
 - RF Surplus Transfer
 - RF Enhanced Transfer
-- B2 extra: Local Store Full Transfer (Type L with low sales)
+- B2/B3 extra: Local Store Full Transfer (Type L with low sales)
+- E Mode Forced Transfer (E1/E1b/E2 modes)
+- F Mode ND Transfer / F Mode RF Transfer (F mode)
 
 ---
 
-# Mode Overview (A to E + B2 + C2)
+# Mode Overview (11 Modes: A, B, B2, B3, C, C2, D, E1, E1b, E2, F)
 
 ## Mode A: Conservative
 - Source rules: RF only, Surplus Transfer
@@ -79,6 +83,14 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Destination labels: Type T High Sales, Type M High Sales, Type T Safety, Type M Safety
 - Goal: stronger rebalancing with Type=L exception
 
+## Mode B3: Enhanced Plus Cross-OM
+- Same source/destination logic as Mode B2
+- Grouping differs: allow cross-OM matching
+- Extra constraints:
+  - HD source cannot transfer to HA/HB/HC destinations
+  - Windy source can only transfer to Windy destinations
+- Goal: cross-OM enhanced transfers with Type=L exception
+
 ## Mode C: Priority Zero Stock
 - Source rules: RF Surplus + RF Enhanced
 - Special destination trigger: Total Available <= 1
@@ -107,12 +119,47 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Destination rules: same as Mode A
 - Goal: clear ND dead stock without leaving 1 piece
 
-## Mode E: Force Transfer
+## Mode E1: Force Transfer (Same OM Only)
 - Only items marked ALL in input file are processed (case-insensitive)
 - Force transfer all available stock for marked items
+- **Same OM only**: transfer and receive sites must be in same OM
 - ND stores remain source-only
+- Reception cap: Safety Stock * 2 (RF stores only)
 - Special OM/HD rules: HD stores cannot transfer to HA/HB/HC
-- Goal: mandatory transfers for flagged items
+- Goal: mandatory transfers for flagged items (same OM only)
+
+## Mode E1b: Force Transfer (Same OM + Priority Type)
+- Same transfer logic as E1: only items marked ALL, same OM only
+- Reception priority follows B2 mode:
+  - Type T (tourist area) by highest sales
+  - Type M (mixed type) by highest sales
+  - Type T by highest Safety Stock
+  - Type M by highest Safety Stock
+- Reception cap: Safety Stock * 2 (RF stores only)
+- Special OM/HD rules: HD stores cannot transfer to HA/HB/HC
+- Goal: mandatory transfers for flagged items (same OM only, priority type reception)
+
+## Mode E2: Force Transfer (Cross OM)
+- Only items marked ALL in input file are processed (case-insensitive)
+- Force transfer all available stock for marked items
+- **Cross OM allowed**: priority same OM, but can cross OM
+- ND stores remain source-only
+- Reception cap: Safety Stock * 2 (RF stores only)
+- Special OM/HD rules: HD stores cannot transfer to HA/HB/HC
+- Phase 3 fallback: if receiving OMs have no E-mode transfer sources, fall back to C-mode logic
+- Goal: mandatory transfers for flagged items (cross-OM capable)
+
+## Mode F: Target Optimization
+- Source rules:
+  - ND: full transfer (unless Target > 0 set for that site)
+  - RF: can transfer (protect highest sales store)
+- Destination priority:
+  1. Sites with Target > current stock: receive up to Target
+  2. Sites with Total Available <= 1: zero stock replenishment logic
+- Grouping: by Article only (allow cross-OM)
+- Extra constraints:
+  - HD source cannot transfer to HA/HB/HC destinations
+- Goal: Target-driven allocation, zero stock replenishment for non-Target sites
 
 ---
 
@@ -120,7 +167,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 1. Start block: Input Excel -> Data validation -> Compute derived fields
 2. Common Rules block (ND only source, protect highest RF, no dual role)
-3. Split into modes A, B, B2, C, C2, D, E (parallel columns)
+3. Split into modes A, B, B2, B3, C, C2, D, E1, E1b, E2, F (parallel columns)
 4. For each mode, show:
    - Source criteria
    - Transfer caps
@@ -133,4 +180,11 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - RF highest sales protected
 - No dual role source/destination
 - Priority matching order list
-- Special rules: C2 cross-OM + HD/Windy, D avoid 1 remainder, E ALL column force transfer
+- Special rules: 
+  - B2/B3 Type=L exception
+  - C2 cross-OM + HD/Windy
+  - D avoid 1 remainder
+  - E1 same OM only + ALL column force transfer
+  - E1b same OM + priority type reception
+  - E2 cross-OM + ALL column force transfer
+  - F Target priority
