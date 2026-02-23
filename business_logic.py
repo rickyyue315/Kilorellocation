@@ -1,13 +1,14 @@
 """
 業務邏輯模組 v2.4.0
 實現調貨規則、源/目的地識別和匹配算法
-支持十一模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E2(強制轉出跨OM)/F(目標優化)
+支持十二模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
 基於累計接收數量判斷是否達到最低保障標準的機制
 強化ND店鋪限制：所有模式下ND店鋪只能轉出，不能接收
 D模式特殊規則：ND清貨轉出避免1件餘貨
 C2模式特殊規則：參照C模式邏輯但允許跨OM配對，HD不能轉到HA/HB/HC，Windy轉出只能到Windy
 E1模式：強制轉出（僅同OM配對）
+E1b模式：強制轉出（僅同OM配對，接收優先Type=T/M）
 E2模式：強制轉出（允許跨OM配對）
 """
 
@@ -35,6 +36,7 @@ class TransferLogic:
         self.mode_c2 = "附加C2(跨OM重點補0)"  # C2模式
         self.mode_d = "清貨轉貨"  # D模式
         self.mode_e1 = "強制轉出"  # E1模式（僅同OM）
+        self.mode_e1b = "強制轉出(優先類型接收)"  # E1b模式（僅同OM，接收優先Type=T/M）
         self.mode_e2 = "強制轉出(跨OM)"  # E2模式（跨OM）
         self.mode_f = "目標優化"  # F模式
     
@@ -116,8 +118,8 @@ class TransferLogic:
             sources.sort(key=lambda x: (x['priority'], x.get('effective_sold_qty', 0)))
             return sources
 
-        # E1/E2模式特殊處理：檢查是否有被標記為*ALL*的行
-        if mode in (self.mode_e1, self.mode_e2):
+        # E1/E1b/E2模式特殊處理：檢查是否有被標記為*ALL*的行
+        if mode in (self.mode_e1, self.mode_e1b, self.mode_e2):
             # 檢查是否存在'ALL'欄位，以及是否有任何行被標記
             if 'ALL' in group_df.columns:
                 all_marked = group_df[
@@ -125,7 +127,7 @@ class TransferLogic:
                     (group_df['ALL'].astype(str).str.strip() != '')
                 ]
                 
-                # E1/E2模式：只有被標記為*ALL*的行才會轉出，所有庫存全數轉出
+                # E1/E1b/E2模式：只有被標記為*ALL*的行才會轉出，所有庫存全數轉出
                 for _, row in all_marked.iterrows():
                     net_stock = int(row['SaSa Net Stock'])
                     if net_stock > 0:  # 只考慮有庫存的店鋪
@@ -147,7 +149,7 @@ class TransferLogic:
                 sources.sort(key=lambda x: x['priority'])
                 return sources  # E模式只處理標記的行，不處理其他邏輯
         
-        # 優先級1：ND類型轉出（所有模式一致，E1/E2模式除外）
+        # 優先級1：ND類型轉出（所有模式一致，E1/E1b/E2模式除外）
         nd_sources = group_df[group_df['RP Type'] == 'ND']
         for _, row in nd_sources.iterrows():
             if row['SaSa Net Stock'] > 0:  # 只考慮有庫存的店鋪
@@ -414,8 +416,13 @@ class TransferLogic:
             destinations.sort(key=lambda x: x['priority'])
             return destinations
         
-        # E1/E2模式特殊處理：所有RF店鋪都可以接收，上限為Safety Stock的2倍
-        if mode in (self.mode_e1, self.mode_e2):
+        # E1/E1b/E2模式特殊處理：所有RF店鋪都可以接收，上限為Safety Stock的2倍
+        if mode in (self.mode_e1, self.mode_e1b, self.mode_e2):
+            if 'Type' in rf_destinations.columns:
+                type_series = rf_destinations['Type'].astype(str).str.upper()
+            else:
+                type_series = pd.Series("", index=rf_destinations.index)
+
             for _, row in rf_destinations.iterrows():
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
                 safety_stock = int(row['Safety Stock'])
@@ -426,19 +433,43 @@ class TransferLogic:
                 # 如果目前庫存低於接收上限，則允許接收
                 if total_available < max_can_receive:
                     needed_qty = max_can_receive - total_available
+                    sales_total = int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])
+
+                    if mode == self.mode_e1b:
+                        store_type = type_series.loc[row.name]
+                        if store_type == 'T':
+                            if sales_total > 0:
+                                priority = 1
+                                dest_type = 'E1b遊客區店舖 高銷量優先'
+                            else:
+                                priority = 3
+                                dest_type = 'E1b遊客區店舖 Safety優先'
+                        elif store_type == 'M':
+                            if sales_total > 0:
+                                priority = 2
+                                dest_type = 'E1b混合型店舖 高銷量優先'
+                            else:
+                                priority = 4
+                                dest_type = 'E1b混合型店舖 Safety優先'
+                        else:
+                            priority = 5
+                            dest_type = 'E1b其他類型店舖'
+                    else:
+                        priority = 1
+                        dest_type = 'E模式接收'
                     
                     destinations.append({
                         'site': row['Site'],
                         'om': row['OM'],
                         'rp_type': row['RP Type'],
                         'needed_qty': needed_qty,
-                        'priority': 1,  # E模式所有RF店鋪同優先級
+                        'priority': priority,
                         'current_stock': row['SaSa Net Stock'],
                         'pending_received': row['Pending Received'],
                         'safety_stock': safety_stock,
                         'moq': row['MOQ'],
                         'effective_sold_qty': row['Effective Sold Qty'],
-                        'dest_type': 'E模式接收',
+                        'dest_type': dest_type,
                         'target_qty': max_can_receive,  # 目標為Safety Stock的2倍
                         'received_qty': 0,  # 初始化累計接收數量
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
@@ -446,8 +477,15 @@ class TransferLogic:
                         'max_receive_qty': max_can_receive  # 記錄最大接收限制
                     })
             
-            # 按優先級排序
-            destinations.sort(key=lambda x: x['priority'])
+            if mode == self.mode_e1b:
+                def e1b_sort_key(item: Dict) -> Tuple[int, int, int]:
+                    if item['priority'] in (1, 2):
+                        return (item['priority'], -int(item.get('effective_sold_qty', 0)), 0)
+                    return (item['priority'], -int(item.get('safety_stock', 0)), 0)
+
+                destinations.sort(key=e1b_sort_key)
+            else:
+                destinations.sort(key=lambda x: x['priority'])
             return destinations
 
         # B2/B3模式特殊處理：接收上限為Safety Stock的2倍，且累計追蹤
@@ -1050,7 +1088,7 @@ class TransferLogic:
         return recommendations
 
     def _match_transfers_e1_mode(self, sources: List[Dict], destinations: List[Dict],
-                                article: str, om: str, product_desc: str) -> List[Dict]:
+                                article: str, om: str, product_desc: str, mode: str) -> List[Dict]:
         """
         E1模式匹配邏輯（僅同OM配對）：
         1. 只做同OM配對，不跨OM
@@ -1139,7 +1177,7 @@ class TransferLogic:
                     'Destination Priority': dest['priority'],
                     'Source Type': source['source_type'],
                     'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received, transfer_qty, self.mode_e1),
+                    'Notes': self._create_recommendation_note(source, dest, current_received, transfer_qty, mode),
                     'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
                     'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
                     'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
@@ -1754,7 +1792,7 @@ class TransferLogic:
         
         Args:
             df: 預處理後的DataFrame
-            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E1模式(強制轉出)、E2模式(強制轉出跨OM)或F模式(目標優化)
+            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)或F模式(目標優化)
             
         Returns:
             調貨建議列表
@@ -1762,7 +1800,7 @@ class TransferLogic:
         logger.info(f"開始生成調貨建議 - {mode}")
         
         # 驗證模式
-        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b3, self.mode_c, self.mode_c2, self.mode_d, self.mode_e1, self.mode_e2, self.mode_f]:
+        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b3, self.mode_c, self.mode_c2, self.mode_d, self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f]:
             raise ValueError(f"無效的轉貨模式: {mode}")
         
         # 根據模式選擇分組方式
@@ -1770,7 +1808,7 @@ class TransferLogic:
             # E2/F/B3/C2模式支持跨OM配對，因此僅按Article分組
             grouped = df.groupby(['Article'])
         else:
-            # 其他模式（含E1）按Article和OM分組
+            # 其他模式（含E1/E1b）按Article和OM分組
             grouped = df.groupby(['Article', 'OM'])
         
         all_recommendations = []
@@ -1791,8 +1829,8 @@ class TransferLogic:
             # 識別接收候選店鋪
             destinations = self.identify_destinations(group_df, mode)
             
-            # E1/E2/F/B3/C2模式特殊處理：從destinations中過濾掉同時作為轉出源的店鋪
-            if mode in [self.mode_e1, self.mode_e2, self.mode_f, self.mode_b3, self.mode_c2]:
+            # E1/E1b/E2/F/B3/C2模式特殊處理：從destinations中過濾掉同時作為轉出源的店鋪
+            if mode in [self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_b3, self.mode_c2]:
                 source_sites = set([s['site'] for s in sources])
                 destinations = [d for d in destinations if d['site'] not in source_sites]
             
@@ -1803,9 +1841,9 @@ class TransferLogic:
             else:
                 article, om = group_keys
             
-            # E1模式：僅同OM配對
-            if mode == self.mode_e1:
-                recommendations = self._match_transfers_e1_mode(sources, destinations, article, om, product_desc)
+            # E1/E1b模式：僅同OM配對
+            if mode in (self.mode_e1, self.mode_e1b):
+                recommendations = self._match_transfers_e1_mode(sources, destinations, article, om, product_desc, mode)
             # E2模式需要傳入group_df以支持Phase 3邏輯
             elif mode == self.mode_e2:
                 recommendations = self._match_transfers_e_mode(sources, destinations, article, om, product_desc, group_df)
@@ -2122,7 +2160,7 @@ class TransferLogic:
         if dest['dest_type'] == 'F模式目標接收':
             target_qty = dest.get('target_qty', 0)
             notes_parts.append(f"【接收分析: F模式目標接收，目標數量{target_qty}件，累計已接收{current_received_qty + transfer_qty}件】")
-        elif dest['dest_type'] == 'E模式接收':
+        elif dest['dest_type'] == 'E模式接收' or str(dest.get('dest_type', '')).startswith('E1b'):
             target_qty = dest.get('target_qty', 0)
             safety_stock = dest.get('safety_stock', 0)
             current_stock = dest.get('current_stock', 0)
@@ -2149,7 +2187,7 @@ class TransferLogic:
             notes_parts.append(f"【接收上限: 附加B系列模式接收上限為安全庫存2倍({dest['target_qty']}件)，累計已接收{current_received_qty + transfer_qty}件】")
         
         # E1/E2模式接收上限說明
-        if mode in (self.mode_e1, self.mode_e2) and 'target_qty' in dest:
+        if mode in (self.mode_e1, self.mode_e1b, self.mode_e2) and 'target_qty' in dest:
             notes_parts.append(f"【接收上限: E模式接收上限為安全庫存2倍(最少3件)，目標{dest['target_qty']}件，累計已接收{current_received_qty + transfer_qty}件】")
         
         # 6. 轉移數量說明
@@ -2173,6 +2211,8 @@ class TransferLogic:
         if source['source_type'] == 'E模式強制轉出':
             if mode == self.mode_e1:
                 notes_parts.append("【特殊標記: E1模式強制轉出，僅同OM配對，店鋪被標記為*ALL*必須全數轉出】")
+            elif mode == self.mode_e1b:
+                notes_parts.append("【特殊標記: E1b模式強制轉出，僅同OM配對，接收端優先Type=T(遊客區)與Type=M(混合型)店舖】")
             elif mode == self.mode_e2:
                 if source['om'] == dest['om']:
                     notes_parts.append("【特殊標記: E2模式強制轉出，優先同OM配對，店鋪被標記為*ALL*必須全數轉出】")
@@ -2180,7 +2220,7 @@ class TransferLogic:
                     notes_parts.append("【特殊標記: E2模式強制轉出，跨OM配對(同OM無法接收)，店鋪被標記為*ALL*必須全數轉出】")
         if dest['dest_type'] == '重點補0':
             notes_parts.append("【特殊標記: 重點補0類型，確保最低保障標準】")
-        if dest['dest_type'] == 'E模式接收':
+        if dest['dest_type'] == 'E模式接收' or str(dest.get('dest_type', '')).startswith('E1b'):
             notes_parts.append("【特殊標記: E模式接收，RF店鋪可接受來自標記為*ALL*的強制轉出】")
         
         return " | ".join(notes_parts)

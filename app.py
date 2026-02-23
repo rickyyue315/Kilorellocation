@@ -1,6 +1,6 @@
 """
 庫存調貨建議系統 v2.4.0 - Streamlit應用程序
-支持十一模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E2(強制轉出跨OM)/F(目標優化)
+支持十二模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)
 新增:預設店舖資料(OM、Type等),當用戶上傳的Excel缺少這些資料時自動填充
 """
 
@@ -305,11 +305,11 @@ with st.sidebar:
     
     with st.expander("💡 核心功能", expanded=False):
         st.markdown("""
-        **九模式智能調貨系統:**
+        **十二模式智能調貨系統:**
         - ✅ A模式(保守轉貨) / B模式(加強轉貨)
         - ✅ B2模式(附加B特別模式) / B3模式(附加B跨OM特別模式)
         - ✅ C模式(重點補0) / C2模式(附加C跨OM重點補0)
-        - ✅ D模式(清貨轉貨) / E1模式(強制轉出) / E2模式(強制轉出跨OM) / F模式(目標優化)
+        - ✅ D模式(清貨轉貨) / E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM) / F模式(目標優化)
         
         **智能識別與匹配:**
         - ✅ ND/RF類型智慧識別
@@ -320,6 +320,7 @@ with st.sidebar:
         **特殊功能:**
         - ✅ D模式：避免1件餘貨
         - ✅ E1模式：標記商品強制轉出(僅同OM)
+        - ✅ E1b模式：標記商品強制轉出(僅同OM，優先Type=T/M接收)
         - ✅ E2模式：標記商品強制轉出(跨OM)
         - ✅ F模式：Target目標接收優先
         - ✅ B2模式：接收端依遊客區/混合型店舖優先排序
@@ -342,7 +343,7 @@ with st.sidebar:
            - 確保包含所有必需欄位
         
         2. **選擇轉貨模式**
-           - 在側邊欄選擇適合的轉貨模式（A/B/B2/B3/C/C2/D/E/F)
+           - 在側邊欄選擇適合的轉貨模式（A/B/B2/B3/C/C2/D/E1/E1b/E2/F)
            - 查看模式說明了解各模式特點
         
         3. **啟動分析**
@@ -366,7 +367,7 @@ with st.sidebar:
         "選擇轉貨模式",
         [
             "A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B3: 附加B(跨OM特別模式)",
-            "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E1: 強制轉出", "E2: 強制轉出(跨OM)", "F: 目標優化"
+            "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化"
         ],
         key='transfer_mode',
         help="選擇適合的調貨模式"
@@ -384,6 +385,7 @@ with st.sidebar:
         "C2: 附加C(跨OM重點補0)": "C模式 + 跨OM配對",
         "D: 清貨轉貨": "清理無銷售ND店幫",
         "E1: 強制轉出": "標記商品強制轉出(僅同OM)",
+        "E1b: 強制轉出(優先類型接收)": "標記商品強制轉出(僅同OM，接收端優先Type=T/M)",
         "E2: 強制轉出(跨OM)": "標記商品強制轉出(可跨OM)",
         "F: 目標優化": "依Target目標分配"
     }
@@ -437,6 +439,12 @@ with st.sidebar:
         - 接收店幫為RF,上限為Safety Stock的2倍
         - **僅同OM配對**,HD不能轉到HA/HB/HC
         - 轉出類型為E模式強制轉出
+
+        **E1b模式(強制轉出優先類型接收)**
+        - 使用E1模式轉出邏輯:標記為*ALL*的商品行全數強制轉出
+        - **僅同OM配對**,HD不能轉到HA/HB/HC
+        - 接收店幫為RF,上限為Safety Stock的2倍
+        - 接收優先級參照B2:Type=T(遊客區)優先,其次Type=M(混合型)
         
         **E2模式(強制轉出跨OM)**
         - 針對標記為*ALL*的商品行,全數強制轉出
@@ -456,7 +464,7 @@ with st.sidebar:
         - **RF過剩轉出**:轉出後剩餘庫存不會低於Safety Stock
         - **RF加強轉出**:轉出後剩餘庫存會低於Safety Stock
         - **ND清貨轉出**:D模式特殊，ND店幫無銷售記錄時
-        - **E模式強制轉出**:E1/E2模式特殊，標記商品強制轉出
+        - **E模式強制轉出**:E1/E1b/E2模式特殊，標記商品強制轉出
         
         ### 接收條件說明
         
@@ -467,6 +475,7 @@ with st.sidebar:
         - C/C2模式：當(SaSa Net Stock+Pending Received)≤1時,補充至Safety或MOQ+1(取最低值)
         - D模式：避免1件餘貨規則
         - E1模式：所有RF店幫可接收,上限為Safety Stock的2倍(僅同OM)
+        - E1b模式：所有RF店幫可接收,上限為Safety Stock的2倍(僅同OM，優先Type=T/M)
         - E2模式：所有RF店幫可接收,上限為Safety Stock的2倍(可跨OM)
         - B2/B3模式：接收上限為Safety Stock的2倍,並累計追蹤接收量
         - 接收優先級(B2/B3):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
@@ -513,11 +522,11 @@ elif mode_code in ["B2", "B3"]:
         - **Type 欄位**:Type=L 且銷量≤2 的店幫將被全轉出(即使是RF);若銷量>2 則按B模式處理
         - **Type 說明**:Type=T 為遊客區店舖、Type=M 為混合型店舖;B2/B3接收優先級以此排序
         """)
-elif mode_code in ["E1", "E2"]:
+elif mode_code in ["E1", "E1b", "E2"]:
     with st.expander("📋 必需欄位說明", expanded=False):
         st.markdown("""
         **基本欄位:**
-        - Article, Article Description, OM, RP Type, Site, **ALL**(標記商品)
+        - Article, Article Description, OM, RP Type, Site, **ALL**(標記商品), Type
         
         **庫存欄位:**
         - SaSa Net Stock, Pending Received, Safety Stock, MOQ
@@ -527,8 +536,9 @@ elif mode_code in ["E1", "E2"]:
         
         **⚠️ 特殊要求:**
         - **ALL 欄位**:請在要強制轉出的商品行填寫任意非空值(例如:*、Y、ALL 等)
-        - E1/E2 模式只會處理標記的商品
-        - E1 模式僅同OM配對,E2 模式可跨OM配對
+        - E1/E1b/E2 模式只會處理標記的商品
+        - E1/E1b 模式僅同OM配對,E2 模式可跨OM配對
+        - E1b 接收優先級參照B2:Type=T(遊客區)優先,其次Type=M(混合型)
         """)
 else:  # F: 目標優化
     with st.expander("📋 必需欄位說明", expanded=False):
@@ -629,6 +639,7 @@ if uploaded_file is not None:
                     "C2": "附加C2(跨OM重點補0)",
                     "D": "清貨轉貨",
                     "E1": "強制轉出",
+                    "E1b": "強制轉出(優先類型接收)",
                     "E2": "強制轉出(跨OM)",
                     "F": "目標優化"
                 }
