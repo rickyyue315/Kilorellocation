@@ -174,36 +174,42 @@ class DataProcessor:
             'sites_not_found': set()
         }
         
-        for idx, row in df_filled.iterrows():
-            site = row.get('Site', '')
-            if pd.isna(site) or site == '':
-                continue
-                
-            # 獲取預設資料
-            default_info = self.get_store_default_info(site)
-            
-            # 如果找不到預設資料，記錄下來
-            if not default_info:
-                self.fill_stats['sites_not_found'].add(site)
-                continue
-            
-            # 填充 OM（如果缺失或為空）
-            current_om = row.get('OM', '')
-            if pd.isna(current_om) or str(current_om).strip() == '':
-                default_om = default_info.get('om', '')
-                if default_om:
-                    df_filled.at[idx, 'OM'] = default_om
-                    self.fill_stats['om_filled'] += 1
-                    logger.debug(f"Site {site}: OM 填充為 {default_om}")
-            
-            # 填充 Type（如果缺失或為空）
-            current_type = row.get('Type', '')
-            if pd.isna(current_type) or str(current_type).strip() == '':
-                default_type = default_info.get('type', '')
-                if default_type:
-                    df_filled.at[idx, 'Type'] = default_type
-                    self.fill_stats['type_filled'] += 1
-                    logger.debug(f"Site {site}: Type 填充為 {default_type}")
+        # 向量化操作：預先建立 Site → OM/Type 對應字典，避免逐列 iterrows
+        site_to_om = {k: v['om'] for k, v in DEFAULT_STORE_DATA.items() if v.get('om')}
+        site_to_type = {k: v['type'] for k, v in DEFAULT_STORE_DATA.items() if v.get('type')}
+        
+        # 標準化 Site 欄位為大寫，用於查詢（與 get_store_default_info 一致）
+        if 'Site' not in df_filled.columns:
+            return df_filled
+        
+        sites_upper = df_filled['Site'].fillna('').astype(str).str.strip().str.upper()
+        
+        # 記錄找不到預設資料的 Site
+        all_sites = set(sites_upper[sites_upper != ''].unique())
+        known_sites = set(DEFAULT_STORE_DATA.keys())
+        self.fill_stats['sites_not_found'] = all_sites - known_sites
+        
+        # ---- 填充 OM ----
+        # 只在 OM 欄位為空或 NaN 時填充
+        if 'OM' not in df_filled.columns:
+            df_filled['OM'] = ''
+        om_empty_mask = df_filled['OM'].isna() | (df_filled['OM'].astype(str).str.strip() == '')
+        if om_empty_mask.any():
+            default_om_series = sites_upper.map(site_to_om)   # NaN 表示找不到
+            fill_mask = om_empty_mask & default_om_series.notna()
+            df_filled.loc[fill_mask, 'OM'] = default_om_series[fill_mask]
+            self.fill_stats['om_filled'] = int(fill_mask.sum())
+        
+        # ---- 填充 Type ----
+        # 只在 Type 欄位為空或 NaN 時填充
+        if 'Type' not in df_filled.columns:
+            df_filled['Type'] = ''
+        type_empty_mask = df_filled['Type'].isna() | (df_filled['Type'].astype(str).str.strip() == '')
+        if type_empty_mask.any():
+            default_type_series = sites_upper.map(site_to_type)   # NaN 表示找不到
+            fill_mask = type_empty_mask & default_type_series.notna()
+            df_filled.loc[fill_mask, 'Type'] = default_type_series[fill_mask]
+            self.fill_stats['type_filled'] = int(fill_mask.sum())
         
         # 記錄填充統計
         if self.fill_stats['om_filled'] > 0 or self.fill_stats['type_filled'] > 0:

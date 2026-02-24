@@ -7,7 +7,6 @@
 import streamlit as st
 import pandas as pd
 import os
-import tempfile
 from datetime import datetime
 import logging
 from io import BytesIO
@@ -27,6 +26,27 @@ except Exception:
 from data_processor import DataProcessor
 from business_logic import TransferLogic
 from excel_generator import ExcelGenerator
+
+
+@st.cache_data(show_spinner=False)
+def _cached_preprocess(file_bytes: bytes) -> tuple:
+    """
+    快取數據預處理結果，相同文件內容只處理一次，
+    避免 Streamlit 重新渲染時重複執行高代價的 Excel 解析。
+    """
+    import tempfile, os
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+    try:
+        processor = DataProcessor()
+        df, stats = processor.preprocess_data(tmp_path)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+    return df, stats
 
 # 配置日誌
 logging.basicConfig(level=logging.INFO)
@@ -569,11 +589,6 @@ if uploaded_file is not None:
         # 文件上傳驗證
         progress_bar.progress(10, text="正在驗證文件格式...")
         
-        # 創建臨時文件
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
-            tmp_file.write(uploaded_file.getvalue())
-            tmp_file_path = tmp_file.name
-        
         # 數據預處理
         progress_bar.progress(25, text="文件讀取成功!正在進行數據預處理...")
         processor = DataProcessor()
@@ -582,15 +597,15 @@ if uploaded_file is not None:
         file_valid, error_msg = processor.validate_file_format(uploaded_file)
         if not file_valid:
             st.error(f"文件格式驗證失敗: {error_msg}")
-            os.unlink(tmp_file_path)
             st.stop()
         
         try:
-            df, processing_stats = processor.preprocess_data(tmp_file_path)
+            # 使用快取函數，相同文件重複分析不需重新解析 Excel
+            # 臨時文件的建立與清理由 _cached_preprocess 內部負責
+            df, processing_stats = _cached_preprocess(uploaded_file.getvalue())
             progress_bar.progress(60, text="數據預處理完成!")
         except ValueError as e:
             st.error(f"❌ {str(e)}")
-            os.unlink(tmp_file_path)
             st.stop()
 
         # B2/B3模式：必須有Type欄位(不分大小寫)
@@ -599,11 +614,7 @@ if uploaded_file is not None:
             has_type_column = any(col.upper() == 'TYPE' for col in original_columns)
             if not has_type_column:
                 st.error("❌ B2/B3模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
-                os.unlink(tmp_file_path)
                 st.stop()
-        
-        # 清理臨時文件
-        os.unlink(tmp_file_path)
         
         st.success("檔案上傳與數據預處理成功!")
         
@@ -688,6 +699,16 @@ if uploaded_file is not None:
                 # 調貨建議表格
                 st.markdown("### 📋 調貨建議清單")
                 
+                # 預先建立 (Article, Site) → 庫存數據的字典（避免迴圈內全表掃描 N+1 問題）
+                _stock_lookup = {
+                    (row['Article'], row['Site']): {
+                        'stock': row['SaSa Net Stock'],
+                        'safety': row['Safety Stock'],
+                        'moq': row['MOQ']
+                    }
+                    for _, row in df[['Article', 'Site', 'SaSa Net Stock', 'Safety Stock', 'MOQ']].iterrows()
+                }
+                
                 # 準備顯示數據
                 display_data = []
                 
@@ -695,17 +716,18 @@ if uploaded_file is not None:
                 cumulative_transfers = {}
                 
                 for rec in recommendations:
-                        # 獲取轉出店幫的原始數據
-                        source_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Transfer Site'])]
-                        source_stock = source_data['SaSa Net Stock'].iloc[0] if not source_data.empty else 0
-                        source_safety = source_data['Safety Stock'].iloc[0] if not source_data.empty else 0
-                        source_moq = source_data['MOQ'].iloc[0] if not source_data.empty else 0
+                        # 透過預建字典查詢，O(1) 取得轉出/接收店幫數據
+                        src_key = (rec['Article'], rec['Transfer Site'])
+                        src_info = _stock_lookup.get(src_key, {})
+                        source_stock = src_info.get('stock', 0)
+                        source_safety = src_info.get('safety', 0)
+                        source_moq = src_info.get('moq', 0)
                         
-                        # 獲取接收店幫的原始數據
-                        dest_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Receive Site'])]
-                        dest_stock = dest_data['SaSa Net Stock'].iloc[0] if not dest_data.empty else 0
-                        dest_safety = dest_data['Safety Stock'].iloc[0] if not dest_data.empty else 0
-                        dest_moq = dest_data['MOQ'].iloc[0] if not dest_data.empty else 0
+                        dst_key = (rec['Article'], rec['Receive Site'])
+                        dst_info = _stock_lookup.get(dst_key, {})
+                        dest_stock = dst_info.get('stock', 0)
+                        dest_safety = dst_info.get('safety', 0)
+                        dest_moq = dst_info.get('moq', 0)
                         
                         # 計算接收後的總貨量
                         dest_total_after = dest_stock + rec['Transfer Qty']
@@ -846,10 +868,6 @@ if uploaded_file is not None:
             st.exception(e)
         if 'progress_bar' in locals():
             progress_bar.progress(100, text="處理失敗!")
-        
-        # 清理臨時文件
-        if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
-            os.unlink(tmp_file_path)
 
 # 系統頁腳
 st.markdown("---")

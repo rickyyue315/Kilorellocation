@@ -1863,13 +1863,14 @@ class TransferLogic:
                 current_received_qty = global_received_qty_by_site.get(receive_site_key, 0)
                 global_received_qty_by_site[receive_site_key] = current_received_qty + rec['Transfer Qty']
             
-            # 更新安全庫存和MOQ信息
-            for rec in recommendations:
-                # 從原始數據中獲取安全庫存和MOQ
-                source_data = df[(df['Article'] == rec['Article']) & (df['Site'] == rec['Transfer Site'])]
-                if not source_data.empty:
-                    rec['Safety Stock'] = source_data['Safety Stock'].iloc[0]
-                    rec['MOQ'] = source_data['MOQ'].iloc[0]
+            # 更新安全庫存和MOQ信息（使用預先建好的索引查詢，避免 N+1 全表掃描）
+            if recommendations:
+                article_site_index = df.set_index(['Article', 'Site'])[['Safety Stock', 'MOQ']]
+                for rec in recommendations:
+                    key = (rec['Article'], rec['Transfer Site'])
+                    if key in article_site_index.index:
+                        rec['Safety Stock'] = article_site_index.at[key, 'Safety Stock']
+                        rec['MOQ'] = article_site_index.at[key, 'MOQ']
             
             all_recommendations.extend(recommendations)
         
@@ -1893,6 +1894,9 @@ class TransferLogic:
         self.quality_errors = []
         self.quality_check_passed = True
         
+        # 預先建立 (Article, Site) → row 的索引，避免後續多次全表掃描
+        df_indexed = df.set_index(['Article', 'Site'])
+        
         # 檢查1：轉出與接收的Article必須完全一致
         for rec in self.transfer_recommendations:
             if 'Article' not in rec:
@@ -1912,9 +1916,9 @@ class TransferLogic:
             cumulative_transfers_by_source[source_key] = cumulative_transfers_by_source.get(source_key, 0) + rec['Transfer Qty']
         
         for (article, transfer_site), total_qty in cumulative_transfers_by_source.items():
-            source_data = df[(df['Article'] == article) & (df['Site'] == transfer_site)]
-            if not source_data.empty:
-                original_stock = source_data['SaSa Net Stock'].iloc[0]
+            key = (article, transfer_site)
+            if key in df_indexed.index:
+                original_stock = df_indexed.at[key, 'SaSa Net Stock']
                 if total_qty > original_stock:
                     self.quality_errors.append(f"累計轉移數量({total_qty})超過原始庫存({original_stock}) - Article: {article}, Site: {transfer_site}")
                     self.quality_check_passed = False
@@ -1957,12 +1961,13 @@ class TransferLogic:
                     self.quality_check_passed = False
         
         # 檢查7：接收店鋪不能是ND類型（ND店鋪在所有模式下都只能轉出，不能接收）
+        # 使用已建好的索引查詢，避免每條建議全表掃描
         for rec in self.transfer_recommendations:
             receive_site = rec['Receive Site']
             article = rec['Article']
-            receive_data = df[(df['Article'] == article) & (df['Site'] == receive_site)]
-            if not receive_data.empty:
-                rp_type = receive_data['RP Type'].iloc[0]
+            key = (article, receive_site)
+            if key in df_indexed.index:
+                rp_type = df_indexed.at[key, 'RP Type']
                 if rp_type == 'ND':
                     self.quality_errors.append(f"ND店鋪不能作為接收店鋪 - Site: {receive_site}, Article: {article}")
                     self.quality_check_passed = False
