@@ -706,174 +706,174 @@ if uploaded_file is not None:
                         st.error(error)
             
         if recommendations:
-                # 4.4. 結果展示區塊
-                st.markdown("---")
-                st.markdown("### 📈 分析結果")
-                
-                # KPI 指標卡
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("調貨建議", f"{statistics.get('total_recommendations', 0):,}")
-                col2.metric("調貨件數", f"{statistics.get('total_transfer_qty', 0):,}")
-                col3.metric("產品數量", f"{statistics.get('unique_articles', 0):,}")
-                col4.metric("OM數量", f"{statistics.get('unique_oms', 0):,}")
-                
-                st.markdown("")
-                
-                # 調貨建議表格
-                st.markdown("### 📋 調貨建議清單")
-                
-                # 預先建立 (Article, Site) → 庫存數據的字典（避免迴圈內全表掃描 N+1 問題）
-                _stock_lookup = {
-                    (row['Article'], row['Site']): {
-                        'stock': row['SaSa Net Stock'],
-                        'safety': row['Safety Stock'],
-                        'moq': row['MOQ']
-                    }
-                    for _, row in df[['Article', 'Site', 'SaSa Net Stock', 'Safety Stock', 'MOQ']].iterrows()
+            # 4.4. 結果展示區塊
+            st.markdown("---")
+            st.markdown("### 📈 分析結果")
+            
+            # KPI 指標卡
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("調貨建議", f"{statistics.get('total_recommendations', 0):,}")
+            col2.metric("調貨件數", f"{statistics.get('total_transfer_qty', 0):,}")
+            col3.metric("產品數量", f"{statistics.get('unique_articles', 0):,}")
+            col4.metric("OM數量", f"{statistics.get('unique_oms', 0):,}")
+            
+            st.markdown("")
+            
+            # 調貨建議表格
+            st.markdown("### 📋 調貨建議清單")
+            
+            # 預先建立 (Article, Site) → 庫存數據的字典（避免迴圈內全表掃描 N+1 問題）
+            _stock_lookup = {
+                (row['Article'], row['Site']): {
+                    'stock': row['SaSa Net Stock'],
+                    'safety': row['Safety Stock'],
+                    'moq': row['MOQ']
                 }
+                for _, row in df[['Article', 'Site', 'SaSa Net Stock', 'Safety Stock', 'MOQ']].iterrows()
+            }
+            
+            # 準備顯示數據
+            display_data = []
+            
+            # 創建一個字典來跟蹤每個店幫的累計轉出量
+            cumulative_transfers = {}
+            
+            for rec in recommendations:
+                # 透過預建字典查詢，O(1) 取得轉出/接收店幫數據
+                src_key = (rec['Article'], rec['Transfer Site'])
+                src_info = _stock_lookup.get(src_key, {})
+                source_stock = src_info.get('stock', 0)
+                source_safety = src_info.get('safety', 0)
+                source_moq = src_info.get('moq', 0)
                 
-                # 準備顯示數據
-                display_data = []
+                dst_key = (rec['Article'], rec['Receive Site'])
+                dst_info = _stock_lookup.get(dst_key, {})
+                dest_stock = dst_info.get('stock', 0)
+                dest_safety = dst_info.get('safety', 0)
+                dest_moq = dst_info.get('moq', 0)
                 
-                # 創建一個字典來跟蹤每個店幫的累計轉出量
-                cumulative_transfers = {}
+                # 計算接收後的總貨量
+                dest_total_after = dest_stock + rec['Transfer Qty']
                 
-                for rec in recommendations:
-                        # 透過預建字典查詢，O(1) 取得轉出/接收店幫數據
-                        src_key = (rec['Article'], rec['Transfer Site'])
-                        src_info = _stock_lookup.get(src_key, {})
-                        source_stock = src_info.get('stock', 0)
-                        source_safety = src_info.get('safety', 0)
-                        source_moq = src_info.get('moq', 0)
-                        
-                        dst_key = (rec['Article'], rec['Receive Site'])
-                        dst_info = _stock_lookup.get(dst_key, {})
-                        dest_stock = dst_info.get('stock', 0)
-                        dest_safety = dst_info.get('safety', 0)
-                        dest_moq = dst_info.get('moq', 0)
-                        
-                        # 計算接收後的總貨量
-                        dest_total_after = dest_stock + rec['Transfer Qty']
-                        
-                        # 創建店幫的唯一標識符
-                        source_key = f"{rec['Article']}_{rec['Transfer Site']}"
-                        
-                        # 如果是第一次轉出,初始化累計轉出量
-                        if source_key not in cumulative_transfers:
-                            cumulative_transfers[source_key] = 0
-                        
-                        # 更新累計轉出量
-                        cumulative_transfers[source_key] += rec['Transfer Qty']
-                        
-                        # 計算累減後的庫存
-                        source_after_transfer_stock = source_stock - cumulative_transfers[source_key]
-                        
-                        display_data.append({
-                            'Article': rec['Article'],
-                            'Product Desc': rec['Product Desc'],
-                            'Transfer OM': rec['Transfer OM'],
-                            'Transfer Site': rec['Transfer Site'],
-                            'Transfer Qty': rec['Transfer Qty'],
-                            'Source Original Stock': source_stock,
-                            'Source After Transfer Stock': source_after_transfer_stock,
-                            'Source Safety Stock': source_safety,
-                            'Source MOQ': source_moq,
-                            'Receive OM': rec['Receive OM'],
-                            'Receive Site': rec['Receive Site'],
-                            'Receive Original Stock': dest_stock,
-                            'Receive Total After': dest_total_after,
-                            'Receive Safety Stock': dest_safety,
-                            'Receive MOQ': dest_moq,
-                            'Source Type': rec.get('Source Type', ''),
-                            'Destination Type': rec.get('Destination Type', '')
-                        })
+                # 創建店幫的唯一標識符
+                source_key = f"{rec['Article']}_{rec['Transfer Site']}"
+                
+                # 如果是第一次轉出,初始化累計轉出量
+                if source_key not in cumulative_transfers:
+                    cumulative_transfers[source_key] = 0
+                
+                # 更新累計轉出量
+                cumulative_transfers[source_key] += rec['Transfer Qty']
+                
+                # 計算累減後的庫存
+                source_after_transfer_stock = source_stock - cumulative_transfers[source_key]
+                
+                display_data.append({
+                    'Article': rec['Article'],
+                    'Product Desc': rec['Product Desc'],
+                    'Transfer OM': rec['Transfer OM'],
+                    'Transfer Site': rec['Transfer Site'],
+                    'Transfer Qty': rec['Transfer Qty'],
+                    'Source Original Stock': source_stock,
+                    'Source After Transfer Stock': source_after_transfer_stock,
+                    'Source Safety Stock': source_safety,
+                    'Source MOQ': source_moq,
+                    'Receive OM': rec['Receive OM'],
+                    'Receive Site': rec['Receive Site'],
+                    'Receive Original Stock': dest_stock,
+                    'Receive Total After': dest_total_after,
+                    'Receive Safety Stock': dest_safety,
+                    'Receive MOQ': dest_moq,
+                    'Source Type': rec.get('Source Type', ''),
+                    'Destination Type': rec.get('Destination Type', '')
+                })
+            
+            # 創建DataFrame並顯示
+            rec_df = pd.DataFrame(display_data)
+            st.dataframe(rec_df, use_container_width=True)
+            
+            # 統計圖表
+            with st.expander("📊 詳細統計", expanded=False):
+            
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("**按產品統計**")
+                    article_stats = statistics.get('article_stats', {})
+                    if article_stats:
+                        article_df = pd.DataFrame([
+                            {
+                                'Article': article,
+                                'Total Qty': stats['total_qty'],
+                                'Count': stats['count'],
+                                'OM Count': stats['om_count']
+                            }
+                            for article, stats in article_stats.items()
+                        ])
+                        st.dataframe(article_df, use_container_width=True)
                     
-                # 創建DataFrame並顯示
-                rec_df = pd.DataFrame(display_data)
-                st.dataframe(rec_df, use_container_width=True)
+                    st.markdown("**轉出類型分佈**")
+                    source_type_stats = statistics.get('source_type_stats', {})
+                    if source_type_stats:
+                        source_df = pd.DataFrame([
+                            {
+                                'Source Type': source_type,
+                                'Count': stats['count'],
+                                'Qty': stats['qty']
+                            }
+                            for source_type, stats in source_type_stats.items()
+                        ])
+                        st.dataframe(source_df, use_container_width=True)
                 
-                # 統計圖表
-                with st.expander("📊 詳細統計", expanded=False):
-                
-                    col1, col2 = st.columns(2)
+                with col2:
+                    st.markdown("**按 OM 統計**")
+                    om_stats = statistics.get('om_stats', {})
+                    if om_stats:
+                        om_df = pd.DataFrame([
+                            {
+                                'OM': om,
+                                'Transfer Qty': stats.get('transfer_qty', stats.get('total_qty', 0)),
+                                'Receive Qty': stats.get('receive_qty', 0),
+                                'Count': stats['count'],
+                                'Article Count': stats['article_count']
+                            }
+                            for om, stats in om_stats.items()
+                        ])
+                        st.dataframe(om_df, use_container_width=True)
                     
-                    with col1:
-                        st.markdown("**按產品統計**")
-                        article_stats = statistics.get('article_stats', {})
-                        if article_stats:
-                            article_df = pd.DataFrame([
-                                {
-                                    'Article': article,
-                                    'Total Qty': stats['total_qty'],
-                                    'Count': stats['count'],
-                                    'OM Count': stats['om_count']
-                                }
-                                for article, stats in article_stats.items()
-                            ])
-                            st.dataframe(article_df, use_container_width=True)
-                        
-                        st.markdown("**轉出類型分佈**")
-                        source_type_stats = statistics.get('source_type_stats', {})
-                        if source_type_stats:
-                            source_df = pd.DataFrame([
-                                {
-                                    'Source Type': source_type,
-                                    'Count': stats['count'],
-                                    'Qty': stats['qty']
-                                }
-                                for source_type, stats in source_type_stats.items()
-                            ])
-                            st.dataframe(source_df, use_container_width=True)
-                    
-                    with col2:
-                        st.markdown("**按 OM 統計**")
-                        om_stats = statistics.get('om_stats', {})
-                        if om_stats:
-                            om_df = pd.DataFrame([
-                                {
-                                    'OM': om,
-                                    'Transfer Qty': stats.get('transfer_qty', stats.get('total_qty', 0)),
-                                    'Receive Qty': stats.get('receive_qty', 0),
-                                    'Count': stats['count'],
-                                    'Article Count': stats['article_count']
-                                }
-                                for om, stats in om_stats.items()
-                            ])
-                            st.dataframe(om_df, use_container_width=True)
-                        
-                        st.markdown("**接收類型分佈**")
-                        dest_type_stats = statistics.get('dest_type_stats', {})
-                        if dest_type_stats:
-                            dest_df = pd.DataFrame([
-                                {
-                                    'Destination Type': dest_type,
-                                    'Count': stats['count'],
-                                    'Qty': stats['qty']
-                                }
-                                for dest_type, stats in dest_type_stats.items()
-                            ])
-                            st.dataframe(dest_df, use_container_width=True)
-                
-                st.markdown("---")
-                st.success("✅ 分析完成!")
-                
-                # 生成Excel文件（BytesIO記憶體模式，無磁碟暫存安全問題）
-                with st.spinner("生成 Excel 文件..."):
-                    excel_generator = ExcelGenerator()
-                    excel_data = excel_generator.generate_excel_file(recommendations, statistics)
-                
-                st.download_button(
-                    label="📥 下載 Excel 報表",
-                    data=excel_data,
-                    file_name=excel_generator.output_filename,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-                
-                progress_bar.progress(100, text="處理完畢!")
-            else:
-                st.info("根據當前規則，沒有生成任何調貨建議。")
-                progress_bar.progress(100, text="處理完畢!")
+                    st.markdown("**接收類型分佈**")
+                    dest_type_stats = statistics.get('dest_type_stats', {})
+                    if dest_type_stats:
+                        dest_df = pd.DataFrame([
+                            {
+                                'Destination Type': dest_type,
+                                'Count': stats['count'],
+                                'Qty': stats['qty']
+                            }
+                            for dest_type, stats in dest_type_stats.items()
+                        ])
+                        st.dataframe(dest_df, use_container_width=True)
+            
+            st.markdown("---")
+            st.success("✅ 分析完成!")
+            
+            # 生成Excel文件（BytesIO記憶體模式，無磁碟暫存安全問題）
+            with st.spinner("生成 Excel 文件..."):
+                excel_generator = ExcelGenerator()
+                excel_data = excel_generator.generate_excel_file(recommendations, statistics)
+            
+            st.download_button(
+                label="📥 下載 Excel 報表",
+                data=excel_data,
+                file_name=excel_generator.output_filename,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+            
+            progress_bar.progress(100, text="處理完畢!")
+        else:
+            st.info("根據當前規則，沒有生成任何調貨建議。")
+            progress_bar.progress(100, text="處理完畢!")
     
     except Exception as e:
         st.error(f"處理文件時發生錯誤: {e}")
