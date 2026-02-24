@@ -1,7 +1,7 @@
 """
-數據預處理模組 v2.2.0
+數據預處理模組 v2.4.0
 處理Excel文件讀取、數據清理和驗證
-支持七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/C(重點補0)/D(清貨轉貨)/E(強制轉出)/F(目標優化)
+支持十一模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)
 新增：預設店舖資料（OM、Type等），當用戶上傳的Excel缺少這些資料時自動填充
 """
 
@@ -235,18 +235,22 @@ class DataProcessor:
             dtype_dict = {'Article': str}
             df = pd.read_excel(file_path, dtype=dtype_dict)
             
-            # 確保Article欄位為12位文本格式
+            # 確保Article欄位為12位文本格式（補零不足12位；截斷超過12位）
             if 'Article' in df.columns:
-                df['Article'] = df['Article'].astype(str).str.zfill(12)
+                df['Article'] = df['Article'].astype(str).str.zfill(12).str[-12:]
             
             # 處理*ALL*欄位：無論大小寫，都轉換為標準化的'ALL'欄位
             all_column_names = [col for col in df.columns if col.upper() == 'ALL']
             if all_column_names:
-                # 如果存在*ALL*欄位，將其標準化為'ALL'
-                for col in all_column_names:
-                    if col != 'ALL':
-                        df['ALL'] = df[col]
-                        df = df.drop(columns=[col])
+                # 優先保留已命名為 'ALL' 的欄位；若無則取第一個改名
+                canonical = 'ALL' if 'ALL' in all_column_names else all_column_names[0]
+                rename_map = {col: 'ALL' for col in all_column_names if col != 'ALL'}
+                if rename_map:
+                    df = df.rename(columns=rename_map)
+                # 移除重複欄位（若有多個原始 ALL 欄位）
+                duplicate_cols = [col for col in df.columns if col == 'ALL']
+                if len(duplicate_cols) > 1:
+                    df = df.loc[:, ~df.columns.duplicated(keep='first')]
                 logger.info("找到*ALL*欄位用於E1/E2模式")
             else:
                 # 創建空的ALL欄位，用於後續邏輯判斷
@@ -367,8 +371,21 @@ class DataProcessor:
             invalid_rp_types = ~df_processed['RP Type'].isin(['ND', 'RF'])
             if invalid_rp_types.any():
                 invalid_values = df_processed.loc[invalid_rp_types, 'RP Type'].unique()
+                invalid_count = int(invalid_rp_types.sum())
                 logger.warning(f"發現無效的RP Type值: {invalid_values}，請檢查原始數據，已自動修正為RF")
                 df_processed.loc[invalid_rp_types, 'RP Type'] = 'RF'  # 默認設為RF
+                # 記錄至 Notes 欄位（供後續 preprocess_data 回傳 stats 並於界面顯示）
+                if 'Notes' in df_processed.columns:
+                    df_processed.loc[invalid_rp_types, 'Notes'] = (
+                        df_processed.loc[invalid_rp_types, 'Notes'].astype(str)
+                        + f"RP Type無效已修正為RF;"
+                    )
+                # 將無效值列表和計數存入實例屬性，供呼叫方讀取
+                self._invalid_rp_type_values = list(invalid_values)
+                self._invalid_rp_type_count = invalid_count
+            else:
+                self._invalid_rp_type_values = []
+                self._invalid_rp_type_count = 0
         
         logger.info("數據類型轉換完成")
         return df_processed
@@ -514,7 +531,10 @@ class DataProcessor:
             'total_rows': len(df),
             'columns': list(df.columns),
             'data_types': df.dtypes.to_dict(),
-            'fill_stats': self.fill_stats  # 添加填充統計
+            'fill_stats': self.fill_stats,  # 添加填充統計
+            # 無效 RP Type 修正資訊（供界面顯示警告）
+            'invalid_rp_types': getattr(self, '_invalid_rp_type_values', []),
+            'invalid_rp_type_count': getattr(self, '_invalid_rp_type_count', 0)
         }
         
         logger.info("數據預處理完成")

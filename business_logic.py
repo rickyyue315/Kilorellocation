@@ -352,8 +352,8 @@ class TransferLogic:
         """
         destinations = []
         
-        # 只考慮RF類型店鋪，明確排除ND類型店鋪（ND店鋪在所有模式下都只能轉出，不能接收）
-        rf_destinations = group_df[(group_df['RP Type'] == 'RF') & (group_df['RP Type'] != 'ND')]
+        # 只考慮RF類型店鋪（ND店鋪在所有模式下都只能轉出，不能接收）
+        rf_destinations = group_df[group_df['RP Type'] == 'RF']
 
         # F模式特殊處理：Target數字優先接收，其餘店鋪按C模式補0
         if mode == self.mode_f:
@@ -1819,6 +1819,9 @@ class TransferLogic:
         # 記錄所有接收店鋪的累計接收數量
         global_received_qty_by_site = {}
         
+        # 預先建立全局 (Article, Site) → Safety Stock / MOQ 索引，避免迴圈內重複建立（效能優化）
+        article_site_index = df.set_index(['Article', 'Site'])[['Safety Stock', 'MOQ']]
+        
         for group_keys, group_df in grouped:
             # 獲取商品描述
             product_desc = group_df['Article Description'].iloc[0] if 'Article Description' in group_df.columns else ""
@@ -1863,9 +1866,8 @@ class TransferLogic:
                 current_received_qty = global_received_qty_by_site.get(receive_site_key, 0)
                 global_received_qty_by_site[receive_site_key] = current_received_qty + rec['Transfer Qty']
             
-            # 更新安全庫存和MOQ信息（使用預先建好的索引查詢，避免 N+1 全表掃描）
+            # 更新安全庫存和MOQ信息（使用迴圈外預建索引，O(1) 查詢）
             if recommendations:
-                article_site_index = df.set_index(['Article', 'Site'])[['Safety Stock', 'MOQ']]
                 for rec in recommendations:
                     key = (rec['Article'], rec['Transfer Site'])
                     if key in article_site_index.index:
@@ -2155,10 +2157,10 @@ class TransferLogic:
         elif source['source_type'] == 'Local店舖全轉出':
             notes_parts.append("【轉出分析: Local店舖全轉出（附加B系列模式），可全數轉出】")
         elif source['source_type'] == 'RF過剩轉出':
-            remaining_after_transfer = source['original_stock'] - transfer_qty
+            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
             notes_parts.append(f"【轉出分析: RF過剩轉出，轉出後剩餘庫存({remaining_after_transfer})仍高於安全庫存({source.get('safety_stock', 'N/A')})】")
         elif source['source_type'] == 'RF加強轉出':
-            remaining_after_transfer = source['original_stock'] - transfer_qty
+            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
             notes_parts.append(f"【轉出分析: RF加強轉出，轉出後剩餘庫存({remaining_after_transfer})可能低於安全庫存({source.get('safety_stock', 'N/A')})】")
         
         # 5. 接收需求分析

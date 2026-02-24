@@ -6,11 +6,8 @@
 
 import streamlit as st
 import pandas as pd
-import os
 from datetime import datetime
 import logging
-from io import BytesIO
-import time
 
 try:
     from streamlit.delta_generator import DeltaGenerator
@@ -618,6 +615,15 @@ if uploaded_file is not None:
         
         st.success("檔案上傳與數據預處理成功!")
         
+        # 若有無效 RP Type，於界面顯示警告讓使用者知情
+        invalid_rp_count = processing_stats['processed_stats'].get('invalid_rp_type_count', 0)
+        if invalid_rp_count > 0:
+            invalid_rp_vals = processing_stats['processed_stats'].get('invalid_rp_types', [])
+            st.warning(
+                f"⚠️ 資料品質提示：發現 {invalid_rp_count} 行 RP Type 欄位值不是 ND 或 RF "
+                f"（{', '.join(str(v) for v in invalid_rp_vals)}），已自動修正為 RF。請確認原始數據是否正確。"
+            )
+        
         # 4.2. 資料查覽模塊
         st.markdown("### 📊 資料查覽")
         col1, col2, col3 = st.columns(3)
@@ -636,6 +642,13 @@ if uploaded_file is not None:
         st.markdown("### 🚀 分析與建議")
         
         st.info(f"當前模式:**{transfer_mode}**")
+        
+        # 當模式或檔案改變時，清除舊的分析結果
+        current_run_key = f"{mode_code}_{uploaded_file.name}_{uploaded_file.size}"
+        if st.session_state.get('_run_key') != current_run_key:
+            for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors']:
+                st.session_state.pop(k, None)
+            st.session_state['_run_key'] = current_run_key
         
         if st.button("🎯 生成調貨建議", type="primary", use_container_width=True):
             progress_bar.progress(70, text="正在分析數據並生成建議...")
@@ -668,10 +681,20 @@ if uploaded_file is not None:
                 # 獲取統計信息
                 statistics = transfer_logic.get_transfer_statistics()
                 
-                time.sleep(1)  # 模擬耗時操作
+                # 將結果存入 session_state，確保重新渲染時結果不消失
+                st.session_state['recommendations'] = recommendations
+                st.session_state['statistics'] = statistics
+                st.session_state['quality_passed'] = quality_passed
+                st.session_state['quality_errors'] = transfer_logic.quality_errors
                 
             progress_bar.progress(90, text="分析完成!正在準備結果展示...")
-            
+        
+        # 從 session_state 讀取結果（按鈕觸發後或重新渲染均可顯示）
+        recommendations = st.session_state.get('recommendations')
+        statistics = st.session_state.get('statistics', {})
+        quality_passed = st.session_state.get('quality_passed')
+        
+        if quality_passed is not None:
             if quality_passed:
                 st.success("質量檢查通過!")
             else:
@@ -679,10 +702,10 @@ if uploaded_file is not None:
                 
                 # 顯示錯誤信息
                 with st.expander("質量檢查錯誤詳情"):
-                    for error in transfer_logic.quality_errors:
+                    for error in st.session_state.get('quality_errors', []):
                         st.error(error)
             
-            if recommendations:
+        if recommendations:
                 # 4.4. 結果展示區塊
                 st.markdown("---")
                 st.markdown("### 📈 分析結果")
@@ -834,20 +857,10 @@ if uploaded_file is not None:
                 st.markdown("---")
                 st.success("✅ 分析完成!")
                 
-                # 生成Excel文件
+                # 生成Excel文件（BytesIO記憶體模式，無磁碟暫存安全問題）
                 with st.spinner("生成 Excel 文件..."):
                     excel_generator = ExcelGenerator()
-                    excel_path = excel_generator.generate_excel_file(recommendations, statistics)
-                
-                # 資料讀取Excel文件
-                with open(excel_path, "rb") as file:
-                    excel_data = file.read()
-                
-                # 清除暫存Excel文件
-                try:
-                    os.unlink(excel_path)
-                except OSError:
-                    pass
+                    excel_data = excel_generator.generate_excel_file(recommendations, statistics)
                 
                 st.download_button(
                     label="📥 下載 Excel 報表",

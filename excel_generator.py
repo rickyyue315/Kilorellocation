@@ -5,6 +5,7 @@ Excel輸出模組 v2.4.0
 增加詳細Notes分類資訊
 """
 
+import io
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -18,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ExcelGenerator:
-    """Excel輸出類 v2.3.0"""
+    """Excel輸出類 v2.4.0"""
     
     def __init__(self):
         self.output_filename = ""
@@ -314,37 +315,32 @@ class ExcelGenerator:
         worksheet.set_row(5, 20)  # KPI值行
         worksheet.set_row(6, 20)  # KPI值行
     
-    def generate_excel_file(self, recommendations: List[Dict], statistics: Dict, 
-                           output_path: Optional[str] = None) -> str:
+    def generate_excel_file(self, recommendations: List[Dict], statistics: Dict,
+                           output_path: Optional[str] = None) -> bytes:
         """
-        生成完整的Excel文件
+        生成完整的Excel文件，返回 bytes（記憶體操作，無磁碟 I/O）
         
         Args:
             recommendations: 調貨建議列表
             statistics: 統計信息字典
-            output_path: 輸出路徑（可選）
+            output_path: 保留參數（已棄用，不再使用）
             
         Returns:
-            生成的文件路徑
+            Excel 文件的 bytes 內容
         """
-        logger.info("開始生成Excel文件")
+        logger.info("開始生成Excel文件（BytesIO模式）")
         
-        # 生成文件名
-        filename = self.generate_filename()
+        # 生成文件名（供外部引用 output_filename 屬性使用）
+        self.generate_filename()
         
-        # 確定完整路徑
-        if output_path:
-            filepath = f"{output_path}/{filename}"
-        else:
-            filepath = filename
-        
-        # 創建ExcelWriter對象
-        with pd.ExcelWriter(filepath, engine='xlsxwriter') as writer:
+        # 使用 BytesIO 完全在記憶體中生成，避免磁碟並發安全問題
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
             # 創建調貨建議工作表
             self.create_transfer_recommendations_sheet(writer, recommendations)
             
             # 創建統計摘要工作表
             self.create_summary_dashboard_sheet(writer, statistics)
         
-        logger.info(f"Excel文件生成完成: {filepath}")
-        return filepath
+        logger.info("Excel文件生成完成（BytesIO）")
+        return buf.getvalue()
