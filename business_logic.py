@@ -1885,6 +1885,16 @@ class TransferLogic:
         for group_keys, group_df in grouped:
             # 獲取商品描述
             product_desc = group_df['Article Description'].iloc[0] if 'Article Description' in group_df.columns else ""
+
+            # 獲取品牌（Product Hierarchy = Brand = 品牌）
+            product_brand = ""
+            for brand_col in ['Product Hierarchy', 'Brand', '品牌']:
+                if brand_col in group_df.columns:
+                    brand_series = group_df[brand_col].dropna().astype(str).str.strip()
+                    brand_series = brand_series[brand_series != '']
+                    if not brand_series.empty:
+                        product_brand = brand_series.iloc[0]
+                        break
             
             # 識別轉出候選店鋪
             sources = self.identify_sources(group_df, mode)
@@ -1919,6 +1929,10 @@ class TransferLogic:
             
             # 更新全局轉出店鋪集合
             for rec in recommendations:
+                # 統一補上品牌欄位，供Excel輸出使用
+                rec['Product Hierarchy'] = product_brand
+                rec['Brand'] = product_brand
+
                 global_transfer_sites.add(rec['Transfer Site'])
                 
                 # 更新全局累計接收數量
