@@ -401,12 +401,14 @@ with st.sidebar:
     if mode_code in ["B2", "B2a", "B3", "B3a"]:
         b_special_receive_site_limit_option = st.radio(
             "B2/B2a/B3/B3a 出貨店舖接收店數限制",
-            ["最多 2 間", "不限制"],
-            index=0,
+            ["優先 1 間", "最多 2 間", "不限制"],
+            index=1,
             key='b_special_receive_site_limit_option',
             help="控制同一SKU下，每個出貨店舖最多可分配到多少個接收店舖"
         )
-        if b_special_receive_site_limit_option == "最多 2 間":
+        if b_special_receive_site_limit_option == "優先 1 間":
+            b_special_max_receive_sites_per_source = 1
+        elif b_special_receive_site_limit_option == "最多 2 間":
             b_special_max_receive_sites_per_source = 2
     
     # 精簡模式說明
@@ -448,21 +450,23 @@ with st.sidebar:
         - 其餘RF依B模式規則
         - 接收端依遊客區/混合型店舖優先級排序
         - 接收上限為Safety Stock的2倍
-        - 可設定同一SKU下單一出貨店舖配對接收店舖：最多2間 / 不限制
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         
         **B3模式(附加B跨OM特別模式)**
         - 參照B2,但允許跨OM配對
         - HD不能轉到HA/HB/HC
         - Windy轉出只能到Windy,Windy可接收其他OM
-        - 可設定同一SKU下單一出貨店舖配對接收店舖：最多2間 / 不限制
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
 
         **B2a模式(附加B2a特別模式)**
         - 參照B2模式
         - 新增限制：Type=T(遊客鋪)不可出貨
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
 
         **B3a模式(附加B3a跨OM特別模式)**
         - 參照B3模式
         - 新增限制：Type=T(遊客鋪)不可出貨
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         
         **C模式(重點補0)**
         - 主要針對接收店舖

@@ -1693,7 +1693,7 @@ class TransferLogic:
                 if dest.get('rp_type') == 'ND':
                     continue
 
-                # B2/B3店舖數量限制：同一SKU下每個轉出店最多配對2個接收店
+                # B2/B2a/B3/B3a店舖數量限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
                 if max_receive_sites_per_source is not None:
                     source_site = source.get('site')
                     matched_sites = source_to_receive_sites.get(source_site, set())

@@ -6,7 +6,7 @@
 
 ### **0. B2/B2a/B3/B3a 操作設定（介面）**
 - **規則**：當選擇 B2/B2a/B3/B3a 時，可在介面設定「出貨店舖接收店數限制」
-- **選項**：`最多 2 間` 或 `不限制`
+- **選項**：`優先 1 間`、`最多 2 間`、`不限制`
 - **作用**：控制同一 SKU 下，單一出貨店舖最多可配對的接收店舖數
 - **適用模式**：B2、B2a、B3、B3a
 - **介面位置**：`app.py` 側邊欄模式選擇區塊
@@ -90,6 +90,7 @@ actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stoc
 - Type=L 且銷量≤2：全數轉出（即使RF）
 - Type=L 且銷量>2：回到B模式RF規則
 - 接收上限為 Safety Stock × 2，並累計追蹤
+- 可配置同一 SKU 下單一出貨店舖可配對的接收店數（優先1間 / 最多2間 / 不限）
 
 **轉出規則：**
 1. ND店鋪：全數轉出
@@ -116,6 +117,7 @@ actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stoc
 **核心特徵：**
 - 完整沿用 B2 模式規則（Type=L 特殊轉出、接收上限 Safety×2、接收優先級）
 - 額外限制：**Type=T（遊客鋪）不可作為出貨來源**
+- 可配置同一 SKU 下單一出貨店舖可配對的接收店數（優先1間 / 最多2間 / 不限）
 
 **轉出規則（相較 B2 新增）**
 1. 若店舖 Type = T，則不可作為 source
@@ -135,6 +137,7 @@ actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stoc
 - 允許跨 OM 配對
 - **HD 限制**：HD 不能轉到 HA/HB/HC
 - **Windy 限制**：Windy 轉出只能到 Windy
+- 可配置同一 SKU 下單一出貨店舖可配對的接收店數（優先1間 / 最多2間 / 不限）
 
 **轉出規則：** 與 B2 相同（含 Type=L 特殊轉出）
 **接收規則：** 與 B2 相同（Safety×2 上限與優先排序）
@@ -146,6 +149,7 @@ actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stoc
 **核心特徵：**
 - 完整沿用 B3 模式規則（跨 OM + HD/Windy 限制）
 - 額外限制：**Type=T（遊客鋪）不可作為出貨來源**
+- 可配置同一 SKU 下單一出貨店舖可配對的接收店數（優先1間 / 最多2間 / 不限）
 
 **轉出規則（相較 B3 新增）**
 1. 若店舖 Type = T，則不可作為 source
