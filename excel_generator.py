@@ -68,6 +68,7 @@ class ExcelGenerator:
             remark = self._generate_remark(source_type, dest_type) if source_type and dest_type else ''
             
             df_data.append({
+                'Brand': rec.get('Product Hierarchy') or rec.get('Brand') or rec.get('品牌', ''),
                 'Article': rec['Article'],
                 'Product Desc': rec['Product Desc'],
                 'Transfer OM': rec['Transfer OM'],
@@ -101,24 +102,25 @@ class ExcelGenerator:
         worksheet = writer.sheets['調貨建議 (Transfer Recommendations)']
         
         # 設置列寬（優化為適中寬度）
-        worksheet.set_column('A:A', 12)  # Article
-        worksheet.set_column('B:B', 25)  # Product Desc
-        worksheet.set_column('C:C', 12)  # Transfer OM
-        worksheet.set_column('D:D', 12)  # Transfer Site
-        worksheet.set_column('E:E', 12)  # Receive OM
-        worksheet.set_column('F:F', 12)  # Receive Site
-        worksheet.set_column('G:G', 10)  # Transfer Qty
-        worksheet.set_column('H:H', 18)  # Transfer Original Stock
-        worksheet.set_column('I:I', 20)  # Transfer After Transfer Stock
-        worksheet.set_column('J:J', 18)  # Transfer Safety Stock
-        worksheet.set_column('K:K', 12)  # Transfer MOQ
-        worksheet.set_column('L:L', 25)  # Remark - 簡潔的轉出→接收映射
-        worksheet.set_column('M:M', 75)  # Notes - 600像素約等於75字符
-        worksheet.set_column('N:N', 18)  # Transfer Site Last Month Sold Qty
-        worksheet.set_column('O:O', 15)  # Transfer Site MTD Sold Qty
-        worksheet.set_column('P:P', 18)  # Receive Site Last Month Sold Qty
-        worksheet.set_column('Q:Q', 15)  # Receive Site MTD Sold Qty
-        worksheet.set_column('R:R', 15)  # Receive Original Stock
+        worksheet.set_column('A:A', 14)  # Brand
+        worksheet.set_column('B:B', 12)  # Article
+        worksheet.set_column('C:C', 25)  # Product Desc
+        worksheet.set_column('D:D', 12)  # Transfer OM
+        worksheet.set_column('E:E', 12)  # Transfer Site
+        worksheet.set_column('F:F', 12)  # Receive OM
+        worksheet.set_column('G:G', 12)  # Receive Site
+        worksheet.set_column('H:H', 10)  # Transfer Qty
+        worksheet.set_column('I:I', 18)  # Transfer Original Stock
+        worksheet.set_column('J:J', 20)  # Transfer After Transfer Stock
+        worksheet.set_column('K:K', 18)  # Transfer Safety Stock
+        worksheet.set_column('L:L', 12)  # Transfer MOQ
+        worksheet.set_column('M:M', 25)  # Remark - 簡潔的轉出→接收映射
+        worksheet.set_column('N:N', 75)  # Notes - 600像素約等於75字符
+        worksheet.set_column('O:O', 18)  # Transfer Site Last Month Sold Qty
+        worksheet.set_column('P:P', 15)  # Transfer Site MTD Sold Qty
+        worksheet.set_column('Q:Q', 18)  # Receive Site Last Month Sold Qty
+        worksheet.set_column('R:R', 15)  # Receive Site MTD Sold Qty
+        worksheet.set_column('S:S', 15)  # Receive Original Stock
         
         # 添加標題格式
         header_format = workbook.add_format({
@@ -155,9 +157,9 @@ class ExcelGenerator:
         })
         
         # 應用數據格式（使用列格式避免逐格寫入，提高效能）
-        worksheet.set_column('A:L', None, data_format)
-        worksheet.set_column('M:M', 75, notes_format)
-        worksheet.set_column('N:R', None, data_format)
+        worksheet.set_column('A:M', None, data_format)
+        worksheet.set_column('N:N', 75, notes_format)
+        worksheet.set_column('O:S', None, data_format)
 
         # 設置標題行高度與預設行高（避免逐行設定）
         worksheet.set_row(0, 40)
