@@ -1,5 +1,5 @@
 """
-業務邏輯模組 v2.4.0
+業務邏輯模組 v2.4.1
 實現調貨規則、源/目的地識別和匹配算法
 支持十四模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.4.0"""
+    """調貨業務邏輯類 v2.4.1"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None):
         self.transfer_recommendations = []
@@ -56,15 +56,8 @@ class TransferLogic:
     def _is_b_tourist_no_source_mode(self, mode: str) -> bool:
         return mode in (self.mode_b_special_a, self.mode_b3a)
 
-    def _get_last_two_month_sold_qty(self, data: Dict) -> int:
-        value = data.get('last_2_month_sold_qty', data.get('last_month_sold_qty', 0))
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return 0
-
     def _get_b_special_sales_total(self, data: Dict) -> int:
-        return self._get_last_two_month_sold_qty(data) + int(data.get('mtd_sold_qty', 0) or 0)
+        return int(data.get('last_month_sold_qty', 0) or 0) + int(data.get('mtd_sold_qty', 0) or 0)
     
     def identify_sources(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
         """

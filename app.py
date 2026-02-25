@@ -1,5 +1,5 @@
 """
-庫存調貨建議系統 v2.4.0 - Streamlit應用程序
+庫存調貨建議系統 v2.4.1 - Streamlit應用程序
 支持十三模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)
 新增:預設店舖資料(OM、Type等),當用戶上傳的Excel缺少這些資料時自動填充
 """
@@ -135,7 +135,7 @@ _patch_streamlit_text_rendering()
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.4.0"),
+    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.4.1"),
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -315,7 +315,7 @@ with st.sidebar:
     st.markdown("### 📦 系統資訊")
     st.markdown("""
     <div class="info-card">
-    <b>版本</b>: v2.4.0<br>
+    <b>版本</b>: v2.4.1<br>
     <b>開發者</b>: Ricky
     </div>
     """, unsafe_allow_html=True)
@@ -342,6 +342,7 @@ with st.sidebar:
         - ✅ E2模式：標記商品強制轉出(跨OM)
         - ✅ F模式：Target目標接收優先
         - ✅ B2/B2a模式：接收端依遊客區/混合型店舖優先排序
+        - ✅ B2/B2a/B3/B3a模式：Mix店舖若總銷量高於目標店，禁止出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
         - ✅ B2a/B3a模式：T遊客鋪不作為出貨來源
         - ✅ B3/B3a/C2模式：跨OM配對規則(HD不能轉到HA/HB/HC；Windy轉出只能到Windy)
         
@@ -415,10 +416,10 @@ with st.sidebar:
     mode_descriptions = {
         "A: 保守轉貨": "轉出後保留安全庫存",
         "B: 加強轉貨": "積極處理滯銷品",
-        "B2: 附加B(特別模式)": "B模式 + Type=L全轉出",
-        "B2a: 附加B2a(特別模式-T遊客鋪不出貨)": "B2 + Type=T遊客鋪不出貨",
-        "B3: 附加B(跨OM特別模式)": "B2 + 跨OM配對",
-        "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)": "B3 + Type=T遊客鋪不出貨",
+        "B2: 附加B(特別模式)": "B模式 + Type=L全轉出 + Mix高銷量保護",
+        "B2a: 附加B2a(特別模式-T遊客鋪不出貨)": "B2 + Type=T遊客鋪不出貨 + Mix高銷量保護",
+        "B3: 附加B(跨OM特別模式)": "B2 + 跨OM配對 + Mix高銷量保護",
+        "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)": "B3 + Type=T遊客鋪不出貨 + Mix高銷量保護",
         "C: 重點補0": "補充庫存≤1的店舖",
         "C2: 附加C(跨OM重點補0)": "C模式 + 跨OM配對",
         "D: 清貨轉貨": "清理無銷售ND店舖",
@@ -448,12 +449,14 @@ with st.sidebar:
         - ND店舖全轉出
         - Type=L在銷量≤2時全轉出(含RF),若銷量>2則回到B模式
         - 其餘RF依B模式規則
+        - Mix店舖若總銷量高於目標店則不可出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
         - 接收端依遊客區/混合型店舖優先級排序
         - 接收上限為Safety Stock的2倍
         - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         
         **B3模式(附加B跨OM特別模式)**
         - 參照B2,但允許跨OM配對
+        - 同樣套用Mix店舖總銷量保護規則（總銷量=Last Month Sold Qty+MTD Sold Qty）
         - HD不能轉到HA/HB/HC
         - Windy轉出只能到Windy,Windy可接收其他OM
         - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
@@ -461,11 +464,13 @@ with st.sidebar:
         **B2a模式(附加B2a特別模式)**
         - 參照B2模式
         - 新增限制：Type=T(遊客鋪)不可出貨
+        - 同樣套用Mix店舖總銷量保護規則（總銷量=Last Month Sold Qty+MTD Sold Qty）
         - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
 
         **B3a模式(附加B3a跨OM特別模式)**
         - 參照B3模式
         - 新增限制：Type=T(遊客鋪)不可出貨
+        - 同樣套用Mix店舖總銷量保護規則（總銷量=Last Month Sold Qty+MTD Sold Qty）
         - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         
         **C模式(重點補0)**
@@ -536,7 +541,7 @@ with st.sidebar:
 
 # 3. 頁面頭部
 st.title("📦 庫存調貨建議系統")
-st.caption("v2.4.0 | Intelligent Inventory Reallocation System")
+st.caption("v2.4.1 | Intelligent Inventory Reallocation System")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -571,6 +576,7 @@ elif mode_code in ["B2", "B2a", "B3", "B3a"]:
         **⚠️ 特殊要求:**
         - **Type 欄位**:Type=L 且銷量≤2 的店舖將被全轉出(即使是RF);若銷量>2 則按B模式處理
         - **Type 說明**:Type=T 為遊客區店舖、Type=M 為混合型店舖;B2/B2a/B3/B3a接收優先級以此排序
+        - **Mix 保護規則**:若出貨店舖 Type=M 且總銷量 > 目標店總銷量，該配對會被跳過（總銷量=Last Month Sold Qty+MTD Sold Qty）
         - **B2a/B3a 限制**:Type=T(遊客鋪)不可出貨
         """)
 elif mode_code in ["E1", "E1b", "E2"]:
@@ -924,7 +930,7 @@ if uploaded_file is not None:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #6C757D; padding: 30px 0;">
-    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.4.0</p>
+    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.4.1</p>
     <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
 </div>
 """, unsafe_allow_html=True)

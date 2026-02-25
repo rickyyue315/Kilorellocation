@@ -18,7 +18,9 @@ Draw one logic image that lets users compare all current transfer modes and unde
 2. Highest Effective Sold Qty RF store is protected from being a SOURCE.
 3. A site that is a SOURCE for a SKU cannot also be a DESTINATION for that SKU (no dual role).
 4. Same site cannot transfer to itself.
-5. Matching priority order (core flow):
+5. For B2/B2a/B3/B3a only: if a Type=M (Mix) source store has higher total sales than destination store, the match is blocked.
+  - Total sales = Last Month Sold Qty + MTD Sold Qty
+6. Matching priority order (core flow):
    - ND source -> Emergency Replenishment
    - ND source -> Potential Replenishment
    - RF Surplus source -> Emergency Replenishment
@@ -73,6 +75,8 @@ Draw one logic image that lets users compare all current transfer modes and unde
   1. ND: full transfer
   2. Type=L and max(Last Month Sold Qty, MTD Sold Qty) <= 2: full transfer (even RF)
   3. Other RF: follow Mode B cap (50%)
+  4. Type=M source blocked if source total sales > destination total sales
+     - Total sales = Last Month Sold Qty + MTD Sold Qty
 - Destination rules:
   - RF only; cap = Safety Stock * 2; track cumulative received
   - Priority order:
@@ -89,6 +93,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Extra constraints:
   - HD source cannot transfer to HA/HB/HC destinations
   - Windy source can only transfer to Windy destinations
+- Also keeps B2 Mix guard rule (Type=M high-sales source cannot transfer to lower-sales destination)
 - Goal: cross-OM enhanced transfers with Type=L exception
 
 ## Mode C: Priority Zero Stock

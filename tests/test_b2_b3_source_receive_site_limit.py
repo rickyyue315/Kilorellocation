@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Set, cast
 
 import pandas as pd
 
@@ -116,9 +116,27 @@ def test_b2_source_receive_site_limit_max_two():
     logic = TransferLogic(b_special_max_receive_sites_per_source=2)
     df = _build_b2_dataset()
 
-    recommendations = logic.generate_transfer_recommendations(df, logic.mode_b_special)
+    recommendations = cast(List[Dict[str, Any]], logic.generate_transfer_recommendations(df, logic.mode_b_special))
 
     _assert_source_receive_site_limit(recommendations, max_sites=2)
+
+
+def test_b2_source_receive_site_limit_max_one():
+    logic = TransferLogic(b_special_max_receive_sites_per_source=1)
+    df = _build_b2_dataset()
+
+    recommendations = cast(List[Dict[str, Any]], logic.generate_transfer_recommendations(df, logic.mode_b_special))
+
+    _assert_source_receive_site_limit(recommendations, max_sites=1)
+
+
+def test_b2a_source_receive_site_limit_max_one():
+    logic = TransferLogic(b_special_max_receive_sites_per_source=1)
+    df = _build_b2_dataset()
+
+    recommendations = cast(List[Dict[str, Any]], logic.generate_transfer_recommendations(df, logic.mode_b_special_a))
+
+    _assert_source_receive_site_limit(recommendations, max_sites=1)
 
 
 
@@ -126,16 +144,25 @@ def test_b3_source_receive_site_limit_max_two():
     logic = TransferLogic(b_special_max_receive_sites_per_source=2)
     df = _build_b3_dataset()
 
-    recommendations = logic.generate_transfer_recommendations(df, logic.mode_b3)
+    recommendations = cast(List[Dict[str, Any]], logic.generate_transfer_recommendations(df, logic.mode_b3))
 
     _assert_source_receive_site_limit(recommendations, max_sites=2)
+
+
+def test_b3a_source_receive_site_limit_max_one():
+    logic = TransferLogic(b_special_max_receive_sites_per_source=1)
+    df = _build_b3_dataset()
+
+    recommendations = cast(List[Dict[str, Any]], logic.generate_transfer_recommendations(df, logic.mode_b3a))
+
+    _assert_source_receive_site_limit(recommendations, max_sites=1)
 
 
 def test_b2_source_receive_site_unlimited_can_exceed_two():
     logic = TransferLogic(b_special_max_receive_sites_per_source=None)
     df = _build_b2_dataset()
 
-    recommendations = logic.generate_transfer_recommendations(df, logic.mode_b_special)
+    recommendations = cast(List[Dict[str, Any]], logic.generate_transfer_recommendations(df, logic.mode_b_special))
 
     source_to_receive_sites: Dict[str, Set[str]] = {}
     for rec in recommendations:
