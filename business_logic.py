@@ -55,6 +55,16 @@ class TransferLogic:
 
     def _is_b_tourist_no_source_mode(self, mode: str) -> bool:
         return mode in (self.mode_b_special_a, self.mode_b3a)
+
+    def _get_last_two_month_sold_qty(self, data: Dict) -> int:
+        value = data.get('last_2_month_sold_qty', data.get('last_month_sold_qty', 0))
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
+    def _get_b_special_sales_total(self, data: Dict) -> int:
+        return self._get_last_two_month_sold_qty(data) + int(data.get('mtd_sold_qty', 0) or 0)
     
     def identify_sources(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
         """
@@ -189,6 +199,9 @@ class TransferLogic:
                 else:
                     # 其他模式：正常ND轉出
                     source_type = 'ND轉出'
+
+                source_store_type = type_series.loc[row.name] if type_series is not None else ''
+                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else last_month_sold
                 
                 sources.append({
                     'site': row['Site'],
@@ -199,7 +212,9 @@ class TransferLogic:
                     'original_stock': int(row['SaSa Net Stock']),
                     'effective_sold_qty': int(row['Effective Sold Qty']),
                     'source_type': source_type,
+                    'store_type': source_store_type,
                     # 添加銷售數據
+                    'last_2_month_sold_qty': last_two_month_sold,
                     'last_month_sold_qty': last_month_sold,
                     'mtd_sold_qty': mtd_sold
                 })
@@ -214,6 +229,8 @@ class TransferLogic:
                 if max(last_month_sold, mtd_sold) > 2:
                     continue
 
+                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else last_month_sold
+
                 net_stock = int(row['SaSa Net Stock'])
                 if net_stock > 0:
                     sources.append({
@@ -225,6 +242,8 @@ class TransferLogic:
                         'original_stock': net_stock,
                         'effective_sold_qty': int(row['Effective Sold Qty']),
                         'source_type': 'Local店舖全轉出',
+                        'store_type': type_series.loc[row.name],
+                        'last_2_month_sold_qty': last_two_month_sold,
                         'last_month_sold_qty': last_month_sold,
                         'mtd_sold_qty': mtd_sold
                     })
@@ -344,6 +363,8 @@ class TransferLogic:
 
             # 加入可轉出來源（所有模式共用）
             if actual_transferable > 0:
+                last_month_sold = int(row['Last Month Sold Qty'])
+                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else last_month_sold
                 sources.append({
                     'site': row['Site'],
                     'om': row['OM'],
@@ -353,8 +374,10 @@ class TransferLogic:
                     'original_stock': int(row['SaSa Net Stock']),
                     'effective_sold_qty': effective_sold,
                     'source_type': source_type,
+                    'store_type': type_series.loc[row.name] if type_series is not None else '',
                     # 添加銷售數據
-                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                    'last_2_month_sold_qty': last_two_month_sold,
+                    'last_month_sold_qty': last_month_sold,
                     'mtd_sold_qty': int(row['MTD Sold Qty'])
                 })
 
@@ -555,6 +578,9 @@ class TransferLogic:
                 if needed_qty <= 0:
                     continue
 
+                last_month_sold = int(row['Last Month Sold Qty'])
+                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else last_month_sold
+
                 destinations.append({
                     'site': row['Site'],
                     'om': row['OM'],
@@ -569,7 +595,9 @@ class TransferLogic:
                     'dest_type': dest_type,
                     'target_qty': max_can_receive,
                     'received_qty': 0,
-                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                    'store_type': store_type,
+                    'last_2_month_sold_qty': last_two_month_sold,
+                    'last_month_sold_qty': last_month_sold,
                     'mtd_sold_qty': int(row['MTD Sold Qty']),
                     'max_receive_qty': max_can_receive
                 })
@@ -1711,6 +1739,14 @@ class TransferLogic:
                         dest_site_upper = dest_site_upper.upper() if isinstance(dest_site_upper, str) else ''
                         if dest_site_upper.startswith(('HA', 'HB', 'HC')):
                             continue
+
+                # B2/B2a/B3/B3a模式：Mix店舖銷售高於目標店時，不允許作為轉出
+                # 規則：Mix source 的 (MTD + Last 2 Month) > destination 的 (MTD + Last 2 Month) 時跳過
+                if self._is_b_special_mode(mode) and str(source.get('store_type', '')).upper() == 'M':
+                    source_sales_total = self._get_b_special_sales_total(source)
+                    dest_sales_total = self._get_b_special_sales_total(dest)
+                    if source_sales_total > dest_sales_total:
+                        continue
                 
                 # 檢查接收店鋪是否已達到目標數量
                 receive_site_key = f"{dest['site']}_{article}"
