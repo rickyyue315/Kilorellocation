@@ -1,6 +1,6 @@
 """
 庫存調貨建議系統 v2.4.0 - Streamlit應用程序
-支持十二模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)
+支持十三模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)
 新增:預設店舖資料(OM、Type等),當用戶上傳的Excel缺少這些資料時自動填充
 """
 
@@ -322,9 +322,10 @@ with st.sidebar:
     
     with st.expander("💡 核心功能", expanded=False):
         st.markdown("""
-        **十二模式智能調貨系統:**
+        **十三模式智能調貨系統:**
         - ✅ A模式(保守轉貨) / B模式(加強轉貨)
-        - ✅ B2模式(附加B特別模式) / B3模式(附加B跨OM特別模式)
+        - ✅ B2模式(附加B特別模式) / B2a模式(B2+T遊客鋪不出貨)
+        - ✅ B3模式(附加B跨OM特別模式) / B3a模式(B3+T遊客鋪不出貨)
         - ✅ C模式(重點補0) / C2模式(附加C跨OM重點補0)
         - ✅ D模式(清貨轉貨) / E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM) / F模式(目標優化)
         
@@ -340,8 +341,9 @@ with st.sidebar:
         - ✅ E1b模式：標記商品強制轉出(僅同OM，優先Type=T/M接收)
         - ✅ E2模式：標記商品強制轉出(跨OM)
         - ✅ F模式：Target目標接收優先
-        - ✅ B2模式：接收端依遊客區/混合型店舖優先排序
-        - ✅ B3/C2模式：跨OM配對規則(HD不能轉到HA/HB/HC；Windy轉出只能到Windy)
+        - ✅ B2/B2a模式：接收端依遊客區/混合型店舖優先排序
+        - ✅ B2a/B3a模式：T遊客鋪不作為出貨來源
+        - ✅ B3/B3a/C2模式：跨OM配對規則(HD不能轉到HA/HB/HC；Windy轉出只能到Windy)
         
         **自動化功能:**
         - ✅ 預設店舖資料自動填充(OM、Type)
@@ -360,8 +362,9 @@ with st.sidebar:
            - 確保包含所有必需欄位
         
         2. **選擇轉貨模式**
-           - 在側邊欄選擇適合的轉貨模式（A/B/B2/B3/C/C2/D/E1/E1b/E2/F)
+           - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B3/B3a/C/C2/D/E1/E1b/E2/F)
            - 查看模式說明了解各模式特點
+              - 若選擇 B2/B2a/B3/B3a，可設定「單一出貨店舖最多配對接收店舖數」（最多2間 / 不限制）
         
         3. **啟動分析**
            - 點擊「生成調貨建議」按鈕開始處理
@@ -383,7 +386,8 @@ with st.sidebar:
     transfer_mode = st.radio(
         "選擇轉貨模式",
         [
-            "A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B3: 附加B(跨OM特別模式)",
+            "A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B2a: 附加B2a(特別模式-T遊客鋪不出貨)",
+            "B3: 附加B(跨OM特別模式)", "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)",
             "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化"
         ],
         key='transfer_mode',
@@ -391,16 +395,31 @@ with st.sidebar:
     )
     transfer_mode = _fix_mojibake_text(transfer_mode)
     mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
+
+    b_special_receive_site_limit_option = "最多 2 間"
+    b_special_max_receive_sites_per_source = None
+    if mode_code in ["B2", "B2a", "B3", "B3a"]:
+        b_special_receive_site_limit_option = st.radio(
+            "B2/B2a/B3/B3a 出貨店舖接收店數限制",
+            ["最多 2 間", "不限制"],
+            index=0,
+            key='b_special_receive_site_limit_option',
+            help="控制同一SKU下，每個出貨店舖最多可分配到多少個接收店舖"
+        )
+        if b_special_receive_site_limit_option == "最多 2 間":
+            b_special_max_receive_sites_per_source = 2
     
     # 精簡模式說明
     mode_descriptions = {
         "A: 保守轉貨": "轉出後保留安全庫存",
         "B: 加強轉貨": "積極處理滯銷品",
         "B2: 附加B(特別模式)": "B模式 + Type=L全轉出",
+        "B2a: 附加B2a(特別模式-T遊客鋪不出貨)": "B2 + Type=T遊客鋪不出貨",
         "B3: 附加B(跨OM特別模式)": "B2 + 跨OM配對",
-        "C: 重點補0": "補充庫存≤1的店幫",
+        "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)": "B3 + Type=T遊客鋪不出貨",
+        "C: 重點補0": "補充庫存≤1的店舖",
         "C2: 附加C(跨OM重點補0)": "C模式 + 跨OM配對",
-        "D: 清貨轉貨": "清理無銷售ND店幫",
+        "D: 清貨轉貨": "清理無銷售ND店舖",
         "E1: 強制轉出": "標記商品強制轉出(僅同OM)",
         "E1b: 強制轉出(優先類型接收)": "標記商品強制轉出(僅同OM，接收端優先Type=T/M)",
         "E2: 強制轉出(跨OM)": "標記商品強制轉出(可跨OM)",
@@ -424,21 +443,31 @@ with st.sidebar:
         - 更積極地處理滯銷品
         
         **B2模式(附加B特別模式)**
-        - ND店幫全轉出
+        - ND店舖全轉出
         - Type=L在銷量≤2時全轉出(含RF),若銷量>2則回到B模式
         - 其餘RF依B模式規則
         - 接收端依遊客區/混合型店舖優先級排序
         - 接收上限為Safety Stock的2倍
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：最多2間 / 不限制
         
         **B3模式(附加B跨OM特別模式)**
         - 參照B2,但允許跨OM配對
         - HD不能轉到HA/HB/HC
         - Windy轉出只能到Windy,Windy可接收其他OM
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：最多2間 / 不限制
+
+        **B2a模式(附加B2a特別模式)**
+        - 參照B2模式
+        - 新增限制：Type=T(遊客鋪)不可出貨
+
+        **B3a模式(附加B3a跨OM特別模式)**
+        - 參照B3模式
+        - 新增限制：Type=T(遊客鋪)不可出貨
         
         **C模式(重點補0)**
-        - 主要針對接收店幫
+        - 主要針對接收店舖
         - 當(SaSa Net Stock+Pending Received)≤1時
-        - 補充至該店幫的Safety或MOQ+1的數量(取最低值)
+        - 補充至該店舖的Safety或MOQ+1的數量(取最低值)
         
         **C2模式(附加C跨OM重點補0)**
         - 參照C模式的轉出/接收邏輯
@@ -447,31 +476,31 @@ with st.sidebar:
         - Windy轉出只能到Windy,Windy可接收其他OM
         
         **D模式(清貨轉貨)**
-        - 針對ND類型且無銷售記錄的店幫進行清貨
+        - 針對ND類型且無銷售記錄的店舖進行清貨
         - 避免1件餘貨,確保轉出後剩餘庫存為0件或≥2件
         - 轉出類型為ND清貨轉出
         
         **E1模式(強制轉出)**
         - 針對標記為*ALL*的商品行,全數強制轉出
-        - 接收店幫為RF,上限為Safety Stock的2倍
+        - 接收店舖為RF,上限為Safety Stock的2倍
         - **僅同OM配對**,HD不能轉到HA/HB/HC
         - 轉出類型為E模式強制轉出
 
         **E1b模式(強制轉出優先類型接收)**
         - 使用E1模式轉出邏輯:標記為*ALL*的商品行全數強制轉出
         - **僅同OM配對**,HD不能轉到HA/HB/HC
-        - 接收店幫為RF,上限為Safety Stock的2倍
+        - 接收店舖為RF,上限為Safety Stock的2倍
         - 接收優先級參照B2:Type=T(遊客區)優先,其次Type=M(混合型)
         
         **E2模式(強制轉出跨OM)**
         - 針對標記為*ALL*的商品行,全數強制轉出
-        - 接收店幫為RF,上限為Safety Stock的2倍
+        - 接收店舖為RF,上限為Safety Stock的2倍
         - 優先同OM配對,**可跨OM**,HD不能轉到HA/HB/HC
         - 轉出類型為E模式強制轉出
         
         **F模式(目標優化)**
         - Target欄位填數字作為優先接收目標
-        - 其他店幫按C模式補0需求計算
+        - 其他店舖按C模式補0需求計算
         - 允許跨OM配對,HD不能轉到HA/HB/HC
         
         ---
@@ -480,7 +509,7 @@ with st.sidebar:
         
         - **RF過剩轉出**:轉出後剩餘庫存不會低於Safety Stock
         - **RF加強轉出**:轉出後剩餘庫存會低於Safety Stock
-        - **ND清貨轉出**:D模式特殊，ND店幫無銷售記錄時
+        - **ND清貨轉出**:D模式特殊，ND店舖無銷售記錄時
         - **E模式強制轉出**:E1/E1b/E2模式特殊，標記商品強制轉出
         
         ### 接收條件說明
@@ -491,11 +520,11 @@ with st.sidebar:
         **特殊條件:**
         - C/C2模式：當(SaSa Net Stock+Pending Received)≤1時,補充至Safety或MOQ+1(取最低值)
         - D模式：避免1件餘貨規則
-        - E1模式：所有RF店幫可接收,上限為Safety Stock的2倍(僅同OM)
-        - E1b模式：所有RF店幫可接收,上限為Safety Stock的2倍(僅同OM，優先Type=T/M)
-        - E2模式：所有RF店幫可接收,上限為Safety Stock的2倍(可跨OM)
-        - B2/B3模式：接收上限為Safety Stock的2倍,並累計追蹤接收量
-        - 接收優先級(B2/B3):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
+        - E1模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM)
+        - E1b模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM，優先Type=T/M)
+        - E2模式：所有RF店舖可接收,上限為Safety Stock的2倍(可跨OM)
+        - B2/B2a/B3/B3a模式：接收上限為Safety Stock的2倍,並累計追蹤接收量
+        - 接收優先級(B2/B2a/B3/B3a):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
         """)
     
     st.markdown("---")
@@ -523,7 +552,7 @@ if mode_code in ["A", "B", "C", "C2", "D"]:
         **銷量欄位:**
         - Last Month Sold Qty, MTD Sold Qty
         """)
-elif mode_code in ["B2", "B3"]:
+elif mode_code in ["B2", "B2a", "B3", "B3a"]:
     with st.expander("📋 必需欄位說明", expanded=False):
         st.markdown("""
         **基本欄位:**
@@ -536,8 +565,9 @@ elif mode_code in ["B2", "B3"]:
         - Last Month Sold Qty, MTD Sold Qty
         
         **⚠️ 特殊要求:**
-        - **Type 欄位**:Type=L 且銷量≤2 的店幫將被全轉出(即使是RF);若銷量>2 則按B模式處理
-        - **Type 說明**:Type=T 為遊客區店舖、Type=M 為混合型店舖;B2/B3接收優先級以此排序
+        - **Type 欄位**:Type=L 且銷量≤2 的店舖將被全轉出(即使是RF);若銷量>2 則按B模式處理
+        - **Type 說明**:Type=T 為遊客區店舖、Type=M 為混合型店舖;B2/B2a/B3/B3a接收優先級以此排序
+        - **B2a/B3a 限制**:Type=T(遊客鋪)不可出貨
         """)
 elif mode_code in ["E1", "E1b", "E2"]:
     with st.expander("📋 必需欄位說明", expanded=False):
@@ -570,8 +600,8 @@ else:  # F: 目標優化
         - Last Month Sold Qty, MTD Sold Qty
         
         **⚠️ 特殊要求:**
-        - **Target 欄位**:填數字代表該店幫的優先接收目標數量
-        - 未填Target的店幫會按C模式補0需求計算
+        - **Target 欄位**:填數字代表該店舖的優先接收目標數量
+        - 未填Target的店舖會按C模式補0需求計算
         """)
 
 uploaded_file = st.file_uploader(
@@ -605,12 +635,12 @@ if uploaded_file is not None:
             st.error(f"❌ {str(e)}")
             st.stop()
 
-        # B2/B3模式：必須有Type欄位(不分大小寫)
-        if mode_code in ["B2", "B3"]:
+        # B2/B2a/B3/B3a模式：必須有Type欄位(不分大小寫)
+        if mode_code in ["B2", "B2a", "B3", "B3a"]:
             original_columns = processing_stats['original_stats'].get('columns', [])
             has_type_column = any(col.upper() == 'TYPE' for col in original_columns)
             if not has_type_column:
-                st.error("❌ B2/B3模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
+            st.error("❌ B2/B2a/B3/B3a模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
                 st.stop()
         
         st.success("檔案上傳與數據預處理成功!")
@@ -644,7 +674,7 @@ if uploaded_file is not None:
         st.info(f"當前模式:**{transfer_mode}**")
         
         # 當模式或檔案改變時，清除舊的分析結果
-        current_run_key = f"{mode_code}_{uploaded_file.name}_{uploaded_file.size}"
+        current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{uploaded_file.name}_{uploaded_file.size}"
         if st.session_state.get('_run_key') != current_run_key:
             for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors']:
                 st.session_state.pop(k, None)
@@ -658,7 +688,9 @@ if uploaded_file is not None:
                     "A": "保守轉貨",
                     "B": "加強轉貨",
                     "B2": "附加B(特別模式)",
+                    "B2a": "附加B2a(特別模式-T遊客鋪不出貨)",
                     "B3": "附加B3(跨OM特別模式)",
+                    "B3a": "附加B3a(跨OM特別模式-T遊客鋪不出貨)",
                     "C": "重點補0",
                     "C2": "附加C2(跨OM重點補0)",
                     "D": "清貨轉貨",
@@ -670,7 +702,9 @@ if uploaded_file is not None:
                 mode_name = mode_name_map.get(mode_code, "目標優化")
                 
                 # 創建業務邏輯對象
-                transfer_logic = TransferLogic()
+                transfer_logic = TransferLogic(
+                    b_special_max_receive_sites_per_source=b_special_max_receive_sites_per_source
+                )
                 
                 # 生成調貨建議
                 recommendations = transfer_logic.generate_transfer_recommendations(df, mode_name)
