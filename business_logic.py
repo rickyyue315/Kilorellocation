@@ -79,6 +79,12 @@ class TransferLogic:
             else:
                 target_series = pd.Series(np.nan, index=group_df.index)
 
+            # 獲取 Type 欄位（用於 store_type）
+            if 'Type' in group_df.columns:
+                type_series_f = group_df['Type'].astype(str).str.upper()
+            else:
+                type_series_f = pd.Series("", index=group_df.index)
+
             # ND類型：全數轉出
             nd_sources = group_df[group_df['RP Type'] == 'ND']
             for _, row in nd_sources.iterrows():
@@ -96,6 +102,7 @@ class TransferLogic:
                         'original_stock': net_stock,
                         'effective_sold_qty': int(row['Effective Sold Qty']),
                         'source_type': 'F模式ND轉出',
+                        'store_type': type_series_f.loc[row.name] if row.name in type_series_f.index else '',
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
                         'mtd_sold_qty': int(row['MTD Sold Qty'])
                     })
@@ -129,6 +136,7 @@ class TransferLogic:
                     'original_stock': net_stock,
                     'effective_sold_qty': effective_sold,
                     'source_type': 'F模式RF轉出',
+                    'store_type': type_series_f.loc[row.name] if row.name in type_series_f.index else '',
                     'last_month_sold_qty': int(row['Last Month Sold Qty']),
                     'mtd_sold_qty': int(row['MTD Sold Qty'])
                 })
@@ -147,6 +155,12 @@ class TransferLogic:
                 ]
                 
                 # E1/E1b/E2模式：只有被標記為*ALL*的行才會轉出，所有庫存全數轉出
+                # 獲取 Type 欄位（用於 store_type）
+                if 'Type' in group_df.columns:
+                    type_series_e = group_df['Type'].astype(str).str.upper()
+                else:
+                    type_series_e = pd.Series("", index=group_df.index)
+                
                 for _, row in all_marked.iterrows():
                     net_stock = int(row['SaSa Net Stock'])
                     if net_stock > 0:  # 只考慮有庫存的店鋪
@@ -159,6 +173,7 @@ class TransferLogic:
                             'original_stock': net_stock,
                             'effective_sold_qty': int(row['Effective Sold Qty']),
                             'source_type': 'E模式強制轉出',
+                            'store_type': type_series_e.loc[row.name] if row.name in type_series_e.index else '',
                             'last_month_sold_qty': int(row['Last Month Sold Qty']),
                             'mtd_sold_qty': int(row['MTD Sold Qty']),
                             'is_e_mode': True  # 標記為E模式
@@ -402,9 +417,16 @@ class TransferLogic:
             else:
                 target_series = pd.Series(np.nan, index=rf_destinations.index)
 
+            # 獲取 Type 欄位（用於 store_type）
+            if 'Type' in rf_destinations.columns:
+                type_series_f = rf_destinations['Type'].astype(str).str.upper()
+            else:
+                type_series_f = pd.Series("", index=rf_destinations.index)
+
             for idx, row in rf_destinations.iterrows():
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
                 target_value = target_series.loc[idx]
+                store_type_f = type_series_f.loc[idx] if idx in type_series_f.index else ''
 
                 # Target數字：優先接收目標
                 if pd.notna(target_value) and target_value > 0:
@@ -425,6 +447,7 @@ class TransferLogic:
                             'dest_type': 'F模式目標接收',
                             'target_qty': target_qty,
                             'received_qty': 0,
+                            'store_type': store_type_f,
                             'last_month_sold_qty': int(row['Last Month Sold Qty']),
                             'mtd_sold_qty': int(row['MTD Sold Qty'])
                         })
@@ -449,6 +472,7 @@ class TransferLogic:
                             'dest_type': '重點補0',
                             'target_qty': target_qty,
                             'received_qty': 0,
+                            'store_type': store_type_f,
                             'last_month_sold_qty': int(row['Last Month Sold Qty']),
                             'mtd_sold_qty': int(row['MTD Sold Qty'])
                         })
@@ -474,17 +498,17 @@ class TransferLogic:
                 if total_available < max_can_receive:
                     needed_qty = max_can_receive - total_available
                     sales_total = int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])
+                    store_type_e = type_series.loc[row.name] if row.name in type_series.index else ''
 
                     if mode == self.mode_e1b:
-                        store_type = type_series.loc[row.name]
-                        if store_type == 'T':
+                        if store_type_e == 'T':
                             if sales_total > 0:
                                 priority = 1
                                 dest_type = 'E1b遊客區店舖 高銷量優先'
                             else:
                                 priority = 3
                                 dest_type = 'E1b遊客區店舖 Safety優先'
-                        elif store_type == 'M':
+                        elif store_type_e == 'M':
                             if sales_total > 0:
                                 priority = 2
                                 dest_type = 'E1b混合型店舖 高銷量優先'
@@ -512,6 +536,7 @@ class TransferLogic:
                         'dest_type': dest_type,
                         'target_qty': max_can_receive,  # 目標為Safety Stock的2倍
                         'received_qty': 0,  # 初始化累計接收數量
+                        'store_type': store_type_e,
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
                         'mtd_sold_qty': int(row['MTD Sold Qty']),
                         'max_receive_qty': max_can_receive  # 記錄最大接收限制
@@ -605,8 +630,15 @@ class TransferLogic:
         
         # D模式特殊處理：放寬接收條件，不要求最高銷量限制
         if mode == self.mode_d:
+            # 獲取 Type 欄位（用於 store_type）
+            if 'Type' in rf_destinations.columns:
+                type_series_d = rf_destinations['Type'].astype(str).str.upper()
+            else:
+                type_series_d = pd.Series("", index=rf_destinations.index)
+            
             for _, row in rf_destinations.iterrows():
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
+                store_type_d = type_series_d.loc[row.name] if row.name in type_series_d.index else ''
                 
                 # 優先級1：緊急缺貨補貨
                 is_no_stock = row['SaSa Net Stock'] == 0
@@ -628,6 +660,7 @@ class TransferLogic:
                         'dest_type': '緊急缺貨補貨',
                         'target_qty': needed_qty,
                         'received_qty': 0,
+                        'store_type': store_type_d,
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
                         'mtd_sold_qty': int(row['MTD Sold Qty'])
                     })
@@ -652,6 +685,7 @@ class TransferLogic:
                         'dest_type': '潛在缺貨補貨',
                         'target_qty': row['Safety Stock'],
                         'received_qty': 0,
+                        'store_type': store_type_d,
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
                         'mtd_sold_qty': int(row['MTD Sold Qty'])
                     })
@@ -661,9 +695,16 @@ class TransferLogic:
         
         # 找出該Article+OM組合中的最高有效銷量
         max_sold_qty = rf_destinations['Effective Sold Qty'].max() if not rf_destinations.empty else 0
+
+        # 獲取 Type 欄位（用於 store_type）- A/B/C模式通用
+        if 'Type' in rf_destinations.columns:
+            type_series_abc = rf_destinations['Type'].astype(str).str.upper()
+        else:
+            type_series_abc = pd.Series("", index=rf_destinations.index)
         
         for _, row in rf_destinations.iterrows():
             total_available = row['SaSa Net Stock'] + row['Pending Received']
+            store_type_abc = type_series_abc.loc[row.name] if row.name in type_series_abc.index else ''
             
             # C模式/C2模式特殊處理：針對(SaSa Net Stock+Pending Received)<=1的店鋪
             if mode in (self.mode_c, self.mode_c2) and total_available <= 1:
@@ -686,6 +727,7 @@ class TransferLogic:
                         'dest_type': '重點補0',
                         'target_qty': target_qty,  # 添加目標數量信息
                         'received_qty': 0,  # 初始化累計接收數量
+                        'store_type': store_type_abc,
                         # 添加銷售數據
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
                         'mtd_sold_qty': int(row['MTD Sold Qty'])
@@ -713,6 +755,7 @@ class TransferLogic:
                     'dest_type': '緊急缺貨補貨',
                     'target_qty': needed_qty,  # 添加目標數量信息
                     'received_qty': 0,  # 初始化累計接收數量
+                    'store_type': store_type_abc,
                     # 添加銷售數據
                     'last_month_sold_qty': int(row['Last Month Sold Qty']),
                     'mtd_sold_qty': int(row['MTD Sold Qty'])
@@ -739,6 +782,7 @@ class TransferLogic:
                     'dest_type': '潛在缺貨補貨',
                     'target_qty': row['Safety Stock'],  # 添加目標數量信息
                     'received_qty': 0,  # 初始化累計接收數量
+                    'store_type': store_type_abc,
                     # 添加銷售數據
                     'last_month_sold_qty': int(row['Last Month Sold Qty']),
                     'mtd_sold_qty': int(row['MTD Sold Qty'])
@@ -982,8 +1026,10 @@ class TransferLogic:
                     'Product Desc': product_desc,
                     'Transfer OM': source['om'],
                     'Transfer Site': source['site'],
+                    'Transfer Type': source.get('store_type', ''),
                     'Receive OM': dest['om'],
                     'Receive Site': dest['site'],
+                    'Receive Type': dest.get('store_type', ''),
                     'Transfer Qty': transfer_qty,
                     'Original Stock': source['original_stock'],
                     'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
@@ -1112,8 +1158,10 @@ class TransferLogic:
                         'Product Desc': product_desc,
                         'Transfer OM': source['om'],
                         'Transfer Site': source['site'],
+                        'Transfer Type': source.get('store_type', ''),
                         'Receive OM': dest['om'],
                         'Receive Site': dest['site'],
+                        'Receive Type': dest.get('store_type', ''),
                         'Transfer Qty': transfer_qty,
                         'Original Stock': source['original_stock'],
                         'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
@@ -1229,8 +1277,10 @@ class TransferLogic:
                     'Product Desc': product_desc,
                     'Transfer OM': source['om'],
                     'Transfer Site': source['site'],
+                    'Transfer Type': source.get('store_type', ''),
                     'Receive OM': dest['om'],
                     'Receive Site': dest['site'],
+                    'Receive Type': dest.get('store_type', ''),
                     'Transfer Qty': transfer_qty,
                     'Original Stock': source['original_stock'],
                     'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
@@ -1351,8 +1401,10 @@ class TransferLogic:
                     'Product Desc': product_desc,
                     'Transfer OM': source['om'],
                     'Transfer Site': source['site'],
+                    'Transfer Type': source.get('store_type', ''),
                     'Receive OM': dest['om'],
                     'Receive Site': dest['site'],
+                    'Receive Type': dest.get('store_type', ''),
                     'Transfer Qty': transfer_qty,
                     'Original Stock': source['original_stock'],
                     'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
@@ -1435,8 +1487,10 @@ class TransferLogic:
                     'Product Desc': product_desc,
                     'Transfer OM': source['om'],
                     'Transfer Site': source['site'],
+                    'Transfer Type': source.get('store_type', ''),
                     'Receive OM': dest['om'],
                     'Receive Site': dest['site'],
+                    'Receive Type': dest.get('store_type', ''),
                     'Transfer Qty': transfer_qty,
                     'Original Stock': source['original_stock'],
                     'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
@@ -1609,8 +1663,10 @@ class TransferLogic:
                         'Product Desc': product_desc,
                         'Transfer OM': source['om'],
                         'Transfer Site': source['site'],
+                        'Transfer Type': source.get('store_type', ''),
                         'Receive OM': dest['om'],
                         'Receive Site': dest['site'],
+                        'Receive Type': dest.get('store_type', ''),
                         'Transfer Qty': transfer_qty,
                         'Original Stock': source['original_stock'],
                         'After Transfer Stock': source['original_stock'] - transfer_qty,
@@ -1815,8 +1871,10 @@ class TransferLogic:
                     'Product Desc': product_desc,
                     'Transfer OM': source['om'],
                     'Transfer Site': source['site'],
+                    'Transfer Type': source.get('store_type', ''),
                     'Receive OM': dest['om'],
                     'Receive Site': dest['site'],
+                    'Receive Type': dest.get('store_type', ''),
                     'Transfer Qty': transfer_qty,
                     'Original Stock': source['original_stock'],
                     'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,

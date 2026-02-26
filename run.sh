@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "啟動庫存調貨建議系統 v1.8..."
+echo "啟動庫存調貨建議系統 v2.4.1..."
 echo
 
 # 檢查Python是否安裝
@@ -40,14 +40,14 @@ python -m pip install --upgrade pip
 
 # 安裝依賴
 echo "安裝依賴包..."
-python install_dependencies.py
+python -m pip install -r requirements.txt
 if [ $? -ne 0 ]; then
     echo "警告: 依賴安裝可能失敗，嘗試安裝核心依賴..."
-    python -m pip install pandas openpyxl streamlit numpy xlsxwriter matplotlib seaborn
+    python -m pip install pandas openpyxl streamlit numpy xlsxwriter matplotlib seaborn ftfy
 fi
 
 # 檢查核心依賴是否安裝成功
-python -c "import pandas, openpyxl, streamlit, numpy, xlsxwriter, matplotlib, seaborn" 2>/dev/null
+python -c "import pandas, openpyxl, streamlit, numpy, xlsxwriter, matplotlib, seaborn, ftfy" 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "錯誤: 核心依賴安裝失敗，請手動安裝"
     exit 1
