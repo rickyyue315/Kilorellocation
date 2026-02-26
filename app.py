@@ -541,7 +541,7 @@ with st.sidebar:
 
 # 3. 頁面頭部
 st.title("📦 庫存調貨建議系統")
-st.caption("v2.4.1 | Intelligent Inventory Reallocation System")
+st.caption("v2.4.1 | Inventory Reallocation System")
 st.markdown("---")
 
 # 4. 主要區塊
