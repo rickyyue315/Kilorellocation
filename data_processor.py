@@ -70,6 +70,7 @@ DEFAULT_STORE_DATA = {
     'HBA2': {'shop': '廣東道2', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B1', 'size': 'M', 'om': 'Hippo', 'type': 'T'},
     'HBA3': {'shop': '荷里活廣場2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Hippo', 'type': 'L'},
     'HBA4': {'shop': '中港城2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Candy', 'type': 'T'},
+    'HBA5': {'shop': '旺角中心', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'XS', 'om': 'Violet', 'type': 'T'},
     'HC02': {'shop': '荃灣', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Eva', 'type': 'L'},
     'HC05': {'shop': '上水', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Candy', 'type': 'T'},
     'HC13': {'shop': '沙田中心', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Queenie', 'type': 'M'},
