@@ -365,7 +365,7 @@ with st.sidebar:
         2. **選擇轉貨模式**
            - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B3/B3a/C/C2/D/E1/E1b/E2/F)
            - 查看模式說明了解各模式特點
-              - 若選擇 B2/B2a/B3/B3a，可設定「單一出貨店舖最多配對接收店舖數」（最多2間 / 不限制）
+              - 若選擇 B2/B2a/B3/B3a/E1/E1b/E2，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
         
         3. **啟動分析**
            - 點擊「生成調貨建議」按鈕開始處理
@@ -399,13 +399,13 @@ with st.sidebar:
 
     b_special_receive_site_limit_option = "最多 2 間"
     b_special_max_receive_sites_per_source = None
-    if mode_code in ["B2", "B2a", "B3", "B3a"]:
+    if mode_code in ["B2", "B2a", "B3", "B3a", "E1", "E1b", "E2"]:
         b_special_receive_site_limit_option = st.radio(
-            "B2/B2a/B3/B3a 出貨店舖接收店數限制",
+            "出貨店舖配對接收店數限制",
             ["優先 1 間", "最多 2 間", "不限制"],
             index=1,
             key='b_special_receive_site_limit_option',
-            help="控制同一SKU下，每個出貨店舖最多可分配到多少個接收店舖"
+            help="控制同一SKU下，每個出貨店舖最多可分配到多少個接收店舖（優先1間：盡量只配1間；最多2間；不限制）"
         )
         if b_special_receive_site_limit_option == "優先 1 間":
             b_special_max_receive_sites_per_source = 1
@@ -494,18 +494,21 @@ with st.sidebar:
         - 接收店舖為RF,上限為Safety Stock的2倍
         - **僅同OM配對**,HD不能轉到HA/HB/HC
         - 轉出類型為E模式強制轉出
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
 
         **E1b模式(強制轉出優先類型接收)**
         - 使用E1模式轉出邏輯:標記為*ALL*的商品行全數強制轉出
         - **僅同OM配對**,HD不能轉到HA/HB/HC
         - 接收店舖為RF,上限為Safety Stock的2倍
         - 接收優先級參照B2:Type=T(遊客區)優先,其次Type=M(混合型)
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         
         **E2模式(強制轉出跨OM)**
         - 針對標記為*ALL*的商品行,全數強制轉出
         - 接收店舖為RF,上限為Safety Stock的2倍
         - 優先同OM配對,**可跨OM**,HD不能轉到HA/HB/HC
         - 轉出類型為E模式強制轉出
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         
         **F模式(目標優化)**
         - Target欄位填數字作為優先接收目標
@@ -541,7 +544,7 @@ with st.sidebar:
 
 # 3. 頁面頭部
 st.title("📦 庫存調貨建議系統")
-st.caption("v2.4.1 | Inventory Reallocation System")
+st.caption("v2.4.1 | Intelligent Inventory Reallocation System")
 st.markdown("---")
 
 # 4. 主要區塊
