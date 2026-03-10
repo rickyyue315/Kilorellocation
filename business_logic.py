@@ -456,19 +456,29 @@ class TransferLogic:
             destinations.sort(key=lambda x: x['priority'])
             return destinations
         
-        # E1/E1b/E2模式特殊處理：所有RF店鋪都可以接收，上限為Safety Stock的2倍
+        # E1/E1b/E2模式特殊處理：所有RF店鋪都可以接收，上限依配對店數限制設定動態調整
         if mode in (self.mode_e1, self.mode_e1b, self.mode_e2):
             if 'Type' in rf_destinations.columns:
                 type_series = rf_destinations['Type'].astype(str).str.upper()
             else:
                 type_series = pd.Series("", index=rf_destinations.index)
 
+            # 根據配對店數限制設定決定接收上限倍數
+            # 優先1間(=1) → ×4；最多2間(=2) → ×3；不限制(None) → ×2.5
+            _limit = self.b_special_max_receive_sites_per_source
+            if _limit == 1:
+                _ss_multiplier = 4
+            elif _limit == 2:
+                _ss_multiplier = 3
+            else:
+                _ss_multiplier = 2.5
+
             for _, row in rf_destinations.iterrows():
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
                 safety_stock = int(row['Safety Stock'])
                 
-                # E模式：接收上限為Safety Stock的2倍，最少為3件
-                max_can_receive = max(safety_stock * 2, 3)
+                # E模式：接收上限依配對店數限制設定，最少為3件
+                max_can_receive = max(int(safety_stock * _ss_multiplier), 3)
                 
                 # 如果目前庫存低於接收上限，則允許接收
                 if total_available < max_can_receive:
@@ -2336,7 +2346,14 @@ class TransferLogic:
         
         # E1/E2模式接收上限說明
         if mode in (self.mode_e1, self.mode_e1b, self.mode_e2) and 'target_qty' in dest:
-            notes_parts.append(f"【接收上限: E模式接收上限為安全庫存2倍(最少3件)，目標{dest['target_qty']}件，累計已接收{current_received_qty + transfer_qty}件】")
+            _limit = self.b_special_max_receive_sites_per_source
+            if _limit == 1:
+                _multiplier_desc = "4倍(優先1間設定)"
+            elif _limit == 2:
+                _multiplier_desc = "3倍(最多2間設定)"
+            else:
+                _multiplier_desc = "2.5倍(不限制設定)"
+            notes_parts.append(f"【接收上限: E模式接收上限為安全庫存{_multiplier_desc}(最少3件)，目標{dest['target_qty']}件，累計已接收{current_received_qty + transfer_qty}件】")
         
         # 6. 轉移數量說明
         if transfer_qty == 2 and source.get('original_stock', 0) == 1:
