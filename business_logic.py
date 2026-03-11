@@ -14,7 +14,7 @@ E2模式：強制轉出（允許跨OM配對）
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
 import logging
 
 # 設置日誌
@@ -1922,6 +1922,158 @@ class TransferLogic:
                 if self._is_b_special_mode(mode) and 'target_qty' in dest:
                     if received_qty_by_site[receive_site_key] >= dest['target_qty']:
                         dest['needed_qty'] = 0
+
+    def _get_record_sales_total(self, rec: Dict[str, Any], prefix: str) -> int:
+        """取得建議記錄中指定端點的總銷量（上月 + MTD）。"""
+        last_month = int(rec.get(f'{prefix} Last Month Sold Qty', 0) or 0)
+        mtd = int(rec.get(f'{prefix} MTD Sold Qty', 0) or 0)
+        return last_month + mtd
+
+    def _infer_source_rp_type(self, source_type: str) -> str:
+        """根據來源類型文字推斷RP Type，避免重建備註時缺欄位。"""
+        return 'ND' if 'ND' in str(source_type) else 'RF'
+
+    def _refresh_recommendation_fields(self, recommendations: List[Dict], mode: str) -> None:
+        """重算優化後的庫存/累計欄位與備註，確保輸出一致。"""
+        source_running: Dict[Tuple[str, str, str], int] = {}
+        receive_running: Dict[Tuple[str, str], int] = {}
+
+        for rec in recommendations:
+            qty = int(rec.get('Transfer Qty', 0) or 0)
+            rec['Transfer Qty'] = qty
+
+            source_key = (
+                str(rec.get('Article', '')),
+                str(rec.get('Transfer Site', '')),
+                str(rec.get('Transfer OM', '')),
+            )
+            receive_key = (
+                str(rec.get('Article', '')),
+                str(rec.get('Receive Site', '')),
+            )
+
+            source_before = source_running.get(source_key, 0)
+            receive_before = receive_running.get(receive_key, 0)
+            original_stock = int(rec.get('Original Stock', 0) or 0)
+
+            rec['After Transfer Stock'] = original_stock - (source_before + qty)
+            rec['Cumulative Received Qty'] = receive_before + qty
+
+            source_running[source_key] = source_before + qty
+            receive_running[receive_key] = receive_before + qty
+
+            source_info = {
+                'source_type': rec.get('Source Type', ''),
+                'priority': int(rec.get('Source Priority', 2) or 2),
+                'rp_type': self._infer_source_rp_type(str(rec.get('Source Type', ''))),
+                'original_stock': original_stock,
+                'total_transferred': source_before,
+                'last_month_sold_qty': int(rec.get('Transfer Site Last Month Sold Qty', 0) or 0),
+                'mtd_sold_qty': int(rec.get('Transfer Site MTD Sold Qty', 0) or 0),
+                'om': rec.get('Transfer OM', ''),
+            }
+            dest_info = {
+                'dest_type': rec.get('Destination Type', ''),
+                'priority': int(rec.get('Destination Priority', 2) or 2),
+                'target_qty': int(rec.get('Target Qty', 0) or 0),
+                'safety_stock': int(rec.get('Safety Stock', 0) or 0),
+                'current_stock': int(rec.get('Receive Original Stock', 0) or 0),
+                'pending_received': 0,
+                'rp_type': 'RF',
+                'last_month_sold_qty': int(rec.get('Receive Site Last Month Sold Qty', 0) or 0),
+                'mtd_sold_qty': int(rec.get('Receive Site MTD Sold Qty', 0) or 0),
+                'om': rec.get('Receive OM', ''),
+            }
+            rec['Notes'] = self._create_recommendation_note(source_info, dest_info, receive_before, qty, mode)
+
+    def _optimize_single_piece_transfers(self, recommendations: List[Dict], mode: str) -> List[Dict]:
+        """
+        全模式後處理：盡量消除同一來源店舖下的1件調貨。
+        例外：若該來源店舖該SKU總調貨量本身只有1件，則保留1件。
+        """
+        if not recommendations:
+            return recommendations
+
+        groups: Dict[Tuple[str, str, str], List[Dict]] = {}
+        for rec in recommendations:
+            key = (
+                str(rec.get('Article', '')),
+                str(rec.get('Transfer Site', '')),
+                str(rec.get('Transfer OM', '')),
+            )
+            groups.setdefault(key, []).append(rec)
+
+        has_change = False
+
+        for group_recs in groups.values():
+            if len(group_recs) <= 1:
+                continue
+
+            total_qty = sum(int(r.get('Transfer Qty', 0) or 0) for r in group_recs)
+            if total_qty <= 1:
+                continue
+
+            while True:
+                singles = [r for r in group_recs if int(r.get('Transfer Qty', 0) or 0) == 1]
+                if not singles:
+                    break
+
+                group_changed = False
+
+                for single_rec in singles:
+                    if int(single_rec.get('Transfer Qty', 0) or 0) != 1:
+                        continue
+
+                    other_recs = [r for r in group_recs if r is not single_rec and int(r.get('Transfer Qty', 0) or 0) > 0]
+                    if not other_recs:
+                        continue
+
+                    # 方案1：從大單挪1件給1件單，直接變2件（避免出現1件）。
+                    donors_ge3 = [r for r in other_recs if int(r.get('Transfer Qty', 0) or 0) >= 3]
+                    if donors_ge3:
+                        donor = max(
+                            donors_ge3,
+                            key=lambda r: (
+                                int(r.get('Transfer Qty', 0) or 0),
+                                self._get_record_sales_total(r, 'Receive Site'),
+                            ),
+                        )
+                        donor['Transfer Qty'] = int(donor.get('Transfer Qty', 0) or 0) - 1
+                        single_rec['Transfer Qty'] = 2
+                        group_changed = True
+                        has_change = True
+                        continue
+
+                    # 方案2：若無法挪出（例如只有2+1），將1件合併到較高銷量目的店。
+                    merge_targets = [r for r in other_recs if int(r.get('Transfer Qty', 0) or 0) >= 2]
+                    if merge_targets:
+                        best_target = max(
+                            merge_targets,
+                            key=lambda r: (
+                                self._get_record_sales_total(r, 'Receive Site'),
+                                int(r.get('Transfer Qty', 0) or 0),
+                            ),
+                        )
+                        single_sales = self._get_record_sales_total(single_rec, 'Receive Site')
+                        target_sales = self._get_record_sales_total(best_target, 'Receive Site')
+
+                        if len(group_recs) == 2 or single_sales <= target_sales:
+                            best_target['Transfer Qty'] = int(best_target.get('Transfer Qty', 0) or 0) + 1
+                            single_rec['Transfer Qty'] = 0
+                            group_changed = True
+                            has_change = True
+
+                group_recs[:] = [r for r in group_recs if int(r.get('Transfer Qty', 0) or 0) > 0]
+
+                if not group_changed or len(group_recs) <= 1:
+                    break
+
+        if not has_change:
+            return recommendations
+
+        optimized = [r for r in recommendations if int(r.get('Transfer Qty', 0) or 0) > 0]
+        self._refresh_recommendation_fields(optimized, mode)
+        return optimized
     
     def generate_transfer_recommendations(self, df: pd.DataFrame, mode: str) -> List[Dict]:
         """
@@ -2027,6 +2179,8 @@ class TransferLogic:
             
             all_recommendations.extend(recommendations)
         
+        all_recommendations = self._optimize_single_piece_transfers(all_recommendations, mode)
+
         logger.info(f"共生成 {len(all_recommendations)} 條調貨建議")
         
         self.transfer_recommendations = all_recommendations
