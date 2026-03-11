@@ -1,5 +1,37 @@
 # 版本更新記錄
 
+## v2.5.0 (2026-03-11)
+
+### 新增功能：所有模式後處理 — 避免單筆1件調貨
+
+**核心改動：** 在 `generate_transfer_recommendations` 最後一步，加入通用後處理，對所有 13 個模式的輸出結果統一執行「避免單筆1件調貨」優化。
+
+#### 規則說明
+- **目標**：所有模式輸出中，同一出貨店舖（Transfer Site）同一 SKU（Article）的每筆調貨數量，不應出現 `Transfer Qty = 1`。
+- **例外**：若該出貨店舖對該 SKU 的可調總量本身就只有 1 件，則允許保留（無法再重新分配）。
+- **不影響** D 模式餘貨邏輯（D 模式處理的是「轉出後剩餘庫存」，本後處理處理的是「每筆調貨數量」，兩者互補）。
+
+#### 兩種優化策略（依序嘗試）
+1. **Rebalance（重新平衡）**：若同群組內有其他目標店數量 ≥ 3，從中取 1 件給單件店舖，使其變為 2 件，施方維持總量不變。
+2. **Merge（合併）**：若無法 Rebalance（例如僅有 2+1 的情況），將 1 件合併至「接收店舖總銷量（Last Month + MTD）最高」的目標店，並移除原單件行。
+
+#### 新增方法（`business_logic.py`）
+| 方法名稱 | 用途 |
+|----------|------|
+| `_get_record_sales_total(rec, prefix)` | 計算某紀錄的 Last Month + MTD 總銷量 |
+| `_refresh_recommendation_fields(recommendations, mode)` | 調整數量後重新計算 After Transfer Stock、Cumulative Received Qty、Notes 欄位 |
+| `_optimize_single_piece_transfers(recommendations, mode)` | 主後處理函式：偵測並消除單件調貨記錄 |
+
+#### 新增測試（`tests/test_single_qty_optimization.py`）
+- `test_optimize_single_qty_rebalance_to_avoid_one_piece`：驗證 11+1 → 10+2 的 Rebalance 情境
+- `test_optimize_single_qty_merge_to_higher_sales_destination`：驗證 2+1 → 3（合併至高銷量目標店）情境
+
+#### 實際效果驗證
+- `100008801001 / HA42`：(HA32:11, HA44:1) → (HA32:10, HA44:2) ✅
+- `100314808024 / HC62`：(HC49:2, HC61:1) → (HC49:3) ✅
+
+---
+
 ## v2.4.1 (2026-02-25)
 
 ### B 特別模式規則更新（2026-02-25）

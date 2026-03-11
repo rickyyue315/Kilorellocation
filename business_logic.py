@@ -1,5 +1,5 @@
 """
-業務邏輯模組 v2.4.1
+業務邏輯模組 v2.5.0
 實現調貨規則、源/目的地識別和匹配算法
 支持十四模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
@@ -10,6 +10,7 @@ C2模式特殊規則：參照C模式邏輯但允許跨OM配對，HD不能轉到H
 E1模式：強制轉出（僅同OM配對）
 E1b模式：強制轉出（僅同OM配對，接收優先Type=T/M）
 E2模式：強制轉出（允許跨OM配對）
+後處理：所有模式輸出後統一套用_optimize_single_piece_transfers，消除單筆Transfer Qty=1的調貨記錄
 """
 
 import pandas as pd
@@ -22,7 +23,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.4.1"""
+    """調貨業務邏輯類 v2.5.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None):
         self.transfer_recommendations = []
