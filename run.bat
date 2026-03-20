@@ -1,5 +1,5 @@
 @echo off
-echo 啟動庫存調貨建議系統 v2.5.0...
+echo 啟動庫存調貨建議系統 v2.6.0...
 echo.
 
 REM 檢查Python是否安裝

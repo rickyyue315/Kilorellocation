@@ -1,5 +1,29 @@
 # 版本更新記錄
 
+## v2.6.0 (2026-03-20)
+
+### 新增 ND1/ND2 模式（ND 智能調貨）
+
+#### ND1 模式（ND 同 OM 轉貨）
+- ND 店舖可互相調貨，限同一 OM 組別及同一 Article
+- 打破「ND 不可接收」全局規則（ND1/ND2 模式例外）
+- 轉出排序：兩月銷量=0 優先 → 最低銷量次選 → 最高銷量保護
+- 接收優先級 1：RF 緊急缺貨（零庫存有銷售記錄）
+- 接收優先級 2：ND 潛在缺貨（按兩月銷量降序）
+- 接收上限：2 × (Last Month Sold Qty + MTD Sold Qty)；銷量=0 不可接收
+
+#### ND2 模式（ND 混合 OM 轉貨）
+- 繼承 ND1 所有算法邏輯，但允許跨 OM
+- Windy（澳門）轉出只能到 Windy；HD 不能轉到 HA/HB/HC
+
+#### 技術架構
+- [`business_logic.py`](business_logic.py)：`mode_nd1`/`mode_nd2` 常數、`_is_nd_transfer_mode()`、`_match_transfers_nd_mode(cross_om)` 共用核心
+- [`perform_quality_checks(mode)`](business_logic.py) 新增 `mode` 參數，ND 模式豁免 ND 接收檢查
+- [`app.py`](app.py)：新增兩個模式選項、說明、`mode_name_map`
+- [`tests/test_nd_modes.py`](tests/test_nd_modes.py)：14 個單元測試，全部通過
+
+---
+
 ## v2.5.0 (2026-03-11)
 
 ### 新增功能：所有模式後處理 — 避免單筆1件調貨
