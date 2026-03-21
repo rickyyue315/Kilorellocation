@@ -1,6 +1,6 @@
 """
-庫存調貨建議系統 v2.6.0 - Streamlit應用程序
-支持十五模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
+庫存調貨建議系統 v2.4.1 - Streamlit應用程序
+支持十三模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)
 新增:預設店舖資料(OM、Type等),當用戶上傳的Excel缺少這些資料時自動填充
 """
 
@@ -135,7 +135,7 @@ _patch_streamlit_text_rendering()
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.6.0"),
+    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.4.1"),
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -315,20 +315,19 @@ with st.sidebar:
     st.markdown("### 📦 系統資訊")
     st.markdown("""
     <div class="info-card">
-    <b>版本</b>: v2.6.0<br>
+    <b>版本</b>: v2.4.1<br>
     <b>開發者</b>: Ricky
     </div>
     """, unsafe_allow_html=True)
     
     with st.expander("💡 核心功能", expanded=False):
         st.markdown("""
-        **十五模式智能調貨系統:**
+        **十三模式智能調貨系統:**
         - ✅ A模式(保守轉貨) / B模式(加強轉貨)
         - ✅ B2模式(附加B特別模式) / B2a模式(B2+T遊客鋪不出貨)
         - ✅ B3模式(附加B跨OM特別模式) / B3a模式(B3+T遊客鋪不出貨)
         - ✅ C模式(重點補0) / C2模式(附加C跨OM重點補0)
         - ✅ D模式(清貨轉貨) / E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM) / F模式(目標優化)
-        - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨)
         
         **智能識別與匹配:**
         - ✅ ND/RF類型智慧識別
@@ -345,7 +344,8 @@ with st.sidebar:
         - ✅ B2/B2a模式：接收端依遊客區/混合型店舖優先排序
         - ✅ B2/B2a/B3/B3a模式：Mix店舖若總銷量高於目標店，禁止出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
         - ✅ B2a/B3a模式：T遊客鋪不作為出貨來源
-        - ✅ B3/B3a/C2模式：跨OM配對規則(HD不能轉到HA/HB/HC；Windy轉出只能到Windy)        - ✅ 所有模式：後處理避免單筆1件調貨（優先Rebalance，其次合並至高銷量目標店）        
+        - ✅ B3/B3a/C2模式：跨OM配對規則(HD不能轉到HA/HB/HC；Windy轉出只能到Windy)
+        
         **自動化功能:**
         - ✅ 預設店舖資料自動填充(OM、Type)
         - ✅ 統計分析和圖表
@@ -365,7 +365,7 @@ with st.sidebar:
         2. **選擇轉貨模式**
            - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B3/B3a/C/C2/D/E1/E1b/E2/F)
            - 查看模式說明了解各模式特點
-              - 若選擇 B2/B2a/B3/B3a/E1/E1b/E2，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
+              - 若選擇 B2/B2a/B3/B3a，可設定「單一出貨店舖最多配對接收店舖數」（最多2間 / 不限制）
         
         3. **啟動分析**
            - 點擊「生成調貨建議」按鈕開始處理
@@ -389,8 +389,7 @@ with st.sidebar:
         [
             "A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B2a: 附加B2a(特別模式-T遊客鋪不出貨)",
             "B3: 附加B(跨OM特別模式)", "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)",
-            "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化",
-            "ND1: ND同OM轉貨", "ND2: ND混合OM轉貨"
+            "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化"
         ],
         key='transfer_mode',
         help="選擇適合的調貨模式"
@@ -400,13 +399,13 @@ with st.sidebar:
 
     b_special_receive_site_limit_option = "最多 2 間"
     b_special_max_receive_sites_per_source = None
-    if mode_code in ["B2", "B2a", "B3", "B3a", "E1", "E1b", "E2"]:
+    if mode_code in ["B2", "B2a", "B3", "B3a"]:
         b_special_receive_site_limit_option = st.radio(
-            "出貨店舖配對接收店數限制",
+            "B2/B2a/B3/B3a 出貨店舖接收店數限制",
             ["優先 1 間", "最多 2 間", "不限制"],
             index=1,
             key='b_special_receive_site_limit_option',
-            help="控制同一SKU下，每個出貨店舖最多可分配到多少個接收店舖（優先1間：盡量只配1間；最多2間；不限制）"
+            help="控制同一SKU下，每個出貨店舖最多可分配到多少個接收店舖"
         )
         if b_special_receive_site_limit_option == "優先 1 間":
             b_special_max_receive_sites_per_source = 1
@@ -427,9 +426,7 @@ with st.sidebar:
         "E1: 強制轉出": "標記商品強制轉出(僅同OM)",
         "E1b: 強制轉出(優先類型接收)": "標記商品強制轉出(僅同OM，接收端優先Type=T/M)",
         "E2: 強制轉出(跨OM)": "標記商品強制轉出(可跨OM)",
-        "F: 目標優化": "依Target目標分配",
-        "ND1: ND同OM轉貨": "ND店舖互轉(同OM)，按銷量智能排序",
-        "ND2: ND混合OM轉貨": "ND店舖互轉(跨OM)，Windy只轉Windy"
+        "F: 目標優化": "依Target目標分配"
     }
     
     st.caption(mode_descriptions[transfer_mode])
@@ -497,40 +494,23 @@ with st.sidebar:
         - 接收店舖為RF,上限為Safety Stock的2倍
         - **僅同OM配對**,HD不能轉到HA/HB/HC
         - 轉出類型為E模式強制轉出
-        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
 
         **E1b模式(強制轉出優先類型接收)**
         - 使用E1模式轉出邏輯:標記為*ALL*的商品行全數強制轉出
         - **僅同OM配對**,HD不能轉到HA/HB/HC
         - 接收店舖為RF,上限為Safety Stock的2倍
         - 接收優先級參照B2:Type=T(遊客區)優先,其次Type=M(混合型)
-        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         
         **E2模式(強制轉出跨OM)**
         - 針對標記為*ALL*的商品行,全數強制轉出
         - 接收店舖為RF,上限為Safety Stock的2倍
         - 優先同OM配對,**可跨OM**,HD不能轉到HA/HB/HC
         - 轉出類型為E模式強制轉出
-        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         
         **F模式(目標優化)**
         - Target欄位填數字作為優先接收目標
         - 其他店舖按C模式補0需求計算
         - 允許跨OM配對,HD不能轉到HA/HB/HC
-
-        **ND1模式(ND同OM轉貨)**
-        - 打破「ND不可接收」全局限制，ND店舖可互相調貨
-        - **限制同OM**：轉出與接收店舖須屬同一OM組別
-        - 轉出排序：兩月銷量=0(Last Month + MTD)優先轉出 → 銷量最低次選 → 最高銷量保護不轉
-        - 接收優先級1：RF緊急缺貨(零庫存但有銷售記錄)
-        - 接收優先級2：ND潛在缺貨(按兩月銷量降序，高銷量優先接收)
-        - 接收上限：2×(Last Month Sold Qty + MTD Sold Qty)
-        - 兩月銷量=0的ND店舖不可接收
-
-        **ND2模式(ND混合OM轉貨)**
-        - 同ND1模式規則，但允許**跨OM**配對
-        - Windy(澳門)轉出只能到Windy店舖
-        - HD不能轉到HA/HB/HC
         
         ---
         
@@ -561,7 +541,7 @@ with st.sidebar:
 
 # 3. 頁面頭部
 st.title("📦 庫存調貨建議系統")
-st.caption("v2.6.0 | Intelligent Inventory Reallocation System")
+st.caption("v2.4.1 | Intelligent Inventory Reallocation System")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -727,9 +707,7 @@ if uploaded_file is not None:
                     "E1": "強制轉出",
                     "E1b": "強制轉出(優先類型接收)",
                     "E2": "強制轉出(跨OM)",
-                    "F": "目標優化",
-                    "ND1": "ND同OM轉貨",
-                    "ND2": "ND混合OM轉貨"
+                    "F": "目標優化"
                 }
                 mode_name = mode_name_map.get(mode_code, "目標優化")
                 
@@ -741,8 +719,8 @@ if uploaded_file is not None:
                 # 生成調貨建議
                 recommendations = transfer_logic.generate_transfer_recommendations(df, mode_name)
                 
-                # 執行質量檢查（傳入模式名稱，ND1/ND2模式允許ND接收）
-                quality_passed = transfer_logic.perform_quality_checks(df, mode_name)
+                # 執行質量檢查
+                quality_passed = transfer_logic.perform_quality_checks(df)
                 
                 # 獲取統計信息
                 statistics = transfer_logic.get_transfer_statistics()
@@ -952,7 +930,7 @@ if uploaded_file is not None:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #6C757D; padding: 30px 0;">
-    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.6.0</p>
+    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.4.1</p>
     <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
 </div>
 """, unsafe_allow_html=True)

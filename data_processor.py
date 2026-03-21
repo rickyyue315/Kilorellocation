@@ -1,5 +1,5 @@
 """
-數據預處理模組 v2.6.0
+數據預處理模組 v2.4.1
 處理Excel文件讀取、數據清理和驗證
 支持十一模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)
 新增：預設店舖資料（OM、Type等），當用戶上傳的Excel缺少這些資料時自動填充
@@ -70,7 +70,6 @@ DEFAULT_STORE_DATA = {
     'HBA2': {'shop': '廣東道2', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B1', 'size': 'M', 'om': 'Hippo', 'type': 'T'},
     'HBA3': {'shop': '荷里活廣場2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Hippo', 'type': 'L'},
     'HBA4': {'shop': '中港城2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Candy', 'type': 'T'},
-    'HBA5': {'shop': '旺角中心', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'XS', 'om': 'Violet', 'type': 'T'},
     'HC02': {'shop': '荃灣', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Eva', 'type': 'L'},
     'HC05': {'shop': '上水', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Candy', 'type': 'T'},
     'HC13': {'shop': '沙田中心', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Queenie', 'type': 'M'},
@@ -108,7 +107,7 @@ DEFAULT_STORE_DATA = {
 }
 
 class DataProcessor:
-    """數據預處理類 v2.6.0"""
+    """數據預處理類 v2.2.0"""
     
     def __init__(self):
         self.required_columns = [

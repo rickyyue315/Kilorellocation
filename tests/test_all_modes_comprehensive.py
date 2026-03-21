@@ -888,18 +888,17 @@ class TestModeE2:
         recs = logic.generate_transfer_recommendations(df, logic.mode_e2)
         run_common_assertions(recs, df, logic, "E2模式")
 
-    def test_no_all_column_produces_nothing(self):
-        """E2: 無ALL欄位時不應轉出"""
+    def test_no_all_column_raises_error(self):
+        """E2: 無ALL欄位時應拋出 ValueError（P0-漏洞4修正：改為明確錯誤提示）"""
         logic = TransferLogic()
         df = _df([
             _make_row(Site='RF01', OM='OM1', **{'SaSa Net Stock': 10, 'Effective Sold Qty': 1}),
             _make_row(Site='RF02', OM='OM1', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
                        'Effective Sold Qty': 8, 'Last Month Sold Qty': 4, 'MTD Sold Qty': 4}),
         ])
-        recs = logic.generate_transfer_recommendations(df, logic.mode_e2)
-        # 沒有ALL標記，不應有E模式轉出（但Phase3可能產生C回退）
-        e_recs = [r for r in recs if r['Source Type'] == 'E模式強制轉出']
-        assert len(e_recs) == 0, "E2無ALL標記不應有E模式強制轉出"
+        # P0-漏洞4修正：缺 ALL 欄位應拋出明確 ValueError，而非靜默輸出空結果
+        with pytest.raises(ValueError, match="ALL"):
+            logic.generate_transfer_recommendations(df, logic.mode_e2)
 
 
 # ===========================================================================
@@ -1078,12 +1077,12 @@ class TestEModeAllColumn:
 
     @pytest.mark.parametrize("mode", ["強制轉出", "強制轉出(優先類型接收)", "強制轉出(跨OM)"])
     def test_empty_all_no_transfer(self, mode):
-        """ALL為空或空白時不應轉出"""
-        for blank in ['', ' ', None]:
+        """ALL欄位存在但全為空白時不應有E模式強制轉出；若ALL欄位不存在則應拋出 ValueError"""
+        # Case 1: ALL欄位存在但值為空字串或空白 → 不應觸發強制轉出（靜默允許）
+        for blank in ['', ' ']:
             logic = TransferLogic()
             row = _make_row(Site='E_SRC', **{'SaSa Net Stock': 5, 'Effective Sold Qty': 1})
-            if blank is not None:
-                row['ALL'] = blank
+            row['ALL'] = blank
             df = _df([
                 row,
                 _make_row(Site='RF01', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
@@ -1092,6 +1091,17 @@ class TestEModeAllColumn:
             recs = logic.generate_transfer_recommendations(df, mode)
             e_recs = [r for r in recs if r['Source Type'] == 'E模式強制轉出']
             assert len(e_recs) == 0, f"E模式空白ALL不應觸發: '{blank}'"
+
+        # Case 2: ALL欄位不存在 → 應拋出 ValueError（P0-漏洞4修正）
+        logic = TransferLogic()
+        row_no_all = _make_row(Site='E_SRC', **{'SaSa Net Stock': 5, 'Effective Sold Qty': 1})
+        df_no_all = _df([
+            row_no_all,
+            _make_row(Site='RF01', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 8, 'Last Month Sold Qty': 4, 'MTD Sold Qty': 4}),
+        ])
+        with pytest.raises(ValueError, match="ALL"):
+            logic.generate_transfer_recommendations(df_no_all, mode)
 
 
 # ===========================================================================

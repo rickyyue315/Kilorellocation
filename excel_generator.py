@@ -1,5 +1,5 @@
 """
-Excel輸出模組 v2.6.0
+Excel輸出模組 v2.4.1
 生成調貨建議和統計摘要的Excel文件
 支持十一模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B3(附加B跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E2(強制轉出跨OM)/F(目標優化)
 增加詳細Notes分類資訊
@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ExcelGenerator:
-    """Excel輸出類 v2.6.0"""
+    """Excel輸出類 v2.4.1"""
     
     def __init__(self):
         self.output_filename = ""
@@ -277,7 +277,7 @@ class ExcelGenerator:
         
         # 轉出類型分析
         worksheet.write(f'A{row}', '轉出類型分析', header_format)
-        worksheet.write(f'B{row}', '建議行數', header_format)
+        worksheet.write(f'B{row}', '建議數量', header_format)
         worksheet.write(f'C{row}', '總件數', header_format)
         
         source_type_stats = statistics.get('source_type_stats', {})
@@ -292,7 +292,7 @@ class ExcelGenerator:
         
         # 接收類型分析
         worksheet.write(f'A{row}', '接收類型分析', header_format)
-        worksheet.write(f'B{row}', '建議行數', header_format)
+        worksheet.write(f'B{row}', '建議數量', header_format)
         worksheet.write(f'C{row}', '總件數', header_format)
         
         dest_type_stats = statistics.get('dest_type_stats', {})

@@ -2,6 +2,34 @@
 
 ---
 
+## ⚠️ 邊界條件與設計說明（補充）
+
+### **A. C/C2 模式 `target_qty` 計算截斷行為（漏洞7說明）**
+- **公式**：`target_qty = max(int(row['Safety Stock'] * 0.5), 3)`
+- **行為**：`int()` 採用截斷（floor），不是四捨五入
+- **範例**：Safety Stock = 7 → `int(3.5) = 3`，`max(3, 3) = 3`（不是 4）
+- **設計決定**：截斷是有意為之，避免補過量。若未來需要改為四捨五入，應改為 `round()`
+
+### **B. B2/B2a/B3/B3a 接收條件（漏洞8說明）**
+- **接收門檻**：店舖必須同時滿足：
+  1. `total_available < safety_stock`（低於安全庫存）
+  2. `total_available < max_can_receive`（低於接收上限 = Safety × 2）
+- **與 E 模式的差異**：E 模式只要求 `total_available < max_can_receive`，不要求低於安全庫存
+- **設計意圖**：B2/B3 系列更保守，只補充真正低於安全庫存的店舖
+
+### **C. F 模式補0接收（priority=2）限同OM配對（漏洞13說明）**
+- **規則**：F 模式中，Target 接收（priority=1）允許跨 OM 配對；但補0接收（priority=2）限制同 OM 配對
+- **原因**：補0屬於次要需求，避免跨 OM 調配產生不必要的物流複雜性
+- **代碼位置**：`_match_transfers_f_mode()` 第 priority_level == 2 判斷段
+
+### **D. Windy OM 配對規則（漏洞14說明）**
+- **Windy 轉出限制**：Windy OM 的店舖作為轉出方（source）時，**只能轉到 Windy OM 的接收店**
+- **Windy 接收無限制**：Windy OM 的店舖作為接收方（destination）時，**可接收來自任何 OM 的轉出**
+- **適用模式**：B3、B3a、C2（均為跨OM配對模式）
+- **代碼位置**：`_match_by_priority()` 和 `_match_transfers_c2_mode()` 中的 Windy 限制檢查
+
+---
+
 ## 通用業務規則 (適用於所有模式)
 
 ### **0. B2/B2a/B3/B3a 操作設定（介面）**
@@ -43,23 +71,6 @@ is_not_highest_sold = effective_sold < max_sold_qty
   - E模式Phase 3回退時特別強化此檢查
 - **代碼位置**：`business_logic.py` 第 392, 420, 448 行（匹配階段多處檢查）
 - **質量檢查**：系統在最終輸出前會執行專門的質量檢查（檢查6）驗證此規則
-
-### **4. 避免單筆調貨 1 件（後處理優化）⭐ 全模式適用**
-- **規則**：所有 13 個模式的輸出結果，在最終返回前統一套用後處理，消除「單筆 Transfer Qty = 1」的調貨記錄。
-- **例外**：若該出貨店舖對該 SKU 的可調總量本身就只有 1 件，則允許保留單件調貨（無法重新分配）。
-- **優化策略（依序嘗試）**：
-  1. **Rebalance（重新平衡）**：找同群組（同一 Article + 同一出貨店舖）中其他目標店數量 ≥ 3 者，取 1 件給單件店舖，使其變為 2 件，总量不變。
-  2. **Merge（合併）**：若無法 Rebalance（例如僅有 2+1 的情況），將 1 件合併至「接收店舖總銷量（Last Month Sold Qty + MTD Sold Qty）最高」的目標店，並移除原單件行。
-- **實現機制**：
-  - 以 `(Article, Transfer Site, Transfer OM)` 分組
-  - 迭代偵測 `Transfer Qty == 1` 的記錄並執行對應策略
-  - 調整後透過 `_refresh_recommendation_fields` 重算 `After Transfer Stock`、`Cumulative Received Qty`、`Notes`
-- **代碼位置**：`business_logic.py`
-  - `_optimize_single_piece_transfers`（主後處理函式）
-  - `_refresh_recommendation_fields`（欄位重算）
-  - `_get_record_sales_total`（輔助：計算接收店總銷量）
-  - Hook：`generate_transfer_recommendations` 末段（`all_recommendations = self._optimize_single_piece_transfers(...)`）
-- **與 D 模式餘貨邏輯的關係**：互補不衝突。D 模式處理「轉出後出貨店剩餘庫存避免 1 件」；本規則處理「每筆調貨記錄的調貨數量避免 1 件」。
 
 ---
 
