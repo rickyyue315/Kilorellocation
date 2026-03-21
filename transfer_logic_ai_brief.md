@@ -28,6 +28,10 @@ Draw one logic image that lets users compare all current transfer modes and unde
    - RF Enhanced source -> Emergency Replenishment
    - RF Enhanced source -> Potential Replenishment
    - (Mode C only) RF source -> Priority Zero Replenishment
+7. **Post-processing (all modes)**: after all matching, single-piece transfer lines (Transfer Qty = 1) are eliminated:
+   - Strategy A (Rebalance): take 1 piece from another destination with qty ≥3 in same source group, making the 1-piece line become 2.
+   - Strategy B (Merge): if no donor ≥3, merge the 1-piece into the highest-sales destination in the group (measured by Last Month Sold Qty + MTD Sold Qty), then remove the 1-piece record.
+   - Exception: if the source store has only 1 transferable piece for that SKU in total, the single-piece line is preserved.
 
 ## Destination types (labels used in output)
 - Emergency Replenishment: SaSa Net Stock = 0 and Effective Sold Qty > 0
@@ -50,7 +54,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 ---
 
-# Mode Overview (11 Modes: A, B, B2, B3, C, C2, D, E1, E1b, E2, F)
+# Mode Overview (13 Modes: A, B, B2, B2a, B3, B3a, C, C2, D, E1, E1b, E2, F)
 
 ## Mode A: Conservative
 - Source rules: RF only, Surplus Transfer
@@ -185,8 +189,10 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - RF highest sales protected
 - No dual role source/destination
 - Priority matching order list
+- Post-processing: eliminate single-piece (qty=1) transfer lines across all modes
 - Special rules: 
-  - B2/B3 Type=L exception
+  - B2/B2a/B3/B3a Type=L exception
+  - B2a/B3a Type=T no-source restriction
   - C2 cross-OM + HD/Windy
   - D avoid 1 remainder
   - E1 same OM only + ALL column force transfer
