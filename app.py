@@ -8,6 +8,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import logging
+import os
 
 try:
     from streamlit.delta_generator import DeltaGenerator
@@ -131,7 +132,10 @@ def _patch_streamlit_text_rendering():
         setattr(DeltaGenerator, method_name, wrapped)
 
 
-_patch_streamlit_text_rendering()
+# 僅在明確需要修復亂碼時啟用（本機 Windows 環境可設 KILO_FIX_MOJIBAKE=1）
+# Zeabur/streamlit.io 等 Linux 容器無需啟用，避免每次渲染的額外 CPU 開銷
+if os.getenv("KILO_FIX_MOJIBAKE", "0") == "1":
+    _patch_streamlit_text_rendering()
 
 # 1. 頁面配置
 st.set_page_config(
@@ -788,15 +792,13 @@ if uploaded_file is not None:
             # 調貨建議表格
             st.markdown("### 📋 調貨建議清單")
             
-            # 預先建立 (Article, Site) → 庫存數據的字典（避免迴圈內全表掃描 N+1 問題）
-            _stock_lookup = {
-                (row['Article'], row['Site']): {
-                    'stock': row['SaSa Net Stock'],
-                    'safety': row['Safety Stock'],
-                    'moq': row['MOQ']
-                }
-                for _, row in df[['Article', 'Site', 'SaSa Net Stock', 'Safety Stock', 'MOQ']].iterrows()
-            }
+            # 預先建立 (Article, Site) → 庫存數據的字典（向量化操作，避免 iterrows 逐行 Python 迴圈）
+            _stock_lookup = (
+                df[['Article', 'Site', 'SaSa Net Stock', 'Safety Stock', 'MOQ']]
+                .set_index(['Article', 'Site'])
+                .rename(columns={'SaSa Net Stock': 'stock', 'Safety Stock': 'safety', 'MOQ': 'moq'})
+                .to_dict('index')
+            )
             
             # 準備顯示數據
             display_data = []
