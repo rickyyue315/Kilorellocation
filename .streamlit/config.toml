@@ -1,0 +1,9 @@
+[server]
+# 停用檔案監聽器，減少容器 CPU 用量（Zeabur/雲端部署適用）
+fileWatcherType = "none"
+# 雲端環境必須設為 headless
+headless = true
+
+[browser]
+# 停用使用統計上報，避免啟動時外部網路請求
+gatherUsageStats = false
