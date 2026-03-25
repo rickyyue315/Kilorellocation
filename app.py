@@ -710,7 +710,7 @@ if uploaded_file is not None:
         # 當模式或檔案改變時，清除舊的分析結果
         current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{uploaded_file.name}_{uploaded_file.size}"
         if st.session_state.get('_run_key') != current_run_key:
-            for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors']:
+            for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key']:
                 st.session_state.pop(k, None)
             st.session_state['_run_key'] = current_run_key
         
@@ -926,16 +926,21 @@ if uploaded_file is not None:
             st.success("✅ 分析完成!")
             
             # 生成Excel文件（BytesIO記憶體模式，無磁碟暫存安全問題）
-            with st.spinner("生成 Excel 文件..."):
-                excel_generator = ExcelGenerator()
-                excel_data = excel_generator.generate_excel_file(recommendations, statistics)
+            # 只在本次分析結果首次展示時生成，避免重渲染/下載按鈕觸發時重算
+            if st.session_state.get('excel_run_key') != current_run_key or 'excel_data' not in st.session_state:
+                with st.spinner("生成 Excel 文件..."):
+                    excel_generator = ExcelGenerator()
+                    st.session_state['excel_data'] = excel_generator.generate_excel_file(recommendations, statistics)
+                    st.session_state['excel_filename'] = excel_generator.output_filename
+                    st.session_state['excel_run_key'] = current_run_key
             
             st.download_button(
                 label="📥 下載 Excel 報表",
-                data=excel_data,
-                file_name=excel_generator.output_filename,
+                data=st.session_state.get('excel_data', b''),
+                file_name=st.session_state.get('excel_filename', '調貨建議.xlsx'),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
+                use_container_width=True,
+                on_click="ignore"
             )
             
             progress_bar.progress(100, text="處理完畢!")
