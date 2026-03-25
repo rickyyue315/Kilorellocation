@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import datetime
 import logging
 import os
+import base64
 
 try:
     from streamlit.delta_generator import DeltaGenerator
@@ -934,13 +935,16 @@ if uploaded_file is not None:
                     st.session_state['excel_filename'] = excel_generator.output_filename
                     st.session_state['excel_run_key'] = current_run_key
             
-            st.download_button(
-                label="📥 下載 Excel 報表",
-                data=st.session_state.get('excel_data', b''),
-                file_name=st.session_state.get('excel_filename', '調貨建議.xlsx'),
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                on_click="ignore"
+            _excel_bytes = st.session_state.get('excel_data', b'')
+            _excel_filename = st.session_state.get('excel_filename', '調貨建議.xlsx')
+            _b64 = base64.b64encode(_excel_bytes).decode('utf-8')
+            _mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            st.markdown(
+                f'<a href="data:{_mime};base64,{_b64}" download="{_excel_filename}" '
+                f'style="display:block;padding:0.5em 1em;background:#ff4b4b;color:white;'
+                f'text-decoration:none;border-radius:0.3em;text-align:center;'
+                f'font-weight:bold;font-size:1rem;">📥 下載 Excel 報表</a>',
+                unsafe_allow_html=True
             )
             
             progress_bar.progress(100, text="處理完畢!")
