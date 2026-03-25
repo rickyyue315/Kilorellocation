@@ -43,11 +43,11 @@ echo "安裝依賴包..."
 python -m pip install -r requirements.txt
 if [ $? -ne 0 ]; then
     echo "警告: 依賴安裝可能失敗，嘗試安裝核心依賴..."
-    python -m pip install pandas openpyxl streamlit numpy xlsxwriter matplotlib seaborn ftfy
+    python -m pip install pandas openpyxl streamlit numpy xlsxwriter ftfy
 fi
 
 # 檢查核心依賴是否安裝成功
-python -c "import pandas, openpyxl, streamlit, numpy, xlsxwriter, matplotlib, seaborn, ftfy" 2>/dev/null
+python -c "import pandas, openpyxl, streamlit, numpy, xlsxwriter, ftfy" 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "錯誤: 核心依賴安裝失敗，請手動安裝"
     exit 1
