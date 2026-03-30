@@ -55,6 +55,7 @@ MODES = [
     "清貨轉貨",
     "強制轉出",
     "目標優化",
+    "F指定模式",
 ]
 
 def check_mode(df: pd.DataFrame, mode: str):

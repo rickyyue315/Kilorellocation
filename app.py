@@ -1,6 +1,6 @@
 """
-庫存調貨建議系統 v2.6.0 - Streamlit應用程序
-支持十五模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
+庫存調貨建議系統 v2.7.0 - Streamlit應用程序
+支持十六模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
 新增:預設店舖資料(OM、Type等),當用戶上傳的Excel缺少這些資料時自動填充
 """
 
@@ -148,7 +148,7 @@ def _parse_target_for_ui(value):
 
 
 def _find_f_mode_nd_target_conflicts(df: pd.DataFrame) -> pd.DataFrame:
-    """找出 F 模式下 ND 且 Target>0 的店舖資料。"""
+    """找出 F/F2 模式下 ND 且 Target>0 的店舖資料。"""
     if 'RP Type' not in df.columns or 'Target' not in df.columns:
         return pd.DataFrame()
 
@@ -170,7 +170,7 @@ if os.getenv("KILO_FIX_MOJIBAKE", "0") == "1":
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.6.0"),
+    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.7.0"),
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -350,26 +350,26 @@ with st.sidebar:
     st.markdown("### 📦 系統資訊")
     st.markdown("""
     <div class="info-card">
-    <b>版本</b>: v2.6.0<br>
+    <b>版本</b>: v2.7.0<br>
     <b>開發者</b>: Ricky
     </div>
     """, unsafe_allow_html=True)
     
     with st.expander("💡 核心功能", expanded=False):
         st.markdown("""
-        **十五模式智能調貨系統:**
+        **十六模式智能調貨系統:**
         - ✅ A模式(保守轉貨) / B模式(加強轉貨)
         - ✅ B2模式(附加B特別模式) / B2a模式(B2+T遊客鋪不出貨)
         - ✅ B3模式(附加B跨OM特別模式) / B3a模式(B3+T遊客鋪不出貨)
         - ✅ C模式(重點補0) / C2模式(附加C跨OM重點補0)
-        - ✅ D模式(清貨轉貨) / E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM) / F模式(目標優化)
+        - ✅ D模式(清貨轉貨) / E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM) / F模式(目標優化) / F2模式(F指定模式)
         - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨)
         
         **智能識別與匹配:**
         - ✅ ND/RF類型智慧識別
         - ✅ 優先順序調貨匹配
         - ✅ RF轉出限制控制
-        - ✅ 跨OM配對支援(B3/C2/E/F模式）
+        - ✅ 跨OM配對支援(B3/C2/E/F/F2模式）
         
         **特殊功能:**
         - ✅ D模式：避免1件餘貨
@@ -377,6 +377,7 @@ with st.sidebar:
         - ✅ E1b模式：標記商品強制轉出(僅同OM，優先Type=T/M接收)
         - ✅ E2模式：標記商品強制轉出(跨OM)
         - ✅ F模式：Target目標接收優先
+        - ✅ F2模式：僅Target店舖可接收，集中優先補貨
         - ✅ B2/B2a模式：接收端依遊客區/混合型店舖優先排序
         - ✅ B2/B2a/B3/B3a模式：Mix店舖若總銷量高於目標店，禁止出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
         - ✅ B2a/B3a模式：T遊客鋪不作為出貨來源
@@ -398,7 +399,7 @@ with st.sidebar:
            - 確保包含所有必需欄位
         
         2. **選擇轉貨模式**
-           - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B3/B3a/C/C2/D/E1/E1b/E2/F)
+           - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B3/B3a/C/C2/D/E1/E1b/E2/F/F2)
            - 查看模式說明了解各模式特點
               - 若選擇 B2/B2a/B3/B3a/E1/E1b/E2，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
         
@@ -424,7 +425,7 @@ with st.sidebar:
         [
             "A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B2a: 附加B2a(特別模式-T遊客鋪不出貨)",
             "B3: 附加B(跨OM特別模式)", "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)",
-            "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化",
+            "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化", "F2: F指定模式",
             "ND1: ND同OM轉貨", "ND2: ND混合OM轉貨"
         ],
         key='transfer_mode',
@@ -463,6 +464,7 @@ with st.sidebar:
         "E1b: 強制轉出(優先類型接收)": "標記商品強制轉出(僅同OM，接收端優先Type=T/M)",
         "E2: 強制轉出(跨OM)": "標記商品強制轉出(可跨OM)",
         "F: 目標優化": "依Target目標分配",
+        "F2: F指定模式": "僅Target店舖可接收，集中調貨",
         "ND1: ND同OM轉貨": "ND店舖互轉(同OM)，按銷量智能排序",
         "ND2: ND混合OM轉貨": "ND店舖互轉(跨OM)，Windy只轉Windy"
     }
@@ -553,6 +555,11 @@ with st.sidebar:
         - 其他店舖按C模式補0需求計算
         - 允許跨OM配對,HD不能轉到HA/HB/HC
 
+        **F2模式(F指定模式)**
+        - Target欄位填數字作為唯一接收目標
+        - 僅Target店舖可接收，非Target RF店舖不參與接收
+        - 允許跨OM配對,HD不能轉到HA/HB/HC
+
         **ND1模式(ND同OM轉貨)**
         - 打破「ND不可接收」全局限制，ND店舖可互相調貨
         - **限制同OM**：轉出與接收店舖須屬同一OM組別
@@ -596,7 +603,7 @@ with st.sidebar:
 
 # 3. 頁面頭部
 st.title("📦 庫存調貨建議系統")
-st.caption("v2.6.0 | Intelligent Inventory Reallocation System")
+st.caption("v2.7.0 | Intelligent Inventory Reallocation System")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -652,7 +659,7 @@ elif mode_code in ["E1", "E1b", "E2"]:
         - E1/E1b 模式僅同OM配對,E2 模式可跨OM配對
         - E1b 接收優先級參照B2:Type=T(遊客區)優先,其次Type=M(混合型)
         """)
-else:  # F: 目標優化
+else:  # F / F2
     with st.expander("📋 必需欄位說明", expanded=False):
         st.markdown("""
         **基本欄位:**
@@ -666,7 +673,8 @@ else:  # F: 目標優化
         
         **⚠️ 特殊要求:**
         - **Target 欄位**:填數字代表該店舖的優先接收目標數量
-        - 未填Target的店舖會按C模式補0需求計算
+        - F模式:未填Target的店舖會按C模式補0需求計算
+        - F2模式:未填Target的店舖不會接收
         """)
 
 uploaded_file = st.file_uploader(
@@ -719,8 +727,8 @@ if uploaded_file is not None:
                 f"（{', '.join(str(v) for v in invalid_rp_vals)}），已自動修正為 RF。請確認原始數據是否正確。"
             )
 
-        # F 模式前置警示：ND + Target>0 不會接收
-        if mode_code == "F":
+        # F/F2 模式前置警示：ND + Target>0 不會接收
+        if mode_code in ["F", "F2"]:
             f_mode_conflicts = _find_f_mode_nd_target_conflicts(df)
             if not f_mode_conflicts.empty:
                 affected_sites = sorted(
@@ -731,7 +739,7 @@ if uploaded_file is not None:
                     site_text += f" 等{len(affected_sites)}間店"
 
                 st.warning(
-                    f"⚠️ F模式提示：偵測到 {len(f_mode_conflicts)} 行資料為 ND 且 Target>0。"
+                    f"⚠️ {mode_code}模式提示：偵測到 {len(f_mode_conflicts)} 行資料為 ND 且 Target>0。"
                     f"此店因 ND 規則不會接收。"
                     f"受影響店舖：{site_text}"
                 )
@@ -787,6 +795,7 @@ if uploaded_file is not None:
                     "E1b": "強制轉出(優先類型接收)",
                     "E2": "強制轉出(跨OM)",
                     "F": "目標優化",
+                    "F2": "F指定模式",
                     "ND1": "ND同OM轉貨",
                     "ND2": "ND混合OM轉貨"
                 }
@@ -1017,7 +1026,7 @@ if uploaded_file is not None:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #6C757D; padding: 30px 0;">
-    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.6.0</p>
+    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.7.0</p>
     <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
 </div>
 """, unsafe_allow_html=True)

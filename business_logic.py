@@ -1,7 +1,7 @@
 """
-業務邏輯模組 v2.6.0
+業務邏輯模組 v2.7.0
 實現調貨規則、源/目的地識別和匹配算法
-支持十五模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
+支持十六模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
 基於累計接收數量判斷是否達到最低保障標準的機制
 強化ND店鋪限制：所有模式下ND店鋪只能轉出，不能接收（ND1/ND2模式除外）
@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.6.0"""
+    """調貨業務邏輯類 v2.7.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None):
         self.transfer_recommendations = []
@@ -50,6 +50,7 @@ class TransferLogic:
         self.mode_e1b = "強制轉出(優先類型接收)"  # E1b模式（僅同OM，接收優先Type=T/M）
         self.mode_e2 = "強制轉出(跨OM)"  # E2模式（跨OM）
         self.mode_f = "目標優化"  # F模式
+        self.mode_f_target_only = "F指定模式"  # F2模式（僅Target店舖接收）
         self.mode_nd1 = "ND同OM轉貨"   # ND1模式（ND同OM互轉，智能銷量排序）
         self.mode_nd2 = "ND混合OM轉貨"  # ND2模式（ND跨OM互轉，Windy只轉Windy）
 
@@ -143,8 +144,8 @@ class TransferLogic:
             sources.sort(key=lambda x: x.get('total_sales_sort', 0))
             return sources
 
-        # F模式特殊處理：Target優先接收，轉出可全數釋放
-        if mode == self.mode_f:
+        # F/F2模式特殊處理：Target優先接收，轉出可全數釋放
+        if mode in (self.mode_f, self.mode_f_target_only):
             target_series = self._parse_target_series(group_df)
 
             # ND類型：全數轉出
@@ -537,8 +538,10 @@ class TransferLogic:
         # 只考慮RF類型店鋪（ND店鋪在所有模式下都只能轉出，不能接收）
         rf_destinations = group_df[group_df['RP Type'] == 'RF']
 
-        # F模式特殊處理：Target數字優先接收，其餘店鋪按C模式補0
-        if mode == self.mode_f:
+        # F/F2模式特殊處理：Target數字優先接收
+        # - F：其餘店鋪按C模式補0
+        # - F2：僅Target店舖可接收
+        if mode in (self.mode_f, self.mode_f_target_only):
             target_series = self._parse_target_series(rf_destinations)
 
             for idx, row in rf_destinations.iterrows():
@@ -549,6 +552,7 @@ class TransferLogic:
                 if pd.notna(target_value) and target_value > 0:
                     target_qty = int(target_value)
                     if total_available < target_qty:
+                        dest_type = 'F模式目標接收' if mode == self.mode_f else 'F指定模式目標接收'
                         needed_qty = target_qty - total_available
                         destinations.append({
                             'site': row['Site'],
@@ -561,12 +565,16 @@ class TransferLogic:
                             'safety_stock': row['Safety Stock'],
                             'moq': row['MOQ'],
                             'effective_sold_qty': row['Effective Sold Qty'],
-                            'dest_type': 'F模式目標接收',
+                            'dest_type': dest_type,
                             'target_qty': target_qty,
                             'received_qty': 0,
                             'last_month_sold_qty': int(row['Last Month Sold Qty']),
                             'mtd_sold_qty': int(row['MTD Sold Qty'])
                         })
+                    continue
+
+                # F2：非Target店舖不接收
+                if mode == self.mode_f_target_only:
                     continue
 
                 # 未標Target的店鋪，按C模式重點補0
@@ -923,8 +931,8 @@ class TransferLogic:
         # E1/E2模式由generate_transfer_recommendations直接調用對應的匹配函數處理
         # 此處不需要處理E1/E2模式
 
-        # F模式特殊處理：Target優先接收 + 跨OM匹配
-        if mode == self.mode_f:
+        # F/F2模式特殊處理：Target優先接收 + 跨OM匹配
+        if mode in (self.mode_f, self.mode_f_target_only):
             return self._match_transfers_f_mode(sources, destinations, article, product_desc, mode)
         
         # C2模式特殊處理：C模式邏輯 + 跨OM匹配
@@ -1298,12 +1306,13 @@ class TransferLogic:
     def _match_transfers_f_mode(self, sources: List[Dict], destinations: List[Dict],
                                article: str, product_desc: str, mode: str) -> List[Dict]:
         """
-        F模式特殊匹配邏輯：
+        F/F2模式特殊匹配邏輯：
         1. Target數字優先接收（priority=1先完全滿足）
         2. 允許跨OM配對
         3. HD店鋪不能轉到HA/HB/HC
         4. 嚴格避免同一SKU的轉出店鋪同時接收
         5. 總轉移量不超過總需求量
+        6. F2模式僅允許Target店舖接收（由identify_destinations控管）
         """
         recommendations = []
 
@@ -1397,7 +1406,7 @@ class TransferLogic:
                         'Destination Priority': dest['priority'],
                         'Source Type': source['source_type'],
                         'Destination Type': dest['dest_type'],
-                        'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, self.mode_f),
+                        'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode),
                         'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
                         'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
                         'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
@@ -2345,7 +2354,7 @@ class TransferLogic:
         
         Args:
             df: 預處理後的DataFrame
-            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)或F模式(目標優化)
+            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)、F模式(目標優化)或F2模式(F指定模式)
             
         Returns:
             調貨建議列表
@@ -2353,12 +2362,12 @@ class TransferLogic:
         logger.info(f"開始生成調貨建議 - {mode}")
         
         # 驗證模式
-        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b_special_a, self.mode_b3, self.mode_b3a, self.mode_c, self.mode_c2, self.mode_d, self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_nd1, self.mode_nd2]:
+        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b_special_a, self.mode_b3, self.mode_b3a, self.mode_c, self.mode_c2, self.mode_d, self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_nd1, self.mode_nd2]:
             raise ValueError(f"無效的轉貨模式: {mode}")
         
         # 根據模式選擇分組方式
-        if mode in [self.mode_e2, self.mode_f, self.mode_b3, self.mode_b3a, self.mode_c2, self.mode_nd2]:
-            # E2/F/B3/C2/ND2模式支持跨OM配對，因此僅按Article分組
+        if mode in [self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_c2, self.mode_nd2]:
+            # E2/F/F2/B3/C2/ND2模式支持跨OM配對，因此僅按Article分組
             grouped = df.groupby(['Article'])
         else:
             # 其他模式（含E1/E1b/ND1）按Article和OM分組
@@ -2395,13 +2404,13 @@ class TransferLogic:
             # 識別接收候選店鋪
             destinations = self.identify_destinations(group_df, mode)
             
-            # E1/E1b/E2/F/B3/B3a/C2/ND1/ND2模式特殊處理：從destinations中過濾掉同時作為轉出源的店鋪
-            if mode in [self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_b3, self.mode_b3a, self.mode_c2, self.mode_nd1, self.mode_nd2]:
+            # E1/E1b/E2/F/F2/B3/B3a/C2/ND1/ND2模式特殊處理：從destinations中過濾掉同時作為轉出源的店鋪
+            if mode in [self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_c2, self.mode_nd1, self.mode_nd2]:
                 source_sites = set([s['site'] for s in sources])
                 destinations = [d for d in destinations if d['site'] not in source_sites]
             
             # 執行匹配
-            if mode in [self.mode_e2, self.mode_f, self.mode_b3, self.mode_b3a, self.mode_c2, self.mode_nd2]:
+            if mode in [self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_c2, self.mode_nd2]:
                 article = group_keys[0] if isinstance(group_keys, (list, tuple)) else group_keys
                 om = "Multiple"  # 跨OM模式下OM由source/dest決定
             else:
@@ -2413,7 +2422,7 @@ class TransferLogic:
             # E2模式需要傳入group_df以支持Phase 3邏輯
             elif mode == self.mode_e2:
                 recommendations = self._match_transfers_e_mode(sources, destinations, article, om, product_desc, group_df)
-            elif mode == self.mode_f:
+            elif mode in (self.mode_f, self.mode_f_target_only):
                 recommendations = self._match_transfers_f_mode(sources, destinations, article, product_desc, mode)
             elif mode == self.mode_c2:
                 recommendations = self._match_transfers_c2_mode(sources, destinations, article, product_desc, mode)
@@ -2751,9 +2760,12 @@ class TransferLogic:
             notes_parts.append(f"【轉出分析: RF加強轉出，轉出後剩餘庫存({remaining_after_transfer})可能低於安全庫存({source.get('safety_stock', 'N/A')})】")
         
         # 5. 接收需求分析
-        if dest['dest_type'] == 'F模式目標接收':
+        if dest['dest_type'] in ('F模式目標接收', 'F指定模式目標接收'):
             target_qty = dest.get('target_qty', 0)
-            notes_parts.append(f"【接收分析: F模式目標接收，目標數量{target_qty}件，累計已接收{current_received_qty + transfer_qty}件】")
+            if dest['dest_type'] == 'F指定模式目標接收':
+                notes_parts.append(f"【接收分析: F指定模式目標接收，僅Target店舖可接收，目標數量{target_qty}件，累計已接收{current_received_qty + transfer_qty}件】")
+            else:
+                notes_parts.append(f"【接收分析: F模式目標接收，目標數量{target_qty}件，累計已接收{current_received_qty + transfer_qty}件】")
         elif dest['dest_type'] == 'E模式接收' or str(dest.get('dest_type', '')).startswith('E1b'):
             target_qty = dest.get('target_qty', 0)
             safety_stock = dest.get('safety_stock', 0)

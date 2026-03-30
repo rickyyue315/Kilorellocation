@@ -54,7 +54,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 ---
 
-# Mode Overview (13 Modes: A, B, B2, B2a, B3, B3a, C, C2, D, E1, E1b, E2, F)
+# Mode Overview (16 Modes: A, B, B2, B2a, B3, B3a, C, C2, D, E1, E1b, E2, F, F2, ND1, ND2)
 
 ## Mode A: Conservative
 - Source rules: RF only, Surplus Transfer
@@ -170,6 +170,18 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - HD source cannot transfer to HA/HB/HC destinations
 - Goal: Target-driven allocation, zero stock replenishment for non-Target sites
 
+## Mode F2: Target-Only Optimization
+- Source rules:
+  - ND: full transfer (unless Target > 0 set for that site)
+  - RF: can transfer (protect highest sales store)
+- Destination priority:
+  1. Sites with Target > current stock: receive up to Target
+  2. Non-Target RF sites do not receive
+- Grouping: by Article only (allow cross-OM)
+- Extra constraints:
+  - HD source cannot transfer to HA/HB/HC destinations
+- Goal: Target-only allocation, concentrate transfer to designated stores
+
 ---
 
 # Diagram layout suggestion (single image)
@@ -199,3 +211,4 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - E1b same OM + priority type reception
   - E2 cross-OM + ALL column force transfer
   - F Target priority
+  - F2 Target-only reception

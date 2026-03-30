@@ -1,5 +1,35 @@
 # 版本更新記錄
 
+## v2.7.0 (2026-03-30)
+
+### 新增 F2 模式（F指定模式）
+
+#### F2 模式核心規則
+- 僅 `Target > 0` 的 RF 店舖可以接收
+- 非 Target RF 店舖不再走補 0 接收流程
+- 保留 F 模式的跨 OM 配對能力與 HD 限制（HD 不可轉到 HA/HB/HC）
+- 轉出邏輯沿用 F 模式（ND 可全轉出；RF 保護最高銷量店）
+
+#### 程式碼更新
+- [`business_logic.py`](business_logic.py)
+  - 新增 `mode_f_target_only = "F指定模式"`
+  - `identify_sources` / `identify_destinations` / `match_transfers` / `generate_transfer_recommendations` 納入 F2 分支
+  - F2 接收類型新增 `F指定模式目標接收`
+- [`app.py`](app.py)
+  - 側邊欄新增 `F2: F指定模式`
+  - `mode_name_map`、模式說明、欄位要求與前置警示同步更新
+- [`tests/test_all_modes_comprehensive.py`](tests/test_all_modes_comprehensive.py)
+  - 新增 F2 僅 Target 接收測試
+- [`tests/test_modes_simple.py`](tests/test_modes_simple.py)、[`tests/test_all_modes_no_dual_role.py`](tests/test_all_modes_no_dual_role.py)
+  - 將 F2 納入模式清單
+
+#### 文件同步
+- [`README.md`](README.md)
+- [`調貨模式詳解.txt`](調貨模式詳解.txt)
+- [`transfer_logic_ai_brief.md`](transfer_logic_ai_brief.md)
+
+---
+
 ## v2.6.0 (2026-03-20)
 
 ### 新增 ND1/ND2 模式（ND 智能調貨）

@@ -9,7 +9,8 @@
   4. D模式避免1件餘貨
   5. E模式ALL標記與Phase 3回退
   6. B2系列Type=L全轉出、Mix高銷量保護、接收優先級
-  7. F模式Target優先
+    7. F模式Target優先
+    8. F2模式僅Target接收
   8. 質量檢查全通過
 """
 
@@ -926,6 +927,21 @@ class TestModeF:
         tgt_recs = [r for r in recs if r['Receive Site'] == 'TGT']
         assert len(tgt_recs) > 0, "F模式Target店應接收"
 
+    def test_target_fullwidth_digits_supported(self):
+        """F模式：Target 支援全形數字輸入（例如：１０）"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='ND01', **{'RP Type': 'ND', 'SaSa Net Stock': 20,
+                       'Effective Sold Qty': 0, 'Safety Stock': 0,
+                       'Last Month Sold Qty': 0, 'MTD Sold Qty': 0, 'Target': 0}),
+            _make_row(Site='TGT', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 5, 'Last Month Sold Qty': 3, 'MTD Sold Qty': 2,
+                       'Target': '１０'}),
+        ])
+        recs = logic.generate_transfer_recommendations(df, logic.mode_f)
+        tgt_recs = [r for r in recs if r['Receive Site'] == 'TGT']
+        assert len(tgt_recs) > 0, "F模式應能解析全形Target並調貨至目標店"
+
     def test_cross_om_with_target(self):
         """F模式允許跨OM"""
         logic = TransferLogic()
@@ -986,6 +1002,28 @@ class TestModeF:
         recs = logic.generate_transfer_recommendations(df, logic.mode_f)
         run_common_assertions(recs, df, logic, "F模式")
 
+    def test_f2_target_only_receiving(self):
+        """F2模式：僅Target店舖可接收，非Target RF店舖不應接收"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='ND01', OM='OM1', **{'RP Type': 'ND', 'SaSa Net Stock': 20,
+                       'Effective Sold Qty': 0, 'Safety Stock': 0,
+                       'Last Month Sold Qty': 0, 'MTD Sold Qty': 0, 'Target': 0}),
+            _make_row(Site='TGT', OM='OM2', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 5, 'Last Month Sold Qty': 3, 'MTD Sold Qty': 2,
+                       'Target': 10}),
+            _make_row(Site='ZERO', OM='OM2', **{'SaSa Net Stock': 0, 'Safety Stock': 6,
+                       'Effective Sold Qty': 4, 'Last Month Sold Qty': 2, 'MTD Sold Qty': 2,
+                       'Target': 0}),
+        ])
+        recs = logic.generate_transfer_recommendations(df, logic.mode_f_target_only)
+        assert len(recs) > 0, "F2模式應產生建議"
+
+        receive_sites = {r['Receive Site'] for r in recs}
+        assert 'TGT' in receive_sites, "F2模式Target店應接收"
+        assert 'ZERO' not in receive_sites, "F2模式非Target店不應接收"
+        run_common_assertions(recs, df, logic, "F2模式")
+
 
 # ===========================================================================
 # 跨模式通用規則整合測試
@@ -999,7 +1037,7 @@ ALL_SAME_OM_MODES = [
 
 ALL_CROSS_OM_MODES = [
     "附加B3(跨OM特別模式)", "附加B3a(跨OM特別模式-T遊客鋪不出貨)",
-    "附加C2(跨OM重點補0)", "目標優化",
+    "附加C2(跨OM重點補0)", "目標優化", "F指定模式",
 ]
 
 
@@ -1115,7 +1153,7 @@ ALL_MODES_WITH_ALL = [
     "重點補0", "附加C2(跨OM重點補0)",
     "清貨轉貨",
     "強制轉出", "強制轉出(優先類型接收)", "強制轉出(跨OM)",
-    "目標優化",
+    "目標優化", "F指定模式",
 ]
 
 
