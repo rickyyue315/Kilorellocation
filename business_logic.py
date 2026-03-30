@@ -19,6 +19,7 @@ import pandas as pd
 import numpy as np
 from typing import Any, Dict, List, Tuple, Optional
 import logging
+import unicodedata
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
@@ -67,6 +68,26 @@ class TransferLogic:
 
     def _get_b_special_sales_total(self, data: Dict) -> int:
         return int(data.get('last_month_sold_qty', 0) or 0) + int(data.get('mtd_sold_qty', 0) or 0)
+
+    def _parse_target_series(self, df: pd.DataFrame) -> pd.Series:
+        """將 Target 欄位安全轉為數值，支援全形數字與千分位逗號。"""
+        if 'Target' not in df.columns:
+            return pd.Series(np.nan, index=df.index)
+
+        def _normalize_target(value: Any) -> Any:
+            if pd.isna(value):
+                return np.nan
+            text = str(value).strip()
+            if text == "":
+                return np.nan
+            text = unicodedata.normalize('NFKC', text).replace(',', '')
+            return text
+
+        normalized = df['Target'].map(_normalize_target)
+        parsed = pd.to_numeric(normalized, errors='coerce')
+        if isinstance(parsed, pd.Series):
+            return parsed
+        return pd.Series(parsed, index=df.index)
     
     def identify_sources(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
         """
@@ -124,10 +145,7 @@ class TransferLogic:
 
         # F模式特殊處理：Target優先接收，轉出可全數釋放
         if mode == self.mode_f:
-            if 'Target' in group_df.columns:
-                target_series = pd.to_numeric(group_df['Target'], errors='coerce')
-            else:
-                target_series = pd.Series(np.nan, index=group_df.index)
+            target_series = self._parse_target_series(group_df)
 
             # ND類型：全數轉出
             nd_sources = group_df[group_df['RP Type'] == 'ND']
@@ -521,10 +539,7 @@ class TransferLogic:
 
         # F模式特殊處理：Target數字優先接收，其餘店鋪按C模式補0
         if mode == self.mode_f:
-            if 'Target' in rf_destinations.columns:
-                target_series = pd.to_numeric(rf_destinations['Target'], errors='coerce')
-            else:
-                target_series = pd.Series(np.nan, index=rf_destinations.index)
+            target_series = self._parse_target_series(rf_destinations)
 
             for idx, row in rf_destinations.iterrows():
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
