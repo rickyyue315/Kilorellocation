@@ -10,6 +10,7 @@ from datetime import datetime
 import logging
 import os
 import base64
+import unicodedata
 
 try:
     from streamlit.delta_generator import DeltaGenerator
@@ -131,6 +132,35 @@ def _patch_streamlit_text_rendering():
             continue
         wrapped = make_wrapper(method_name, original, rule['arg_indexes'], rule['kw_keys'])
         setattr(DeltaGenerator, method_name, wrapped)
+
+
+def _parse_target_for_ui(value):
+    """將 Target 欄位轉為可比較數值，支援全形數字與千分位逗號。"""
+    if pd.isna(value):
+        return float('nan')
+
+    text = str(value).strip()
+    if text == "":
+        return float('nan')
+
+    text = unicodedata.normalize('NFKC', text).replace(',', '')
+    return pd.to_numeric(text, errors='coerce')
+
+
+def _find_f_mode_nd_target_conflicts(df: pd.DataFrame) -> pd.DataFrame:
+    """找出 F 模式下 ND 且 Target>0 的店舖資料。"""
+    if 'RP Type' not in df.columns or 'Target' not in df.columns:
+        return pd.DataFrame()
+
+    target_numeric = df['Target'].map(_parse_target_for_ui)
+    nd_mask = df['RP Type'].astype(str).str.strip().str.upper() == 'ND'
+    target_mask = pd.Series(target_numeric, index=df.index).fillna(0) > 0
+    conflicts = df[nd_mask & target_mask].copy()
+    if conflicts.empty:
+        return conflicts
+
+    conflicts['Target Numeric'] = target_numeric[conflicts.index]
+    return conflicts
 
 
 # 僅在明確需要修復亂碼時啟用（本機 Windows 環境可設 KILO_FIX_MOJIBAKE=1）
@@ -688,6 +718,30 @@ if uploaded_file is not None:
                 f"⚠️ 資料品質提示：發現 {invalid_rp_count} 行 RP Type 欄位值不是 ND 或 RF "
                 f"（{', '.join(str(v) for v in invalid_rp_vals)}），已自動修正為 RF。請確認原始數據是否正確。"
             )
+
+        # F 模式前置警示：ND + Target>0 不會接收
+        if mode_code == "F":
+            f_mode_conflicts = _find_f_mode_nd_target_conflicts(df)
+            if not f_mode_conflicts.empty:
+                affected_sites = sorted(
+                    set(f_mode_conflicts['Site'].astype(str).str.strip().str.upper())
+                )
+                site_text = "、".join(affected_sites[:8])
+                if len(affected_sites) > 8:
+                    site_text += f" 等{len(affected_sites)}間店"
+
+                st.warning(
+                    f"⚠️ F模式提示：偵測到 {len(f_mode_conflicts)} 行資料為 ND 且 Target>0。"
+                    f"此店因 ND 規則不會接收。"
+                    f"受影響店舖：{site_text}"
+                )
+
+                preview_cols = [c for c in ['Article', 'OM', 'Site', 'RP Type', 'Target', 'SaSa Net Stock', 'Pending Received'] if c in f_mode_conflicts.columns]
+                with st.expander("檢視 ND + Target>0 明細", expanded=False):
+                    st.dataframe(
+                        f_mode_conflicts[preview_cols].head(50),
+                        use_container_width=True
+                    )
         
         # 4.2. 資料查覽模塊
         st.markdown("### 📊 資料查覽")
