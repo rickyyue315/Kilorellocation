@@ -45,7 +45,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 ## Source types (labels used in output)
 - ND Transfer
-- ND Clearance Transfer (Mode D only)
+- ND Clearance Transfer (Mode D/D2)
 - RF Surplus Transfer
 - RF Enhanced Transfer
 - B2/B3 extra: Local Store Full Transfer (Type L with low sales)
@@ -54,7 +54,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 ---
 
-# Mode Overview (16 Modes: A, B, B2, B2a, B3, B3a, C, C2, D, E1, E1b, E2, F, F2, ND1, ND2)
+# Mode Overview (17 Modes: A, B, B2, B2a, B3, B3a, C, C2, D, D2, E1, E1b, E2, F, F2, ND1, ND2)
 
 ## Mode A: Conservative
 - Source rules: RF only, Surplus Transfer
@@ -128,6 +128,17 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Destination rules: same as Mode A
 - Goal: clear ND dead stock without leaving 1 piece
 
+## Mode D2: Clearance (ND Only)
+- Source rules:
+  - **Only ND** with Last Month Sold Qty = 0 and MTD Sold Qty = 0: full transfer
+  - Source label: ND Clearance Transfer
+  - **RF stores do NOT transfer out at all** (RF is receive-only)
+  - ND with sales records (Last Month > 0 or MTD > 0): also skipped
+- Special rule: same avoid 1-piece remainder as Mode D
+- Destination rules: same as Mode D (Emergency + Potential Replenishment)
+- Grouping: same OM only (Article + OM)
+- Goal: clear ND dead stock, RF stores only receive, never transfer out
+
 ## Mode E1: Force Transfer (Same OM Only)
 - Only items marked ALL in input file are processed (case-insensitive)
 - Force transfer all available stock for marked items
@@ -188,7 +199,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 1. Start block: Input Excel -> Data validation -> Compute derived fields
 2. Common Rules block (ND only source, protect highest RF, no dual role)
-3. Split into modes A, B, B2, B3, C, C2, D, E1, E1b, E2, F (parallel columns)
+3. Split into modes A, B, B2, B3, C, C2, D, D2, E1, E1b, E2, F (parallel columns)
 4. For each mode, show:
    - Source criteria
    - Transfer caps
@@ -206,7 +217,8 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - B2/B2a/B3/B3a Type=L exception
   - B2a/B3a Type=T no-source restriction
   - C2 cross-OM + HD/Windy
-  - D avoid 1 remainder
+  - D/D2 avoid 1 remainder
+  - D2 ND-only source (RF receive-only)
   - E1 same OM only + ALL column force transfer
   - E1b same OM + priority type reception
   - E2 cross-OM + ALL column force transfer

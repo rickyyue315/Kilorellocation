@@ -1,7 +1,7 @@
 """
-業務邏輯模組 v2.7.0
+業務邏輯模組 v2.8.0
 實現調貨規則、源/目的地識別和匹配算法
-支持十六模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
+支持十七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
 基於累計接收數量判斷是否達到最低保障標準的機制
 強化ND店鋪限制：所有模式下ND店鋪只能轉出，不能接收（ND1/ND2模式除外）
@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.7.0"""
+    """調貨業務邏輯類 v2.8.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None):
         self.transfer_recommendations = []
@@ -46,6 +46,7 @@ class TransferLogic:
         self.mode_c = "重點補0"  # C模式
         self.mode_c2 = "附加C2(跨OM重點補0)"  # C2模式
         self.mode_d = "清貨轉貨"  # D模式
+        self.mode_d2 = "清貨轉貨(ND限定)"  # D2模式：僅ND清貨轉出，RF不做轉出
         self.mode_e1 = "強制轉出"  # E1模式（僅同OM）
         self.mode_e1b = "強制轉出(優先類型接收)"  # E1b模式（僅同OM，接收優先Type=T/M）
         self.mode_e2 = "強制轉出(跨OM)"  # E2模式（跨OM）
@@ -62,6 +63,10 @@ class TransferLogic:
 
     def _is_b_tourist_no_source_mode(self, mode: str) -> bool:
         return mode in (self.mode_b_special_a, self.mode_b3a)
+
+    def _is_d_family_mode(self, mode: str) -> bool:
+        """D/D2 模式家族判斷"""
+        return mode in (self.mode_d, self.mode_d2)
 
     def _is_nd_transfer_mode(self, mode: str) -> bool:
         """ND1/ND2 模式：ND 店舖可互相調貨（打破全局 ND 不可接收規則）"""
@@ -255,9 +260,12 @@ class TransferLogic:
                 last_month_sold = int(row['Last Month Sold Qty'])
                 mtd_sold = int(row['MTD Sold Qty'])
                 
-                if mode == self.mode_d and last_month_sold == 0 and mtd_sold == 0:
-                    # D模式：清貨轉貨，針對無銷售記錄的ND店鋪
+                if self._is_d_family_mode(mode) and last_month_sold == 0 and mtd_sold == 0:
+                    # D/D2模式：清貨轉貨，針對無銷售記錄的ND店鋪
                     source_type = 'ND清貨轉出'
+                elif mode == self.mode_d2:
+                    # D2模式：僅清貨轉出(無銷售記錄)，有銷售的ND不轉出
+                    continue
                 else:
                     # 其他模式：正常ND轉出
                     source_type = 'ND轉出'
@@ -309,6 +317,11 @@ class TransferLogic:
                         'last_month_sold_qty': last_month_sold,
                         'mtd_sold_qty': mtd_sold
                     })
+
+        # D2模式：RF完全不做轉出，僅ND清貨轉出
+        if mode == self.mode_d2:
+            sources.sort(key=lambda x: x['priority'])
+            return sources
 
         # 優先級2：RF類型轉出
         rf_sources = group_df[group_df['RP Type'] == 'RF']
@@ -760,8 +773,8 @@ class TransferLogic:
             destinations.sort(key=b2_sort_key)
             return destinations
         
-        # D模式特殊處理：放寬接收條件，不要求最高銷量限制
-        if mode == self.mode_d:
+        # D/D2模式特殊處理：放寬接收條件，不要求最高銷量限制
+        if self._is_d_family_mode(mode):
             for _, row in rf_destinations.iterrows():
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
                 
@@ -2093,8 +2106,8 @@ class TransferLogic:
                 
                 # --- 數量調整邏輯 (D模式放寬限制以避免1件餘貨) ---
                 
-                # 1. D模式特殊處理：避免ND轉出後剩餘1件 (涵蓋ND清貨轉出和一般ND轉出)
-                if mode == self.mode_d and source['rp_type'] == 'ND':
+                # 1. D/D2模式特殊處理：避免ND轉出後剩餘1件 (涵蓋ND清貨轉出和一般ND轉出)
+                if self._is_d_family_mode(mode) and source['rp_type'] == 'ND':
                     already_out = source.get('total_transferred', 0)
                     remaining_after_transfer = source['original_stock'] - already_out - transfer_qty
                     if remaining_after_transfer == 1:
@@ -2113,8 +2126,8 @@ class TransferLogic:
                         already_out_opt = source.get('total_transferred', 0)
                         remaining_after_opt = source['original_stock'] - already_out_opt - potential_qty
                         
-                        # 在模式D下，ND店鋪要特別避免優化後留下1件餘貨
-                        if mode == self.mode_d and source['rp_type'] == 'ND' and remaining_after_opt == 1:
+                        # 在模式D/D2下，ND店鋪要特別避免優化後留下1件餘貨
+                        if self._is_d_family_mode(mode) and source['rp_type'] == 'ND' and remaining_after_opt == 1:
                             if source['transferable_qty'] >= 3:
                                 transfer_qty = 3
                             else:
@@ -2362,7 +2375,7 @@ class TransferLogic:
         logger.info(f"開始生成調貨建議 - {mode}")
         
         # 驗證模式
-        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b_special_a, self.mode_b3, self.mode_b3a, self.mode_c, self.mode_c2, self.mode_d, self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_nd1, self.mode_nd2]:
+        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b_special_a, self.mode_b3, self.mode_b3a, self.mode_c, self.mode_c2, self.mode_d, self.mode_d2, self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_nd1, self.mode_nd2]:
             raise ValueError(f"無效的轉貨模式: {mode}")
         
         # 根據模式選擇分組方式
@@ -2734,13 +2747,14 @@ class TransferLogic:
                 notes_parts.append(f"【轉出分析: ND智能轉出，0銷量店舖優先轉出，轉出後剩餘{remaining_after}件】")
             else:
                 notes_parts.append(f"【轉出分析: ND智能轉出，兩月銷量{total_sales}件(按銷量升序排序)，轉出後剩餘{remaining_after}件】")
-        elif source['source_type'] == 'ND轉出' and mode != self.mode_d:
+        elif source['source_type'] == 'ND轉出' and not self._is_d_family_mode(mode):
             notes_parts.append("【轉出分析: ND類型店鋪，無庫存限制，可全數轉出】")
         elif source['source_type'] == 'F模式ND轉出':
             notes_parts.append("【轉出分析: F模式ND類型店鋪，無庫存限制，全數轉出】")
-        elif source['rp_type'] == 'ND' and mode == self.mode_d:
+        elif source['rp_type'] == 'ND' and self._is_d_family_mode(mode):
+            mode_label = 'D2' if mode == self.mode_d2 else 'D'
             remaining_after_transfer = source['original_stock'] - transfer_qty
-            notes_parts.append(f"【轉出分析: ND店鋪清貨(模式D)，轉出後剩餘庫存({remaining_after_transfer})件，已優化避免1件餘貨】")
+            notes_parts.append(f"【轉出分析: ND店鋪清貨(模式{mode_label})，轉出後剩餘庫存({remaining_after_transfer})件，已優化避免1件餘貨】")
         elif source['source_type'] == 'F模式RF轉出':
             remaining_after_transfer = source['original_stock'] - transfer_qty
             notes_parts.append(f"【轉出分析: F模式RF轉出，可忽視最小庫存要求，轉出後剩餘庫存({remaining_after_transfer})件】")

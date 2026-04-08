@@ -1,5 +1,45 @@
 # 版本更新記錄
 
+## v2.8.0 (2026-04-08)
+
+### 新增 D2 模式（清貨轉貨ND限定）
+
+#### D2 模式核心規則
+- 按照 D 模式邏輯，但**僅 ND Shop 轉出，RF Shop 只做接收不做轉出**
+- 僅針對無銷售記錄（Last Month Sold Qty = 0 且 MTD Sold Qty = 0）的 ND 店舖清貨轉出
+- 有銷售記錄的 ND 店舖在 D2 模式下也不轉出（與 D 模式不同）
+- RF 店舖完全不進入轉出候選，只作為接收方
+- 仍限制同一 OM 內配對
+- 繼承 D 模式的避免 1 件餘貨邏輯
+
+#### 與 D 模式的差異
+| 項目 | D 模式 | D2 模式 |
+|------|--------|---------|
+| ND 清貨轉出（無銷售） | ✅ | ✅ |
+| ND 轉出（有銷售） | ✅ | ❌ |
+| RF 過剩轉出 | ✅ (A模式規則) | ❌ |
+| RF 接收 | ✅ | ✅ |
+
+#### 程式碼更新
+- [`business_logic.py`](business_logic.py)
+  - 新增 `mode_d2 = "清貨轉貨(ND限定)"`
+  - 新增 `_is_d_family_mode()` 共用 D/D2 邏輯判斷
+  - `identify_sources`：D2 模式跳過所有 RF 轉出源，ND 僅清貨轉出
+  - `identify_destinations`：D/D2 共用放寬接收條件
+  - `_match_by_priority`：D/D2 共用避免 1 件餘貨邏輯
+  - `_create_recommendation_note`：D2 使用 D2 標籤
+  - `generate_transfer_recommendations`：新增 mode_d2 到驗證白名單
+- [`app.py`](app.py)
+  - 側邊欄新增 `D2: 清貨轉貨(ND限定)`
+  - `mode_name_map`、模式說明同步更新
+- 測試：D2 已納入 `test_all_modes_comprehensive.py`、`test_modes_simple.py`、`test_all_modes_no_dual_role.py` 模式清單
+
+#### 文件同步
+- [`調貨模式詳解.txt`](調貨模式詳解.txt)
+- [`transfer_logic_ai_brief.md`](transfer_logic_ai_brief.md)
+
+---
+
 ## v2.7.0 (2026-03-30)
 
 ### 新增 F2 模式（F指定模式）
