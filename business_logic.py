@@ -1107,6 +1107,7 @@ class TransferLogic:
 
         接收上限追蹤：max_receive_qty 確保 ND 接收量不超過 2×兩月銷量
         轉出/接收雙方不可同時為同一 Article 的另一方
+        若有設定店數限制，則同一 SKU 下每個 source 最多只可配對指定數量的接收店舖
         """
         recommendations = []
 
@@ -1120,6 +1121,10 @@ class TransferLogic:
 
         # 累計接收數量追蹤
         received_qty_by_site = {}
+
+        # 追蹤同一 SKU 下每個 source 已配對的 receive 店鋪數
+        source_to_receive_sites = {}
+        max_receive_sites_per_source = self.b_special_max_receive_sites_per_source
 
         # destinations 已按 (priority, -total_sales) 排好序
         # 依序處理：先滿足 RF 緊急缺貨(priority=1)，再滿足 ND 潛在缺貨(priority=2)
@@ -1151,6 +1156,12 @@ class TransferLogic:
                 if is_source_hd:
                     dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
                     if dest_site_upper.startswith(('HA', 'HB', 'HC')):
+                        continue
+
+                # 同一 SKU 下每個 source 最多配對 N 個接收店鋪（可配置）
+                if max_receive_sites_per_source is not None:
+                    matched_sites = source_to_receive_sites.get(source['site'], set())
+                    if dest['site'] not in matched_sites and len(matched_sites) >= max_receive_sites_per_source:
                         continue
 
                 # 計算轉移量（考慮接收上限）
@@ -1204,6 +1215,9 @@ class TransferLogic:
                 source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
                 source['transferable_qty'] -= transfer_qty
                 dest['needed_qty'] -= transfer_qty
+
+                matched_sites = source_to_receive_sites.setdefault(source['site'], set())
+                matched_sites.add(dest['site'])
 
                 # ND 接收達上限時設 needed_qty=0
                 if received_qty_by_site[receive_key] >= max_receive:

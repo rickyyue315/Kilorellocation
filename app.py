@@ -400,9 +400,9 @@ with st.sidebar:
            - 確保包含所有必需欄位
         
         2. **選擇轉貨模式**
-           - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B3/B3a/C/C2/D/E1/E1b/E2/F/F2)
+              - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B3/B3a/C/C2/D/D2/E1/E1b/E2/F/F2/ND1/ND2)
            - 查看模式說明了解各模式特點
-              - 若選擇 B2/B2a/B3/B3a/E1/E1b/E2，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
+                  - 若選擇 B2/B2a/B3/B3a/E1/E1b/E2/ND1/ND2，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
         
         3. **啟動分析**
            - 點擊「生成調貨建議」按鈕開始處理
@@ -435,9 +435,11 @@ with st.sidebar:
     transfer_mode = _fix_mojibake_text(transfer_mode)
     mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
 
+    receive_site_limit_mode_codes = ["B2", "B2a", "B3", "B3a", "E1", "E1b", "E2", "ND1", "ND2"]
+
     b_special_receive_site_limit_option = "最多 2 間"
     b_special_max_receive_sites_per_source = None
-    if mode_code in ["B2", "B2a", "B3", "B3a", "E1", "E1b", "E2"]:
+    if mode_code in receive_site_limit_mode_codes:
         b_special_receive_site_limit_option = st.radio(
             "出貨店舖配對接收店數限制",
             ["優先 1 間", "最多 2 間", "不限制"],
@@ -579,11 +581,13 @@ with st.sidebar:
         - 接收優先級2：ND潛在缺貨(按兩月銷量降序，高銷量優先接收)
         - 接收上限：2×(Last Month Sold Qty + MTD Sold Qty)
         - 兩月銷量=0的ND店舖不可接收
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
 
         **ND2模式(ND混合OM轉貨)**
         - 同ND1模式規則，但允許**跨OM**配對
         - Windy(澳門)轉出只能到Windy店舖
         - HD不能轉到HA/HB/HC
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         
         ---
         
@@ -606,6 +610,7 @@ with st.sidebar:
         - E1b模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM，優先Type=T/M)
         - E2模式：所有RF店舖可接收,上限為Safety Stock的2倍(可跨OM)
         - B2/B2a/B3/B3a模式：接收上限為Safety Stock的2倍,並累計追蹤接收量
+        - ND1/ND2模式：可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         - 接收優先級(B2/B2a/B3/B3a):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
         """)
     
@@ -622,7 +627,7 @@ st.markdown("---")
 st.markdown("### 📂 資料上傳")
 
 # 根據模式顯示詳細欄位說明
-if mode_code in ["A", "B", "C", "C2", "D"]:
+if mode_code in ["A", "B", "C", "C2", "D", "D2"]:
     with st.expander("📋 必需欄位說明", expanded=False):
         st.markdown("""
         **基本欄位:**
@@ -669,6 +674,23 @@ elif mode_code in ["E1", "E1b", "E2"]:
         - E1/E1b/E2 模式只會處理標記的商品
         - E1/E1b 模式僅同OM配對,E2 模式可跨OM配對
         - E1b 接收優先級參照B2:Type=T(遊客區)優先,其次Type=M(混合型)
+        """)
+elif mode_code in ["ND1", "ND2"]:
+    with st.expander("📋 必需欄位說明", expanded=False):
+        st.markdown("""
+        **基本欄位:**
+        - Article, Article Description, OM, RP Type, Site
+
+        **庫存欄位:**
+        - SaSa Net Stock, Pending Received, Safety Stock, MOQ
+
+        **銷量欄位:**
+        - Last Month Sold Qty, MTD Sold Qty
+
+        **⚠️ 特殊要求:**
+        - ND1 模式僅同OM配對；ND2 模式允許跨OM配對
+        - ND 店舖在 ND1/ND2 模式可作為接收方，但兩月銷量=0 的 ND 店舖不可接收
+        - 同一SKU下可設定單一出貨店舖最多配對接收店舖數：優先1間 / 最多2間 / 不限
         """)
 else:  # F / F2
     with st.expander("📋 必需欄位說明", expanded=False):
