@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ExcelGenerator:
-    """Excel輸出類 v2.7.0"""
+    """Excel輸出類 v2.8.0"""
     
     def __init__(self):
         self.output_filename = ""

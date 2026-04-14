@@ -170,7 +170,7 @@ if os.getenv("KILO_FIX_MOJIBAKE", "0") == "1":
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.7.0"),
+    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.8.0"),
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -350,7 +350,7 @@ with st.sidebar:
     st.markdown("### 📦 系統資訊")
     st.markdown("""
     <div class="info-card">
-    <b>版本</b>: v2.7.0<br>
+    <b>版本</b>: v2.8.0<br>
     <b>開發者</b>: Ricky
     </div>
     """, unsafe_allow_html=True)
@@ -619,7 +619,7 @@ with st.sidebar:
 
 # 3. 頁面頭部
 st.title("📦 庫存調貨建議系統")
-st.caption("v2.7.0 | Intelligent Inventory Reallocation System")
+st.caption("v2.8.0 | Intelligent Inventory Reallocation System")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -1060,7 +1060,7 @@ if uploaded_file is not None:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #6C757D; padding: 30px 0;">
-    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.7.0</p>
+    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.8.0</p>
     <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
 </div>
 """, unsafe_allow_html=True)
