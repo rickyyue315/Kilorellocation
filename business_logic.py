@@ -2035,6 +2035,17 @@ class TransferLogic:
         # 如果指定了轉出類型過濾器，則按類型篩選
         if source_type_filter:
             filtered_sources = [s for s in filtered_sources if s['source_type'] == source_type_filter]
+
+        # C1模式盡量避免太多1件出貨：
+        # 同優先級下，優先使用可出多件的來源，再處理只能出1件的來源。
+        if mode == self.mode_c1:
+            filtered_sources.sort(
+                key=lambda s: (
+                    int(int(s.get('transferable_qty', 0) or 0) == 1),
+                    -int(s.get('transferable_qty', 0) or 0),
+                    int(s.get('effective_sold_qty', 0) or 0),
+                )
+            )
         
         filtered_destinations = [d for d in destinations if d['priority'] == dest_priority and d['needed_qty'] > 0]
         
@@ -2121,6 +2132,11 @@ class TransferLogic:
                 else:
                     # A、B和D模式，使用原始邏輯
                     transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
+
+                # C1模式盡量避免同一接收店由多個來源追加1件，
+                # 寧可少補1件，也不要把已開始接收的店再拆成新的1件出貨線。
+                if mode == self.mode_c1 and transfer_qty == 1 and current_received_qty > 0:
+                    continue
                 
                 # --- 數量調整邏輯 (D模式放寬限制以避免1件餘貨) ---
                 

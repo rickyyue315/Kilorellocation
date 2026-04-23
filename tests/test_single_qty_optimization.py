@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from business_logic import TransferLogic
+import pandas as pd
 
 
 def _base_rec(transfer_site: str, receive_site: str, qty: int, recv_last: int, recv_mtd: int) -> Dict[str, Any]:
@@ -62,3 +63,59 @@ def test_optimize_single_qty_merge_to_higher_sales_destination():
     assert len(optimized) == 1
     assert optimized[0]['Receive Site'] == 'HC49'
     assert optimized[0]['Transfer Qty'] == 3
+
+
+def test_c1_match_prefers_larger_source_before_one_piece_source():
+    logic = TransferLogic()
+
+    df = pd.DataFrame([
+        {
+            'Article': '100000000001',
+            'Article Description': 'Test Product',
+            'OM': 'OM1',
+            'RP Type': 'RF',
+            'Site': 'SRC_ONE',
+            'SaSa Net Stock': 6,
+            'Pending Received': 0,
+            'Safety Stock': 5,
+            'Last Month Sold Qty': 1,
+            'MTD Sold Qty': 0,
+            'Effective Sold Qty': 1,
+            'MOQ': 1,
+        },
+        {
+            'Article': '100000000001',
+            'Article Description': 'Test Product',
+            'OM': 'OM1',
+            'RP Type': 'RF',
+            'Site': 'SRC_BIG',
+            'SaSa Net Stock': 8,
+            'Pending Received': 0,
+            'Safety Stock': 5,
+            'Last Month Sold Qty': 2,
+            'MTD Sold Qty': 0,
+            'Effective Sold Qty': 2,
+            'MOQ': 1,
+        },
+        {
+            'Article': '100000000001',
+            'Article Description': 'Test Product',
+            'OM': 'OM1',
+            'RP Type': 'RF',
+            'Site': 'DST_MAIN',
+            'SaSa Net Stock': 0,
+            'Pending Received': 0,
+            'Safety Stock': 3,
+            'Last Month Sold Qty': 10,
+            'MTD Sold Qty': 0,
+            'Effective Sold Qty': 10,
+            'MOQ': 1,
+        },
+    ])
+
+    recs = logic.generate_transfer_recommendations(df, logic.mode_c1)
+
+    assert len(recs) == 1
+    assert recs[0]['Transfer Site'] == 'SRC_BIG'
+    assert recs[0]['Receive Site'] == 'DST_MAIN'
+    assert recs[0]['Transfer Qty'] == 2

@@ -34,6 +34,53 @@ def make_df(rows):
     return df
 
 
+def make_nd_limit_df(cross_om: bool = False):
+    """建立測試 ND 接收店數限制用 DataFrame"""
+    rows = [
+        {
+            'Article': '000000009999',
+            'OM': 'Ivy',
+            'Site': 'ND_SRC',
+            'RP Type': 'ND',
+            'SaSa Net Stock': 20,
+            'Last Month Sold Qty': 0,
+            'MTD Sold Qty': 0,
+        }
+    ]
+
+    destination_oms = ['Ivy', 'Ivy', 'Ivy', 'Ivy'] if not cross_om else ['Ivy', 'Hippo', 'Violet', 'Eva']
+    destination_sites = ['RF01', 'RF02', 'RF03', 'RF04']
+
+    for site, om in zip(destination_sites, destination_oms):
+        rows.append({
+            'Article': '000000009999',
+            'OM': om,
+            'Site': site,
+            'RP Type': 'RF',
+            'SaSa Net Stock': 0,
+            'Pending Received': 0,
+            'Safety Stock': 3,
+            'Last Month Sold Qty': 2,
+            'MTD Sold Qty': 1,
+            'MOQ': 1,
+        })
+
+    return make_df(rows)
+
+
+def assert_source_receive_site_limit(recommendations, max_sites):
+    source_to_receive_sites = {}
+
+    for rec in recommendations:
+        source = rec['Transfer Site']
+        source_to_receive_sites.setdefault(source, set()).add(rec['Receive Site'])
+
+    for source, receive_sites in source_to_receive_sites.items():
+        assert len(receive_sites) <= max_sites, (
+            f"Source {source} matched to {len(receive_sites)} receive sites, exceeds limit {max_sites}."
+        )
+
+
 # =============================================
 # ND1 模式測試
 # =============================================
@@ -175,6 +222,31 @@ class TestND1Mode:
             passed = logic.perform_quality_checks(df, logic.mode_nd1)
             assert passed, f"ND1 模式質量檢查應通過: {logic.quality_errors}"
 
+    def test_nd1_source_receive_site_limit_max_one(self):
+        """ND1 模式可限制單一 source 最多只配對 1 間接收店"""
+        logic = TransferLogic(b_special_max_receive_sites_per_source=1)
+        df = make_nd_limit_df(cross_om=False)
+
+        recs = logic.generate_transfer_recommendations(df, logic.mode_nd1)
+
+        assert_source_receive_site_limit(recs, max_sites=1)
+
+    def test_nd1_source_receive_site_limit_unlimited_can_exceed_two(self):
+        """ND1 模式未限制時，單一 source 可配對超過 2 間接收店"""
+        logic = TransferLogic(b_special_max_receive_sites_per_source=None)
+        df = make_nd_limit_df(cross_om=False)
+
+        recs = logic.generate_transfer_recommendations(df, logic.mode_nd1)
+
+        source_to_receive_sites = {}
+        for rec in recs:
+            source = rec['Transfer Site']
+            source_to_receive_sites.setdefault(source, set()).add(rec['Receive Site'])
+
+        assert any(len(receive_sites) > 2 for receive_sites in source_to_receive_sites.values()), (
+            "Unlimited mode should allow a source site to match more than 2 receive sites in ND1 mode."
+        )
+
 
 # =============================================
 # ND2 模式測試
@@ -231,6 +303,15 @@ class TestND2Mode:
         # A 模式下 ND 不可接收（ND01/ND02 均無 RF 緊急缺貨目標）
         for r in recs_a:
             assert r['Receive Site'] not in ('ND01', 'ND02'), "A 模式下 ND 不可接收"
+
+    def test_nd2_source_receive_site_limit_max_two(self):
+        """ND2 模式可限制單一 source 最多只配對 2 間接收店"""
+        logic = TransferLogic(b_special_max_receive_sites_per_source=2)
+        df = make_nd_limit_df(cross_om=True)
+
+        recs = logic.generate_transfer_recommendations(df, logic.mode_nd2)
+
+        assert_source_receive_site_limit(recs, max_sites=2)
 
 
 # =============================================

@@ -557,6 +557,50 @@ class TestModeC:
 
 
 # ===========================================================================
+# 模式 C1：重點補0-只補0/1
+# ===========================================================================
+
+class TestModeC1:
+
+    def test_only_targets_zero_or_one_stock(self):
+        """C1模式只允許 total_available <= 1 的店舖接收"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='RF_SRC', **{'SaSa Net Stock': 15, 'Safety Stock': 5,
+                       'Effective Sold Qty': 1}),
+            _make_row(Site='RF_ZERO', **{'SaSa Net Stock': 0, 'Pending Received': 1,
+                       'Safety Stock': 6, 'Effective Sold Qty': 5,
+                       'Last Month Sold Qty': 3, 'MTD Sold Qty': 2}),
+            _make_row(Site='RF_TWO', **{'SaSa Net Stock': 2, 'Pending Received': 0,
+                       'Safety Stock': 6, 'Effective Sold Qty': 9,
+                       'Last Month Sold Qty': 5, 'MTD Sold Qty': 4}),
+        ])
+        recs = logic.generate_transfer_recommendations(df, logic.mode_c1)
+        dest_sites = {r['Receive Site'] for r in recs}
+        assert 'RF_ZERO' in dest_sites, "C1模式應補 total_available<=1 的店"
+        assert 'RF_TWO' not in dest_sites, "C1模式不應補 total_available=2 的店"
+
+    def test_not_fallback_to_general_shortage_rules(self):
+        """C1模式不應落入一般緊急缺貨或潛在缺貨接收分支"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='RF_SRC', **{'SaSa Net Stock': 18, 'Safety Stock': 5,
+                       'Effective Sold Qty': 1}),
+            _make_row(Site='RF_NO_STOCK', **{'SaSa Net Stock': 0, 'Pending Received': 0,
+                       'Safety Stock': 6, 'Effective Sold Qty': 6,
+                       'Last Month Sold Qty': 4, 'MTD Sold Qty': 2}),
+            _make_row(Site='RF_LOW_NOT_C1', **{'SaSa Net Stock': 2, 'Pending Received': 0,
+                       'Safety Stock': 6, 'Effective Sold Qty': 10,
+                       'Last Month Sold Qty': 6, 'MTD Sold Qty': 4}),
+        ])
+        recs = logic.generate_transfer_recommendations(df, logic.mode_c1)
+        receive_types = {(r['Receive Site'], r['Destination Type']) for r in recs}
+        assert ('RF_NO_STOCK', '重點補0') in receive_types
+        assert ('RF_LOW_NOT_C1', '緊急缺貨補貨') not in receive_types
+        assert ('RF_LOW_NOT_C1', '潛在缺貨補貨') not in receive_types
+
+
+# ===========================================================================
 # 模式 C2：跨OM重點補0
 # ===========================================================================
 
@@ -1032,7 +1076,7 @@ class TestModeF:
 ALL_SAME_OM_MODES = [
     "保守轉貨", "加強轉貨", "附加B(特別模式)",
     "附加B2a(特別模式-T遊客鋪不出貨)",
-    "重點補0", "清貨轉貨", "清貨轉貨(ND限定)",
+    "重點補0", "重點補0-只補0/1", "清貨轉貨", "清貨轉貨(ND限定)",
 ]
 
 ALL_CROSS_OM_MODES = [
@@ -1150,7 +1194,7 @@ ALL_MODES_WITH_ALL = [
     "保守轉貨", "加強轉貨",
     "附加B(特別模式)", "附加B2a(特別模式-T遊客鋪不出貨)",
     "附加B3(跨OM特別模式)", "附加B3a(跨OM特別模式-T遊客鋪不出貨)",
-    "重點補0", "附加C2(跨OM重點補0)",
+    "重點補0", "重點補0-只補0/1", "附加C2(跨OM重點補0)",
     "清貨轉貨", "清貨轉貨(ND限定)",
     "強制轉出", "強制轉出(優先類型接收)", "強制轉出(跨OM)",
     "目標優化", "F指定模式",
