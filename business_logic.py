@@ -1,7 +1,7 @@
 """
 業務邏輯模組 v2.8.0
 實現調貨規則、源/目的地識別和匹配算法
-支持十七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
+支持十八模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
 基於累計接收數量判斷是否達到最低保障標準的機制
 強化ND店鋪限制：所有模式下ND店鋪只能轉出，不能接收（ND1/ND2模式除外）
@@ -44,6 +44,7 @@ class TransferLogic:
         self.mode_b3 = "附加B3(跨OM特別模式)"  # B3模式
         self.mode_b3a = "附加B3a(跨OM特別模式-T遊客鋪不出貨)"  # B3a模式
         self.mode_c = "重點補0"  # C模式
+        self.mode_c1 = "重點補0-只補0/1"  # C1模式
         self.mode_c2 = "附加C2(跨OM重點補0)"  # C2模式
         self.mode_d = "清貨轉貨"  # D模式
         self.mode_d2 = "清貨轉貨(ND限定)"  # D2模式：僅ND清貨轉出，RF不做轉出
@@ -380,8 +381,8 @@ class TransferLogic:
                 else:
                     continue
 
-            elif mode in (self.mode_c, self.mode_c2):
-                # C模式(重點補0) / C2模式(附加C跨OM重點補0)
+            elif mode in (self.mode_c, self.mode_c1, self.mode_c2):
+                # C模式(重點補0) / C1模式(重點補0-只補0/1) / C2模式(附加C跨OM重點補0)
                 # 中等強度，小量精準支援 0 / 低庫存店，不做大規模抽貨。
                 base_transferable = total_available - safety_stock
                 if base_transferable <= 0:
@@ -835,8 +836,8 @@ class TransferLogic:
         for _, row in rf_destinations.iterrows():
             total_available = row['SaSa Net Stock'] + row['Pending Received']
             
-            # C模式/C2模式特殊處理：針對(SaSa Net Stock+Pending Received)<=1的店鋪
-            if mode in (self.mode_c, self.mode_c2) and total_available <= 1:
+            # C模式/C1模式/C2模式特殊處理：針對(SaSa Net Stock+Pending Received)<=1的店鋪
+            if mode in (self.mode_c, self.mode_c1, self.mode_c2) and total_available <= 1:
                 # 計算需要補充的數量：根據Safety Stock的50%和3件的最高值來確定補充數量
                 target_qty = max(int(row['Safety Stock'] * 0.5), 3)
                 needed_qty = target_qty - total_available
@@ -860,6 +861,9 @@ class TransferLogic:
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
                         'mtd_sold_qty': int(row['MTD Sold Qty'])
                     })
+                continue
+
+            if mode == self.mode_c1:
                 continue
             
             # A和B模式的常規處理
@@ -998,8 +1002,8 @@ class TransferLogic:
                                article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF加強轉出',
                                receive_sites=receive_sites)
         
-        # 7. C模式特殊處理：RF轉出 -> 重點補0
-        if mode == self.mode_c:
+        # 7. C模式/C1模式特殊處理：RF轉出 -> 重點補0
+        if mode in (self.mode_c, self.mode_c1):
             self._match_by_priority(temp_sources, temp_destinations, recommendations, 
                                    article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, None, '重點補0',
                                    receive_sites=receive_sites)
@@ -2381,7 +2385,7 @@ class TransferLogic:
         
         Args:
             df: 預處理後的DataFrame
-            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)、F模式(目標優化)或F2模式(F指定模式)
+            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、C1模式(重點補0-只補0/1)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)、F模式(目標優化)或F2模式(F指定模式)
             
         Returns:
             調貨建議列表
@@ -2389,7 +2393,7 @@ class TransferLogic:
         logger.info(f"開始生成調貨建議 - {mode}")
         
         # 驗證模式
-        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b_special_a, self.mode_b3, self.mode_b3a, self.mode_c, self.mode_c2, self.mode_d, self.mode_d2, self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_nd1, self.mode_nd2]:
+        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b_special_a, self.mode_b3, self.mode_b3a, self.mode_c, self.mode_c1, self.mode_c2, self.mode_d, self.mode_d2, self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_nd1, self.mode_nd2]:
             raise ValueError(f"無效的轉貨模式: {mode}")
         
         # 根據模式選擇分組方式

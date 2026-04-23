@@ -1,4 +1,4 @@
-## 十七種調貨模式詳解
+## 十八種調貨模式詳解
 
 ---
 
@@ -208,6 +208,27 @@ upper_limit = max(1, min(ratio_cap, abs_cap))
 
 **轉出類型：** `RF過剩轉出`、`RF加強轉出`
 **接收類型：** `重點補0`（獨有）、緊急缺貨補貨、潛在缺貨補貨
+
+---
+
+## 模式C1：重點補0-只補0/1 (Priority Zero Stock Replenishment - Only 0/1)
+
+**核心特徵：**
+- 完整沿用 C 模式的轉出強度與同 OM 配對邏輯
+- 僅處理 `(SaSa Net Stock + Pending Received) <= 1` 的店鋪作為接收方
+- 不再納入一般緊急缺貨補貨、潛在缺貨補貨分支
+
+**調貨邏輯：**
+```python
+if total_available <= 1:
+  target_qty = max(int(safety_stock * 0.5), 3)
+  needed_qty = target_qty - total_available
+else:
+  continue  # C1 不處理一般缺貨接收
+```
+
+**轉出類型：** `RF過剩轉出`、`RF加強轉出`
+**接收類型：** `重點補0`
 
 ---
 
