@@ -287,7 +287,8 @@ class TransferLogic:
                     # 添加銷售數據
                     'last_2_month_sold_qty': last_two_month_sold,
                     'last_month_sold_qty': last_month_sold,
-                    'mtd_sold_qty': mtd_sold
+                    'mtd_sold_qty': mtd_sold,
+                    'total_sales_sort': last_month_sold + mtd_sold
                 })
 
         # B2/B2a/B3/B3a模式特殊處理：Type=L 全轉出（即使RF）
@@ -355,8 +356,13 @@ class TransferLogic:
             is_not_highest_sold = effective_sold < max_sold_qty
 
             # 不符合前置條件則略過
-            if not (is_stock_above_safety and is_not_highest_sold):
-                continue
+            # C1微調：允許低於Safety，但必須可在轉後保留至少2件。
+            if mode == self.mode_c1:
+                if not (int(row['SaSa Net Stock']) > 2 and is_not_highest_sold):
+                    continue
+            else:
+                if not (is_stock_above_safety and is_not_highest_sold):
+                    continue
 
             # 根據模式計算可轉出數量（已明確階梯：A < C < B）
             if mode == self.mode_a:
@@ -384,9 +390,16 @@ class TransferLogic:
             elif mode in (self.mode_c, self.mode_c1, self.mode_c2):
                 # C模式(重點補0) / C1模式(重點補0-只補0/1) / C2模式(附加C跨OM重點補0)
                 # 中等強度，小量精準支援 0 / 低庫存店，不做大規模抽貨。
-                base_transferable = total_available - safety_stock
-                if base_transferable <= 0:
-                    continue
+                if mode == self.mode_c1:
+                    # C1微調：允許低於Safety，但轉出後門市庫存至少保留2件
+                    # 並避免RF只出1件，RF至少需可轉2件才納入來源。
+                    base_transferable = int(row['SaSa Net Stock']) - 2
+                    if base_transferable < 2:
+                        continue
+                else:
+                    base_transferable = total_available - safety_stock
+                    if base_transferable <= 0:
+                        continue
 
                 # 上限設計：
                 # - 比例：最多 30% total_available
@@ -397,7 +410,7 @@ class TransferLogic:
                 # 有效上限不能為負
                 capped_ratio = max(ratio_cap, 0)
                 raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
-                upper_limit = max(1, raw_upper)
+                upper_limit = max(2, raw_upper) if mode == self.mode_c1 else max(1, raw_upper)
 
                 actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
                 if actual_transferable <= 0:
@@ -454,11 +467,22 @@ class TransferLogic:
                     # 添加銷售數據
                     'last_2_month_sold_qty': last_two_month_sold,
                     'last_month_sold_qty': last_month_sold,
-                    'mtd_sold_qty': int(row['MTD Sold Qty'])
+                    'mtd_sold_qty': int(row['MTD Sold Qty']),
+                    'total_sales_sort': last_month_sold + int(row['MTD Sold Qty'])
                 })
 
         # 按優先級排序（ND優先，RF其次）
-        sources.sort(key=lambda x: x['priority'])
+        if mode == self.mode_c1:
+            # C1排序：先ND全數轉出，再RF依近兩月總銷量由低到高
+            sources.sort(
+                key=lambda x: (
+                    x['priority'],
+                    x.get('total_sales_sort', x.get('last_month_sold_qty', 0) + x.get('mtd_sold_qty', 0)),
+                    x.get('effective_sold_qty', 0),
+                )
+            )
+        else:
+            sources.sort(key=lambda x: x['priority'])
 
         return sources
     
