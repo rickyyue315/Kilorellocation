@@ -1,5 +1,44 @@
 # 版本更新記錄
 
+## v2.9.0 (2026-04-24)
+
+### 新增 B2L/B2La/B3L/B3La（Type=L 低銷量保留2件）
+
+#### 新模式核心規則
+- 新增四個 B-special L 系列模式：`B2L`、`B2La`、`B3L`、`B3La`
+- **僅新 L 系列**套用 Type=L 低銷量保留2件：
+  - 條件：`Type=L` 且 `max(Last Month Sold Qty, MTD Sold Qty) <= 2`
+  - 轉出量：`max(SaSa Net Stock - 2, 0)`
+  - 當淨庫存 `<= 2` 時不轉出
+- 舊模式 `B2/B2a/B3/B3a` 維持原行為（Type=L 低銷量全轉出）
+- `B2La/B3La` 延續 a 系列限制：`Type=T` 不可作為出貨來源
+- `B3L/B3La` 延續跨 OM 家族限制：HD/Windy 規則不變
+
+#### 程式碼更新
+- [`business_logic.py`](business_logic.py)
+  - 新增四個模式常數與家族判斷
+  - Type=L 低銷量特例新增「保留2件」分支（僅 L 系列）
+  - 模式白名單、跨 OM 分組/分支與備註文案同步
+- [`app.py`](app.py)
+  - 側欄模式選單新增 B2L/B2La/B3L/B3La
+  - 接收店數限制適用模式清單、模式描述、欄位要求與 Type 欄位驗證同步
+  - `mode_name_map` 新增四模式對應
+- 文件同步
+  - [`README.md`](README.md)
+  - [`調貨模式詳解.txt`](調貨模式詳解.txt)
+
+#### 測試同步
+- [`tests/test_b_special_mix_sales_guard.py`](tests/test_b_special_mix_sales_guard.py)
+  - Mix 高銷量保護測試納入四新模式
+- [`tests/test_b2a_b3a_t_no_source.py`](tests/test_b2a_b3a_t_no_source.py)
+  - 新增 B2La/B3La Type=T 不可 source 測試
+- [`tests/test_b2_b3_source_receive_site_limit.py`](tests/test_b2_b3_source_receive_site_limit.py)
+  - 新增 B2L/B2La/B3L/B3La 接收店數上限測試
+- [`tests/test_all_modes_comprehensive.py`](tests/test_all_modes_comprehensive.py)
+  - 新增 B-L 系列整合測試（保留2件、邊界庫存、跨OM、a系列限制）
+
+---
+
 ## v2.8.0 (2026-04-08)
 
 ### 新增 D2 模式（清貨轉貨ND限定）

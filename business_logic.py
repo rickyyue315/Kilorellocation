@@ -1,7 +1,7 @@
 """
 業務邏輯模組 v2.8.0
 實現調貨規則、源/目的地識別和匹配算法
-支持十八模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
+支持二十一模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B2L(附加B特別模式-Type=L保留2件)/B2La(附加B特別模式-Type=L保留2件-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/B3L(附加B跨OM特別模式-Type=L保留2件)/B3La(附加B跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
 優化接收條件和避免同一SKU的轉出店鋪同時接收
 基於累計接收數量判斷是否達到最低保障標準的機制
 強化ND店鋪限制：所有模式下ND店鋪只能轉出，不能接收（ND1/ND2模式除外）
@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.8.0"""
+    """調貨業務邏輯類 v2.9.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None):
         self.transfer_recommendations = []
@@ -41,8 +41,12 @@ class TransferLogic:
         self.mode_b = "加強轉貨"  # B模式
         self.mode_b_special = "附加B(特別模式)"  # B2模式
         self.mode_b_special_a = "附加B2a(特別模式-T遊客鋪不出貨)"  # B2a模式
+        self.mode_b2l = "附加B2L(特別模式-Type=L保留2件)"  # B2L模式
+        self.mode_b2la = "附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨)"  # B2La模式
         self.mode_b3 = "附加B3(跨OM特別模式)"  # B3模式
         self.mode_b3a = "附加B3a(跨OM特別模式-T遊客鋪不出貨)"  # B3a模式
+        self.mode_b3l = "附加B3L(跨OM特別模式-Type=L保留2件)"  # B3L模式
+        self.mode_b3la = "附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)"  # B3La模式
         self.mode_c = "重點補0"  # C模式
         self.mode_c1 = "重點補0-只補0/1"  # C1模式
         self.mode_c2 = "附加C2(跨OM重點補0)"  # C2模式
@@ -57,13 +61,25 @@ class TransferLogic:
         self.mode_nd2 = "ND混合OM轉貨"  # ND2模式（ND跨OM互轉，Windy只轉Windy）
 
     def _is_b_special_mode(self, mode: str) -> bool:
-        return mode in (self.mode_b_special, self.mode_b_special_a, self.mode_b3, self.mode_b3a)
+        return mode in (
+            self.mode_b_special,
+            self.mode_b_special_a,
+            self.mode_b2l,
+            self.mode_b2la,
+            self.mode_b3,
+            self.mode_b3a,
+            self.mode_b3l,
+            self.mode_b3la,
+        )
 
     def _is_b3_family_mode(self, mode: str) -> bool:
-        return mode in (self.mode_b3, self.mode_b3a)
+        return mode in (self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la)
 
     def _is_b_tourist_no_source_mode(self, mode: str) -> bool:
-        return mode in (self.mode_b_special_a, self.mode_b3a)
+        return mode in (self.mode_b_special_a, self.mode_b2la, self.mode_b3a, self.mode_b3la)
+
+    def _is_b_l_retain_mode(self, mode: str) -> bool:
+        return mode in (self.mode_b2l, self.mode_b2la, self.mode_b3l, self.mode_b3la)
 
     def _is_d_family_mode(self, mode: str) -> bool:
         """D/D2 模式家族判斷"""
@@ -287,11 +303,10 @@ class TransferLogic:
                     # 添加銷售數據
                     'last_2_month_sold_qty': last_two_month_sold,
                     'last_month_sold_qty': last_month_sold,
-                    'mtd_sold_qty': mtd_sold,
-                    'total_sales_sort': last_month_sold + mtd_sold
+                    'mtd_sold_qty': mtd_sold
                 })
 
-        # B2/B2a/B3/B3a模式特殊處理：Type=L 全轉出（即使RF）
+        # B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式特殊處理：Type=L 低銷量特例
         if self._is_b_special_mode(mode):
 
             type_l_sources = group_df[(type_series == 'L') & (group_df['RP Type'] == 'RF')]
@@ -304,12 +319,17 @@ class TransferLogic:
                 last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else last_month_sold
 
                 net_stock = int(row['SaSa Net Stock'])
-                if net_stock > 0:
+                if self._is_b_l_retain_mode(mode):
+                    transferable_qty = max(net_stock - 2, 0)
+                else:
+                    transferable_qty = net_stock
+
+                if transferable_qty > 0:
                     sources.append({
                         'site': row['Site'],
                         'om': row['OM'],
                         'rp_type': row['RP Type'],
-                        'transferable_qty': net_stock,  # 全數轉出
+                        'transferable_qty': transferable_qty,
                         'priority': 2,
                         'original_stock': net_stock,
                         'effective_sold_qty': int(row['Effective Sold Qty']),
@@ -388,18 +408,11 @@ class TransferLogic:
                     continue
 
             elif mode in (self.mode_c, self.mode_c1, self.mode_c2):
-                # C模式(重點補0) / C1模式(重點補0-只補0/1) / C2模式(附加C跨OM重點補0)
+                # C模式(重點補0) / C2模式(附加C跨OM重點補0)
                 # 中等強度，小量精準支援 0 / 低庫存店，不做大規模抽貨。
-                if mode == self.mode_c1:
-                    # C1微調：允許低於Safety，但轉出後門市庫存至少保留2件
-                    # 並避免RF只出1件，RF至少需可轉2件才納入來源。
-                    base_transferable = int(row['SaSa Net Stock']) - 2
-                    if base_transferable < 2:
-                        continue
-                else:
-                    base_transferable = total_available - safety_stock
-                    if base_transferable <= 0:
-                        continue
+                base_transferable = total_available - safety_stock
+                if base_transferable <= 0:
+                    continue
 
                 # 上限設計：
                 # - 比例：最多 30% total_available
@@ -452,6 +465,10 @@ class TransferLogic:
 
             # 加入可轉出來源（所有模式共用）
             if actual_transferable > 0:
+                # C1模式：避免只可轉出1件的來源參與配對
+                if mode == self.mode_c1 and actual_transferable < 2:
+                    continue
+
                 last_month_sold = int(row['Last Month Sold Qty'])
                 last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else last_month_sold
                 sources.append({
@@ -467,22 +484,11 @@ class TransferLogic:
                     # 添加銷售數據
                     'last_2_month_sold_qty': last_two_month_sold,
                     'last_month_sold_qty': last_month_sold,
-                    'mtd_sold_qty': int(row['MTD Sold Qty']),
-                    'total_sales_sort': last_month_sold + int(row['MTD Sold Qty'])
+                    'mtd_sold_qty': int(row['MTD Sold Qty'])
                 })
 
         # 按優先級排序（ND優先，RF其次）
-        if mode == self.mode_c1:
-            # C1排序：先ND全數轉出，再RF依近兩月總銷量由低到高
-            sources.sort(
-                key=lambda x: (
-                    x['priority'],
-                    x.get('total_sales_sort', x.get('last_month_sold_qty', 0) + x.get('mtd_sold_qty', 0)),
-                    x.get('effective_sold_qty', 0),
-                )
-            )
-        else:
-            sources.sort(key=lambda x: x['priority'])
+        sources.sort(key=lambda x: x['priority'])
 
         return sources
     
@@ -641,29 +647,19 @@ class TransferLogic:
             destinations.sort(key=lambda x: x['priority'])
             return destinations
         
-        # E1/E1b/E2模式特殊處理：所有RF店鋪都可以接收，上限依配對店數限制設定動態調整
+        # E1/E1b/E2模式特殊處理：所有RF店鋪都可以接收，上限固定為 Safety Stock * 2
         if mode in (self.mode_e1, self.mode_e1b, self.mode_e2):
             if 'Type' in rf_destinations.columns:
                 type_series = rf_destinations['Type'].astype(str).str.upper()
             else:
                 type_series = pd.Series("", index=rf_destinations.index)
 
-            # 根據配對店數限制設定決定接收上限倍數
-            # 優先1間(=1) → ×4；最多2間(=2) → ×3；不限制(None) → ×2.5
-            _limit = self.b_special_max_receive_sites_per_source
-            if _limit == 1:
-                _ss_multiplier = 4
-            elif _limit == 2:
-                _ss_multiplier = 3
-            else:
-                _ss_multiplier = 2.5
-
             for _, row in rf_destinations.iterrows():
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
                 safety_stock = int(row['Safety Stock'])
                 
-                # E模式：接收上限依配對店數限制設定，最少為3件
-                max_can_receive = max(int(safety_stock * _ss_multiplier), 3)
+                # E模式：接收上限固定為 Safety Stock * 2，最少為3件
+                max_can_receive = max(int(safety_stock * 2), 3)
                 
                 # 如果目前庫存低於接收上限，則允許接收
                 if total_available < max_can_receive:
@@ -854,14 +850,47 @@ class TransferLogic:
             destinations.sort(key=lambda x: x['priority'])
             return destinations
         
+        # C1模式特殊處理：只補 total_available <= 1，且不回落到一般缺貨分支
+        if mode == self.mode_c1:
+            for _, row in rf_destinations.iterrows():
+                total_available = row['SaSa Net Stock'] + row['Pending Received']
+                if total_available > 1:
+                    continue
+
+                target_qty = max(int(row['Safety Stock'] * 0.5), 3)
+                needed_qty = target_qty - total_available
+                if needed_qty <= 0:
+                    continue
+
+                destinations.append({
+                    'site': row['Site'],
+                    'om': row['OM'],
+                    'rp_type': row['RP Type'],
+                    'needed_qty': needed_qty,
+                    'priority': 1,
+                    'current_stock': row['SaSa Net Stock'],
+                    'pending_received': row['Pending Received'],
+                    'safety_stock': row['Safety Stock'],
+                    'moq': row['MOQ'],
+                    'effective_sold_qty': row['Effective Sold Qty'],
+                    'dest_type': '重點補0',
+                    'target_qty': target_qty,
+                    'received_qty': 0,
+                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                    'mtd_sold_qty': int(row['MTD Sold Qty'])
+                })
+
+            destinations.sort(key=lambda x: x['priority'])
+            return destinations
+
         # 找出該Article+OM組合中的最高有效銷量
         max_sold_qty = rf_destinations['Effective Sold Qty'].max() if not rf_destinations.empty else 0
         
         for _, row in rf_destinations.iterrows():
             total_available = row['SaSa Net Stock'] + row['Pending Received']
             
-            # C模式/C1模式/C2模式特殊處理：針對(SaSa Net Stock+Pending Received)<=1的店鋪
-            if mode in (self.mode_c, self.mode_c1, self.mode_c2) and total_available <= 1:
+            # C模式/C2模式特殊處理：針對(SaSa Net Stock+Pending Received)<=1的店鋪
+            if mode in (self.mode_c, self.mode_c2) and total_available <= 1:
                 # 計算需要補充的數量：根據Safety Stock的50%和3件的最高值來確定補充數量
                 target_qty = max(int(row['Safety Stock'] * 0.5), 3)
                 needed_qty = target_qty - total_available
@@ -885,9 +914,6 @@ class TransferLogic:
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
                         'mtd_sold_qty': int(row['MTD Sold Qty'])
                     })
-                continue
-
-            if mode == self.mode_c1:
                 continue
             
             # A和B模式的常規處理
@@ -1026,8 +1052,8 @@ class TransferLogic:
                                article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF加強轉出',
                                receive_sites=receive_sites)
         
-        # 7. C模式/C1模式特殊處理：RF轉出 -> 重點補0
-        if mode in (self.mode_c, self.mode_c1):
+        # 7. C模式特殊處理：RF轉出 -> 重點補0
+        if mode == self.mode_c:
             self._match_by_priority(temp_sources, temp_destinations, recommendations, 
                                    article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, None, '重點補0',
                                    receive_sites=receive_sites)
@@ -2055,21 +2081,19 @@ class TransferLogic:
             source_to_receive_sites = {}
         # 篩選指定優先級的源和目的地
         filtered_sources = [s for s in sources if s['priority'] == source_priority and s['transferable_qty'] > 0]
+
+        # C1模式優先使用可轉量較大的來源，減少拆單與單件來源先被耗用
+        if mode == self.mode_c1:
+            filtered_sources.sort(
+                key=lambda x: (
+                    -int(x.get('transferable_qty', 0)),
+                    int(x.get('effective_sold_qty', 0))
+                )
+            )
         
         # 如果指定了轉出類型過濾器，則按類型篩選
         if source_type_filter:
             filtered_sources = [s for s in filtered_sources if s['source_type'] == source_type_filter]
-
-        # C1模式盡量避免太多1件出貨：
-        # 同優先級下，優先使用可出多件的來源，再處理只能出1件的來源。
-        if mode == self.mode_c1:
-            filtered_sources.sort(
-                key=lambda s: (
-                    int(int(s.get('transferable_qty', 0) or 0) == 1),
-                    -int(s.get('transferable_qty', 0) or 0),
-                    int(s.get('effective_sold_qty', 0) or 0),
-                )
-            )
         
         filtered_destinations = [d for d in destinations if d['priority'] == dest_priority and d['needed_qty'] > 0]
         
@@ -2156,11 +2180,6 @@ class TransferLogic:
                 else:
                     # A、B和D模式，使用原始邏輯
                     transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
-
-                # C1模式盡量避免同一接收店由多個來源追加1件，
-                # 寧可少補1件，也不要把已開始接收的店再拆成新的1件出貨線。
-                if mode == self.mode_c1 and transfer_qty == 1 and current_received_qty > 0:
-                    continue
                 
                 # --- 數量調整邏輯 (D模式放寬限制以避免1件餘貨) ---
                 
@@ -2425,7 +2444,7 @@ class TransferLogic:
         
         Args:
             df: 預處理後的DataFrame
-            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、C1模式(重點補0-只補0/1)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)、F模式(目標優化)或F2模式(F指定模式)
+            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)、F模式(目標優化)或F2模式(F指定模式)
             
         Returns:
             調貨建議列表
@@ -2433,12 +2452,16 @@ class TransferLogic:
         logger.info(f"開始生成調貨建議 - {mode}")
         
         # 驗證模式
-        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b_special_a, self.mode_b3, self.mode_b3a, self.mode_c, self.mode_c1, self.mode_c2, self.mode_d, self.mode_d2, self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_nd1, self.mode_nd2]:
+        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b_special_a, self.mode_b2l, self.mode_b2la, self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la, self.mode_c, self.mode_c1, self.mode_c2, self.mode_d, self.mode_d2, self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_nd1, self.mode_nd2]:
             raise ValueError(f"無效的轉貨模式: {mode}")
+
+        # E模式必須存在ALL欄位；若不存在則直接拋出明確錯誤
+        if mode in (self.mode_e1, self.mode_e1b, self.mode_e2) and 'ALL' not in df.columns:
+            raise ValueError("E模式需要ALL欄位")
         
         # 根據模式選擇分組方式
-        if mode in [self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_c2, self.mode_nd2]:
-            # E2/F/F2/B3/C2/ND2模式支持跨OM配對，因此僅按Article分組
+        if mode in [self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la, self.mode_c2, self.mode_nd2]:
+            # E2/F/F2/B3/B3L/C2/ND2模式支持跨OM配對，因此僅按Article分組
             grouped = df.groupby(['Article'])
         else:
             # 其他模式（含E1/E1b/ND1）按Article和OM分組
@@ -2475,13 +2498,13 @@ class TransferLogic:
             # 識別接收候選店鋪
             destinations = self.identify_destinations(group_df, mode)
             
-            # E1/E1b/E2/F/F2/B3/B3a/C2/ND1/ND2模式特殊處理：從destinations中過濾掉同時作為轉出源的店鋪
-            if mode in [self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_c2, self.mode_nd1, self.mode_nd2]:
+            # E1/E1b/E2/F/F2/B3/B3a/B3L/B3La/C2/ND1/ND2模式特殊處理：從destinations中過濾掉同時作為轉出源的店鋪
+            if mode in [self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la, self.mode_c2, self.mode_nd1, self.mode_nd2]:
                 source_sites = set([s['site'] for s in sources])
                 destinations = [d for d in destinations if d['site'] not in source_sites]
             
             # 執行匹配
-            if mode in [self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_c2, self.mode_nd2]:
+            if mode in [self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la, self.mode_c2, self.mode_nd2]:
                 article = group_keys[0] if isinstance(group_keys, (list, tuple)) else group_keys
                 om = "Multiple"  # 跨OM模式下OM由source/dest決定
             else:
@@ -2823,7 +2846,10 @@ class TransferLogic:
             cross_om_desc = "跨OM" if is_cross_om else "同OM"
             notes_parts.append(f"【轉出分析: E模式強制轉出({cross_om_desc}配對)，{rp_type}店鋪被標記為*ALL*全數轉出，原始庫存{source['original_stock']}件，轉出後剩餘{remaining_after_transfer}件】")
         elif source['source_type'] == 'Local店舖全轉出':
-            notes_parts.append("【轉出分析: Local店舖全轉出（附加B系列模式），可全數轉出】")
+            if self._is_b_l_retain_mode(mode):
+                notes_parts.append("【轉出分析: Local店舖低銷量特例（附加B-L系列模式），保留2件後轉出】")
+            else:
+                notes_parts.append("【轉出分析: Local店舖全轉出（附加B系列模式），可全數轉出】")
         elif source['source_type'] == 'RF過剩轉出':
             remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
             notes_parts.append(f"【轉出分析: RF過剩轉出，轉出後剩餘庫存({remaining_after_transfer})仍高於安全庫存({source.get('safety_stock', 'N/A')})】")

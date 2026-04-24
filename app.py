@@ -1,6 +1,6 @@
 """
-庫存調貨建議系統 v2.8.0 - Streamlit應用程序
-支持十八模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
+庫存調貨建議系統 v2.9.0 - Streamlit應用程序
+支持二十一模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
 新增:預設店舖資料(OM、Type等),當用戶上傳的Excel缺少這些資料時自動填充
 """
 
@@ -350,18 +350,20 @@ with st.sidebar:
     st.markdown("### 📦 系統資訊")
     st.markdown("""
     <div class="info-card">
-    <b>版本</b>: v2.8.0<br>
+    <b>版本</b>: v2.9.0<br>
     <b>開發者</b>: Ricky
     </div>
     """, unsafe_allow_html=True)
     
     with st.expander("💡 核心功能", expanded=False):
         st.markdown("""
-        **十八模式智能調貨系統:**
+        **二十一模式智能調貨系統:**
         - ✅ A模式(保守轉貨) / B模式(加強轉貨)
         - ✅ B2模式(附加B特別模式) / B2a模式(B2+T遊客鋪不出貨)
+        - ✅ B2L模式(附加B2L:Type=L保留2件) / B2La模式(B2L+T遊客鋪不出貨)
         - ✅ B3模式(附加B跨OM特別模式) / B3a模式(B3+T遊客鋪不出貨)
-        - ✅ C模式(重點補0) / C1模式(重點補0-只補0/1) / C2模式(附加C跨OM重點補0)
+        - ✅ B3L模式(附加B3L跨OM:Type=L保留2件) / B3La模式(B3L+T遊客鋪不出貨)
+        - ✅ C模式(重點補0) / C2模式(附加C跨OM重點補0)
         - ✅ D模式(清貨轉貨) / D2模式(清貨轉貨ND限定)
         - ✅ E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM) / F模式(目標優化) / F2模式(F指定模式)
         - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨)
@@ -380,9 +382,10 @@ with st.sidebar:
         - ✅ F模式：Target目標接收優先
         - ✅ F2模式：僅Target店舖可接收，集中優先補貨
         - ✅ B2/B2a模式：接收端依遊客區/混合型店舖優先排序
-        - ✅ B2/B2a/B3/B3a模式：Mix店舖若總銷量高於目標店，禁止出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
-        - ✅ B2a/B3a模式：T遊客鋪不作為出貨來源
-        - ✅ B3/B3a/C2模式：跨OM配對規則(HD不能轉到HA/HB/HC；Windy轉出只能到Windy)        - ✅ 所有模式：後處理避免單筆1件調貨（優先Rebalance，其次合並至高銷量目標店）        
+        - ✅ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式：Mix店舖若總銷量高於目標店，禁止出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
+        - ✅ B2a/B2La/B3a/B3La模式：T遊客鋪不作為出貨來源
+        - ✅ B3/B3a/B3L/B3La/C2模式：跨OM配對規則(HD不能轉到HA/HB/HC；Windy轉出只能到Windy)
+        - ✅ 所有模式：後處理避免單筆1件調貨（優先Rebalance，其次合並至高銷量目標店）
         **自動化功能:**
         - ✅ 預設店舖資料自動填充(OM、Type)
         - ✅ 統計分析和圖表
@@ -400,9 +403,9 @@ with st.sidebar:
            - 確保包含所有必需欄位
         
         2. **選擇轉貨模式**
-              - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B3/B3a/C/C1/C2/D/D2/E1/E1b/E2/F/F2/ND1/ND2)
+              - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C2/D/D2/E1/E1b/E2/F/F2/ND1/ND2)
            - 查看模式說明了解各模式特點
-                  - 若選擇 B2/B2a/B3/B3a/E1/E1b/E2/ND1/ND2，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
+                  - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
         
         3. **啟動分析**
            - 點擊「生成調貨建議」按鈕開始處理
@@ -425,8 +428,10 @@ with st.sidebar:
         "選擇轉貨模式",
         [
             "A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B2a: 附加B2a(特別模式-T遊客鋪不出貨)",
+            "B2L: 附加B2L(特別模式-Type=L保留2件)", "B2La: 附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨)",
             "B3: 附加B(跨OM特別模式)", "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)",
-            "C: 重點補0", "C1: 重點補0(只補0/1)", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "D2: 清貨轉貨(ND限定)", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化", "F2: F指定模式",
+            "B3L: 附加B3L(跨OM特別模式-Type=L保留2件)", "B3La: 附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)",
+            "C: 重點補0", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "D2: 清貨轉貨(ND限定)", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化", "F2: F指定模式",
             "ND1: ND同OM轉貨", "ND2: ND混合OM轉貨"
         ],
         key='transfer_mode',
@@ -435,7 +440,7 @@ with st.sidebar:
     transfer_mode = _fix_mojibake_text(transfer_mode)
     mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
 
-    receive_site_limit_mode_codes = ["B2", "B2a", "B3", "B3a", "E1", "E1b", "E2", "ND1", "ND2"]
+    receive_site_limit_mode_codes = ["B2", "B2a", "B2L", "B2La", "B3", "B3a", "B3L", "B3La", "E1", "E1b", "E2", "ND1", "ND2"]
 
     b_special_receive_site_limit_option = "最多 2 間"
     b_special_max_receive_sites_per_source = None
@@ -458,10 +463,13 @@ with st.sidebar:
         "B: 加強轉貨": "積極處理滯銷品",
         "B2: 附加B(特別模式)": "B模式 + Type=L全轉出 + Mix高銷量保護",
         "B2a: 附加B2a(特別模式-T遊客鋪不出貨)": "B2 + Type=T遊客鋪不出貨 + Mix高銷量保護",
+        "B2L: 附加B2L(特別模式-Type=L保留2件)": "B2L模式 + Type=L低銷量保留2件 + Mix高銷量保護",
+        "B2La: 附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨)": "B2L + Type=T遊客鋪不出貨 + Mix高銷量保護",
         "B3: 附加B(跨OM特別模式)": "B2 + 跨OM配對 + Mix高銷量保護",
         "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)": "B3 + Type=T遊客鋪不出貨 + Mix高銷量保護",
-        "C: 重點補0": "補充低庫存店舖，並優先處理庫存≤1",
-        "C1: 重點補0(只補0/1)": "只補充庫存為0或1的店舖",
+        "B3L: 附加B3L(跨OM特別模式-Type=L保留2件)": "B3L模式 + 跨OM配對 + Type=L低銷量保留2件 + Mix高銷量保護",
+        "B3La: 附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)": "B3L + Type=T遊客鋪不出貨 + Mix高銷量保護",
+        "C: 重點補0": "補充庫存≤1的店舖",
         "C2: 附加C(跨OM重點補0)": "C模式 + 跨OM配對",
         "D: 清貨轉貨": "清理無銷售ND店舖",
         "D2: 清貨轉貨(ND限定)": "僅ND清貨轉出，RF不轉出",
@@ -498,6 +506,13 @@ with st.sidebar:
         - 接收端依遊客區/混合型店舖優先級排序
         - 接收上限為Safety Stock的2倍
         - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
+
+        **B2L模式(附加B2L特別模式)**
+        - 參照B2模式,差異僅在 Type=L 特例
+        - Type=L在銷量≤2時不再全轉出,改為保留2件（可轉出=max(淨庫存-2,0)）
+        - 若 Type=L 淨庫存≤2，則不轉出
+        - Mix店舖若總銷量高於目標店則不可出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
+        - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
         
         **B3模式(附加B跨OM特別模式)**
         - 參照B2,但允許跨OM配對
@@ -517,16 +532,25 @@ with st.sidebar:
         - 新增限制：Type=T(遊客鋪)不可出貨
         - 同樣套用Mix店舖總銷量保護規則（總銷量=Last Month Sold Qty+MTD Sold Qty）
         - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
+
+        **B2La模式(附加B2La特別模式)**
+        - 參照B2L模式
+        - 新增限制：Type=T(遊客鋪)不可出貨
+        - Type=L低銷量維持保留2件規則
+
+        **B3L模式(附加B3L跨OM特別模式)**
+        - 參照B3模式,差異僅在 Type=L 特例
+        - Type=L在銷量≤2時保留2件（可轉出=max(淨庫存-2,0)）
+        - 保留B3跨OM規則（HD限制、Windy限制）
+
+        **B3La模式(附加B3La跨OM特別模式)**
+        - 參照B3L模式
+        - 新增限制：Type=T(遊客鋪)不可出貨
         
         **C模式(重點補0)**
         - 主要針對接收店舖
         - 當(SaSa Net Stock+Pending Received)≤1時
         - 補充至該店舖的Safety或MOQ+1的數量(取最低值)
-
-        **C1模式(重點補0-只補0/1)**
-        - 參照C模式的轉出與配對邏輯
-        - 僅處理(SaSa Net Stock+Pending Received)≤1的店舖作為接收方
-        - 不再套用一般緊急缺貨/潛在缺貨接收規則
         
         **C2模式(附加C跨OM重點補0)**
         - 參照C模式的轉出/接收邏輯
@@ -610,15 +634,14 @@ with st.sidebar:
         - SaSa Net Stock + Pending Received < Safety Stock 時需要調撥接收
         
         **特殊條件:**
-        - C1模式：僅當(SaSa Net Stock+Pending Received)≤1時才接收，不套用一般缺貨接收
         - C/C2模式：當(SaSa Net Stock+Pending Received)≤1時,補充至Safety或MOQ+1(取最低值)
         - D/D2模式：避免1件餘貨規則(D2僅ND清貨轉出，RF不轉出)
         - E1模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM)
         - E1b模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM，優先Type=T/M)
         - E2模式：所有RF店舖可接收,上限為Safety Stock的2倍(可跨OM)
-        - B2/B2a/B3/B3a模式：接收上限為Safety Stock的2倍,並累計追蹤接收量
+        - B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式：接收上限為Safety Stock的2倍,並累計追蹤接收量
         - ND1/ND2模式：可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-        - 接收優先級(B2/B2a/B3/B3a):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
+        - 接收優先級(B2/B2a/B2L/B2La/B3/B3a/B3L/B3La):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
         """)
     
     st.markdown("---")
@@ -626,7 +649,7 @@ with st.sidebar:
 
 # 3. 頁面頭部
 st.title("📦 庫存調貨建議系統")
-st.caption("v2.8.0 | Intelligent Inventory Reallocation System")
+st.caption("v2.9.0 | Intelligent Inventory Reallocation System")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -634,7 +657,7 @@ st.markdown("---")
 st.markdown("### 📂 資料上傳")
 
 # 根據模式顯示詳細欄位說明
-if mode_code in ["A", "B", "C", "C1", "C2", "D", "D2"]:
+if mode_code in ["A", "B", "C", "C2", "D", "D2"]:
     with st.expander("📋 必需欄位說明", expanded=False):
         st.markdown("""
         **基本欄位:**
@@ -646,7 +669,7 @@ if mode_code in ["A", "B", "C", "C1", "C2", "D", "D2"]:
         **銷量欄位:**
         - Last Month Sold Qty, MTD Sold Qty
         """)
-elif mode_code in ["B2", "B2a", "B3", "B3a"]:
+elif mode_code in ["B2", "B2a", "B2L", "B2La", "B3", "B3a", "B3L", "B3La"]:
     with st.expander("📋 必需欄位說明", expanded=False):
         st.markdown("""
         **基本欄位:**
@@ -659,10 +682,11 @@ elif mode_code in ["B2", "B2a", "B3", "B3a"]:
         - Last Month Sold Qty, MTD Sold Qty
         
         **⚠️ 特殊要求:**
-        - **Type 欄位**:Type=L 且銷量≤2 的店舖將被全轉出(即使是RF);若銷量>2 則按B模式處理
-        - **Type 說明**:Type=T 為遊客區店舖、Type=M 為混合型店舖;B2/B2a/B3/B3a接收優先級以此排序
+        - **Type 欄位**:B2/B2a/B3/B3a 的 Type=L 且銷量≤2 店舖將全轉出(即使是RF)
+        - **Type 欄位**:B2L/B2La/B3L/B3La 的 Type=L 且銷量≤2 店舖保留2件後轉出
+        - **Type 說明**:Type=T 為遊客區店舖、Type=M 為混合型店舖;B2/B2a/B2L/B2La/B3/B3a/B3L/B3La接收優先級以此排序
         - **Mix 保護規則**:若出貨店舖 Type=M 且總銷量 > 目標店總銷量，該配對會被跳過（總銷量=Last Month Sold Qty+MTD Sold Qty）
-        - **B2a/B3a 限制**:Type=T(遊客鋪)不可出貨
+        - **B2a/B2La/B3a/B3La 限制**:Type=T(遊客鋪)不可出貨
         """)
 elif mode_code in ["E1", "E1b", "E2"]:
     with st.expander("📋 必需欄位說明", expanded=False):
@@ -748,12 +772,12 @@ if uploaded_file is not None:
             st.error(f"❌ {str(e)}")
             st.stop()
 
-        # B2/B2a/B3/B3a模式：必須有Type欄位(不分大小寫)
-        if mode_code in ["B2", "B2a", "B3", "B3a"]:
+        # B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式：必須有Type欄位(不分大小寫)
+        if mode_code in ["B2", "B2a", "B2L", "B2La", "B3", "B3a", "B3L", "B3La"]:
             original_columns = processing_stats['original_stats'].get('columns', [])
             has_type_column = any(col.upper() == 'TYPE' for col in original_columns)
             if not has_type_column:
-                st.error("❌ B2/B2a/B3/B3a模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
+            st.error("❌ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
                 st.stop()
         
         st.success("檔案上傳與數據預處理成功!")
@@ -826,10 +850,13 @@ if uploaded_file is not None:
                     "B": "加強轉貨",
                     "B2": "附加B(特別模式)",
                     "B2a": "附加B2a(特別模式-T遊客鋪不出貨)",
+                    "B2L": "附加B2L(特別模式-Type=L保留2件)",
+                    "B2La": "附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨)",
                     "B3": "附加B3(跨OM特別模式)",
                     "B3a": "附加B3a(跨OM特別模式-T遊客鋪不出貨)",
+                    "B3L": "附加B3L(跨OM特別模式-Type=L保留2件)",
+                    "B3La": "附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)",
                     "C": "重點補0",
-                    "C1": "重點補0-只補0/1",
                     "C2": "附加C2(跨OM重點補0)",
                     "D": "清貨轉貨",
                     "D2": "清貨轉貨(ND限定)",

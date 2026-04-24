@@ -93,6 +93,17 @@ def test_b2a_tourist_type_t_not_source():
     assert all(rec['Transfer Site'] != 'SRC_T' for rec in recs_b2a), "B2a must block Type=T source."
 
 
+def test_b2la_tourist_type_t_not_source():
+    logic = TransferLogic()
+    df = _build_b2_like_dataset()
+
+    recs_b2l = logic.generate_transfer_recommendations(df, logic.mode_b2l)
+    recs_b2la = logic.generate_transfer_recommendations(df, logic.mode_b2la)
+
+    assert any(rec['Transfer Site'] == 'SRC_T' for rec in recs_b2l), "B2L baseline should allow Type=T source in this dataset."
+    assert all(rec['Transfer Site'] != 'SRC_T' for rec in recs_b2la), "B2La must block Type=T source."
+
+
 def test_b3a_tourist_type_t_not_source():
     logic = TransferLogic()
     df = _build_b3_like_dataset()
@@ -102,3 +113,14 @@ def test_b3a_tourist_type_t_not_source():
 
     assert any(rec['Transfer Site'] == 'SRC_T_X' for rec in recs_b3), "B3 baseline should allow Type=T source in this dataset."
     assert all(rec['Transfer Site'] != 'SRC_T_X' for rec in recs_b3a), "B3a must block Type=T source."
+
+
+def test_b3la_tourist_type_t_not_source():
+    logic = TransferLogic()
+    df = _build_b3_like_dataset()
+
+    recs_b3l = logic.generate_transfer_recommendations(df, logic.mode_b3l)
+    recs_b3la = logic.generate_transfer_recommendations(df, logic.mode_b3la)
+
+    assert any(rec['Transfer Site'] == 'SRC_T_X' for rec in recs_b3l), "B3L baseline should allow Type=T source in this dataset."
+    assert all(rec['Transfer Site'] != 'SRC_T_X' for rec in recs_b3la), "B3La must block Type=T source."

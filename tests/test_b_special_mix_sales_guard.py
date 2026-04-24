@@ -106,8 +106,12 @@ def test_mix_source_blocked_when_sales_higher_than_destination_b2_family():
     mode_to_cross_om = {
         logic.mode_b_special: False,
         logic.mode_b_special_a: False,
+        logic.mode_b2l: False,
+        logic.mode_b2la: False,
         logic.mode_b3: True,
         logic.mode_b3a: True,
+        logic.mode_b3l: True,
+        logic.mode_b3la: True,
     }
 
     for mode, cross_om in mode_to_cross_om.items():

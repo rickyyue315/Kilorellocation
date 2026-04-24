@@ -473,6 +473,84 @@ class TestModeB3a:
 
 
 # ===========================================================================
+# 模式 B2L/B2La/B3L/B3La：Type=L 保留2件系列
+# ===========================================================================
+
+class TestModeBLSeries:
+
+    def test_b2l_type_l_low_sales_retain_two(self):
+        """B2L：Type=L 且低銷量時，保留2件後轉出。"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='L_SRC', **{'SaSa Net Stock': 8, 'Safety Stock': 1,
+                       'Last Month Sold Qty': 1, 'MTD Sold Qty': 0,
+                       'Effective Sold Qty': 1, 'Type': 'L'}),
+            _make_row(Site='DST', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 8, 'Last Month Sold Qty': 4,
+                       'MTD Sold Qty': 4, 'Type': 'T'}),
+        ])
+
+        sources = logic.identify_sources(df, logic.mode_b2l)
+        l_sources = [s for s in sources if s['site'] == 'L_SRC']
+        assert l_sources, "B2L 應識別 L_SRC 為來源"
+        assert l_sources[0]['transferable_qty'] == 6, "B2L 應為 8-2=6 件可轉出"
+
+    def test_b2l_type_l_stock_le_two_no_transfer(self):
+        """B2L：Type=L 低銷量且淨庫存<=2時，不轉出。"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='L_SRC_LOW', **{'SaSa Net Stock': 2, 'Safety Stock': 1,
+                       'Last Month Sold Qty': 1, 'MTD Sold Qty': 0,
+                       'Effective Sold Qty': 1, 'Type': 'L'}),
+            _make_row(Site='DST', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 8, 'Last Month Sold Qty': 4,
+                       'MTD Sold Qty': 4, 'Type': 'T'}),
+        ])
+
+        recs = logic.generate_transfer_recommendations(df, logic.mode_b2l)
+        assert all(r['Transfer Site'] != 'L_SRC_LOW' for r in recs), "B2L 庫存<=2應不轉出"
+
+    def test_b3l_cross_om_allowed(self):
+        """B3L：應保有跨OM配對能力。"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='L_SRC_X', OM='OM1', **{'SaSa Net Stock': 8, 'Safety Stock': 1,
+                       'Last Month Sold Qty': 1, 'MTD Sold Qty': 0,
+                       'Effective Sold Qty': 1, 'Type': 'L'}),
+            _make_row(Site='DST_X', OM='OM2', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 8, 'Last Month Sold Qty': 4,
+                       'MTD Sold Qty': 4, 'Type': 'T'}),
+        ])
+
+        recs = logic.generate_transfer_recommendations(df, logic.mode_b3l)
+        assert len(recs) > 0, "B3L 應允許跨OM"
+        assert any(r['Transfer OM'] != r['Receive OM'] for r in recs), "B3L 應有跨OM建議"
+
+    def test_b2la_b3la_type_t_not_source(self):
+        """B2La/B3La：Type=T 不可作為出貨來源。"""
+        logic = TransferLogic()
+        df_same_om = _df([
+            _make_row(Site='T_SRC', OM='OM1', **{'SaSa Net Stock': 10, 'Safety Stock': 1,
+                       'Effective Sold Qty': 1, 'Type': 'T'}),
+            _make_row(Site='DST', OM='OM1', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 8, 'Last Month Sold Qty': 4,
+                       'MTD Sold Qty': 4, 'Type': 'M'}),
+        ])
+        recs_b2la = logic.generate_transfer_recommendations(df_same_om, logic.mode_b2la)
+        assert all(r['Transfer Site'] != 'T_SRC' for r in recs_b2la), "B2La Type=T禁止轉出"
+
+        df_cross_om = _df([
+            _make_row(Site='T_SRC_X', OM='OM1', **{'SaSa Net Stock': 10, 'Safety Stock': 1,
+                       'Effective Sold Qty': 1, 'Type': 'T'}),
+            _make_row(Site='DST_X', OM='OM2', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 8, 'Last Month Sold Qty': 4,
+                       'MTD Sold Qty': 4, 'Type': 'M'}),
+        ])
+        recs_b3la = logic.generate_transfer_recommendations(df_cross_om, logic.mode_b3la)
+        assert all(r['Transfer Site'] != 'T_SRC_X' for r in recs_b3la), "B3La Type=T禁止轉出"
+
+
+# ===========================================================================
 # 模式 C：重點補0
 # ===========================================================================
 
