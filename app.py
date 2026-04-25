@@ -777,7 +777,7 @@ if uploaded_file is not None:
             original_columns = processing_stats['original_stats'].get('columns', [])
             has_type_column = any(col.upper() == 'TYPE' for col in original_columns)
             if not has_type_column:
-            st.error("❌ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
+                st.error("❌ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
                 st.stop()
         
         st.success("檔案上傳與數據預處理成功!")
