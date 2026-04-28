@@ -1,5 +1,5 @@
 """
-庫存調貨建議系統 v2.9.0 - Streamlit應用程序
+庫存調貨建議系統 v2.9.1 - Streamlit應用程序
 支持二十二模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
 新增:預設店舖資料(OM、Type等),當用戶上傳的Excel缺少這些資料時自動填充
 """
@@ -196,7 +196,7 @@ if os.getenv("KILO_FIX_MOJIBAKE", "0") == "1":
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.8.0"),
+    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.9.1"),
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -376,7 +376,7 @@ with st.sidebar:
     st.markdown("### 📦 系統資訊")
     st.markdown("""
     <div class="info-card">
-    <b>版本</b>: v2.9.0<br>
+    <b>版本</b>: v2.9.1<br>
     <b>開發者</b>: Ricky
     </div>
     """, unsafe_allow_html=True)
@@ -676,7 +676,7 @@ with st.sidebar:
 
 # 3. 頁面頭部
 st.title("📦 庫存調貨建議系統")
-st.caption("v2.9.0 | Intelligent Inventory Reallocation System")
+st.caption("v2.9.1 | Intelligent Inventory Reallocation System")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -1143,7 +1143,7 @@ if uploaded_file is not None:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #6C757D; padding: 30px 0;">
-    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.8.0</p>
+    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.9.1</p>
     <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
 </div>
 """, unsafe_allow_html=True)
