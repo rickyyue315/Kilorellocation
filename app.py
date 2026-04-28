@@ -9,7 +9,6 @@ import pandas as pd
 from datetime import datetime
 import logging
 import os
-import base64
 import unicodedata
 
 try:
@@ -51,6 +50,33 @@ def _cached_preprocess(file_bytes: bytes) -> tuple:
 # 配置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _is_zeabur_runtime() -> bool:
+    """偵測是否運行於 Zeabur 容器環境。"""
+    zeabur_env_keys = [
+        'ZEABUR',
+        'ZEABUR_PROJECT_ID',
+        'ZEABUR_SERVICE_ID',
+        'ZEABUR_DEPLOYMENT_ID'
+    ]
+    return any(os.getenv(key) for key in zeabur_env_keys)
+
+
+def _get_env_int(name: str, default: int) -> int:
+    """安全讀取整數環境變數，無效值時回退預設值。"""
+    value = os.getenv(name, '').strip()
+    if not value:
+        return default
+
+    try:
+        return max(0, int(value))
+    except ValueError:
+        return default
+
+
+IS_ZEABUR_RUNTIME = _is_zeabur_runtime()
+ZEABUR_RESULT_PREVIEW_LIMIT = _get_env_int('KILO_ZEABUR_RESULT_PREVIEW_LIMIT', 1000)
 
 
 def _fix_mojibake_text(value):
@@ -993,7 +1019,25 @@ if uploaded_file is not None:
             
             # 創建DataFrame並顯示
             rec_df = pd.DataFrame(display_data)
-            st.dataframe(rec_df, use_container_width=True)
+            if (
+                IS_ZEABUR_RUNTIME
+                and ZEABUR_RESULT_PREVIEW_LIMIT > 0
+                and len(rec_df) > ZEABUR_RESULT_PREVIEW_LIMIT
+            ):
+                st.info(
+                    f"Zeabur 效能模式：目前先顯示前 {ZEABUR_RESULT_PREVIEW_LIMIT:,} 行，"
+                    "避免大型結果表拖慢頁面。完整結果仍可下載，亦可按需展開。"
+                )
+                show_full_result_table = st.toggle(
+                    "載入完整調貨建議表",
+                    value=False,
+                    key=f"show_full_result_table_{current_run_key}",
+                    help="僅在需要時渲染全部結果列，以減少 Zeabur 容器上的前端與傳輸負擔。"
+                )
+                table_df = rec_df if show_full_result_table else rec_df.head(ZEABUR_RESULT_PREVIEW_LIMIT)
+                st.dataframe(table_df, use_container_width=True)
+            else:
+                st.dataframe(rec_df, use_container_width=True)
             
             # 統計圖表
             with st.expander("📊 詳細統計", expanded=False):
@@ -1071,14 +1115,16 @@ if uploaded_file is not None:
             
             _excel_bytes = st.session_state.get('excel_data', b'')
             _excel_filename = st.session_state.get('excel_filename', '調貨建議.xlsx')
-            _b64 = base64.b64encode(_excel_bytes).decode('utf-8')
             _mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            st.markdown(
-                f'<a href="data:{_mime};base64,{_b64}" download="{_excel_filename}" '
-                f'style="display:block;padding:0.5em 1em;background:#ff4b4b;color:white;'
-                f'text-decoration:none;border-radius:0.3em;text-align:center;'
-                f'font-weight:bold;font-size:1rem;">📥 下載 Excel 報表</a>',
-                unsafe_allow_html=True
+            st.download_button(
+                "📥 下載 Excel 報表",
+                data=_excel_bytes,
+                file_name=_excel_filename,
+                mime=_mime,
+                type="primary",
+                use_container_width=True,
+                on_click="ignore",
+                key=f"download_excel_{current_run_key}"
             )
             
             progress_bar.progress(100, text="處理完畢!")
