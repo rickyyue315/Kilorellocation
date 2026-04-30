@@ -1,6 +1,6 @@
 """
-庫存調貨建議系統 v2.9.1 - Streamlit應用程序
-支持二十二模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)
+庫存調貨建議系統 v2.10.0 - Streamlit應用程序
+支持二十四模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
 新增:預設店舖資料(OM、Type等),當用戶上傳的Excel缺少這些資料時自動填充
 """
 
@@ -196,7 +196,7 @@ if os.getenv("KILO_FIX_MOJIBAKE", "0") == "1":
 
 # 1. 頁面配置
 st.set_page_config(
-    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.9.1"),
+    page_title=_fix_mojibake_text("庫存調貨建議系統 v2.10.0"),
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -383,7 +383,7 @@ with st.sidebar:
     
     with st.expander("💡 核心功能", expanded=False):
         st.markdown("""
-        **二十一模式智能調貨系統:**
+        **二十四模式智能調貨系統:**
         - ✅ A模式(保守轉貨) / B模式(加強轉貨)
         - ✅ B2模式(附加B特別模式) / B2a模式(B2+T遊客鋪不出貨)
         - ✅ B2L模式(附加B2L:Type=L保留2件) / B2La模式(B2L+T遊客鋪不出貨)
@@ -393,6 +393,7 @@ with st.sidebar:
         - ✅ D模式(清貨轉貨) / D2模式(清貨轉貨ND限定)
         - ✅ E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM) / F模式(目標優化) / F2模式(F指定模式)
         - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨)
+        - ✅ 精簡SKU(限同OM) / 精簡SKU(跨OM)
         
         **智能識別與匹配:**
         - ✅ ND/RF類型智慧識別
@@ -428,8 +429,8 @@ with st.sidebar:
            - 點擊瀏覽文件或拖放文件到上傳區域
            - 確保包含所有必需欄位
         
-        2. **選擇轉貨模式**
-              - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C2/D/D2/E1/E1b/E2/F/F2/ND1/ND2)
+         2. **選擇轉貨模式**
+              - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C2/D/D2/E1/E1b/E2/F/F2/ND1/ND2/精簡SKU(限同OM)/精簡SKU(跨OM))
            - 查看模式說明了解各模式特點
                   - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
         
@@ -458,7 +459,8 @@ with st.sidebar:
             "B3: 附加B(跨OM特別模式)", "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)",
             "B3L: 附加B3L(跨OM特別模式-Type=L保留2件)", "B3La: 附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)",
             "C: 重點補0", "C1: 重點補0(只補0/1)", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "D2: 清貨轉貨(ND限定)", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化", "F2: F指定模式",
-            "ND1: ND同OM轉貨", "ND2: ND混合OM轉貨"
+            "ND1: ND同OM轉貨", "ND2: ND混合OM轉貨",
+            "精簡SKU(限同OM): 精簡SKU限同OM", "精簡SKU(跨OM): 精簡SKU跨OM"
         ],
         key='transfer_mode',
         help="選擇適合的調貨模式"
@@ -506,7 +508,9 @@ with st.sidebar:
         "F: 目標優化": "依Target目標分配",
         "F2: F指定模式": "僅Target店舖可接收，集中調貨",
         "ND1: ND同OM轉貨": "ND店舖互轉(同OM)，按銷量智能排序",
-        "ND2: ND混合OM轉貨": "ND店舖互轉(跨OM)，Windy只轉Windy"
+        "ND2: ND混合OM轉貨": "ND店舖互轉(跨OM)，Windy只轉Windy",
+        "精簡SKU(限同OM): 精簡SKU限同OM": "精簡SKU模式：同OM轉貨，RF上限=Max(Safety×2,2月銷量×2)，剩餘退回D001",
+        "精簡SKU(跨OM): 精簡SKU跨OM": "精簡SKU模式：跨OM轉貨(Windy限制)，RF上限=Max(Safety×2,2月銷量×2)，剩餘退回D001"
     }
     
     st.caption(mode_descriptions[transfer_mode])
@@ -645,8 +649,19 @@ with st.sidebar:
         - Windy(澳門)轉出只能到Windy店舖
         - HD不能轉到HA/HB/HC
         - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-        
-        ---
+
+        **精簡SKU(限同OM)模式**
+        - RF店舖存貨上限=Max(Safety×2, 2月銷量×2)，超出部分轉出
+        - ND店舖全數可轉出
+        - 轉給RF店舖最少2件起（參考C1模式）
+        - 剩餘無法配對的數量一律退回D001（無數量限制）
+        - 僅同OM配對
+
+        **精簡SKU(跨OM)模式**
+        - 同精簡SKU(限同OM)規則，但允許跨OM配對
+        - Windy轉出只能到Windy店舖
+        - HD不能轉到HA/HB/HC
+        - 剩餘無法配對的數量一律退回D001
         
         ### 轉出類型判斷
         
@@ -676,7 +691,7 @@ with st.sidebar:
 
 # 3. 頁面頭部
 st.title("📦 庫存調貨建議系統")
-st.caption("v2.9.1 | Intelligent Inventory Reallocation System")
+st.caption("v2.10.0 | Intelligent Inventory Reallocation System")
 st.markdown("---")
 
 # 4. 主要區塊
@@ -749,6 +764,25 @@ elif mode_code in ["ND1", "ND2"]:
         - ND1 模式僅同OM配對；ND2 模式允許跨OM配對
         - ND 店舖在 ND1/ND2 模式可作為接收方，但兩月銷量=0 的 ND 店舖不可接收
         - 同一SKU下可設定單一出貨店舖最多配對接收店舖數：優先1間 / 最多2間 / 不限
+        """)
+elif mode_code in ["精簡SKU(限同OM)", "精簡SKU(跨OM)"]:
+    with st.expander("📋 必需欄位說明", expanded=False):
+        st.markdown("""
+        **基本欄位:**
+        - Article, Article Description, OM, RP Type, Site
+
+        **庫存欄位:**
+        - SaSa Net Stock, Pending Received, Safety Stock, MOQ
+
+        **銷量欄位:**
+        - Last Month Sold Qty, MTD Sold Qty, **Last 2 Month Sold Qty**
+
+        **⚠️ 特殊說明:**
+        - RF店舖存貨上限 = Max(Safety Stock × 2, Last 2 Month Sold Qty × 2)
+        - ND店舖全數可轉出，RF店舖超出上限部分可轉出
+        - 轉給RF店舖最少2件起（參考C1模式），退回D001無數量限制
+        - 剩餘無法配對的數量一律建議退回D001
+        - 精簡SKU(限同OM)僅同OM配對；精簡SKU(跨OM)允許跨OM配對（Windy限制、HD限制）
         """)
 else:  # F / F2
     with st.expander("📋 必需欄位說明", expanded=False):
@@ -894,7 +928,9 @@ if uploaded_file is not None:
                     "F": "目標優化",
                     "F2": "F指定模式",
                     "ND1": "ND同OM轉貨",
-                    "ND2": "ND混合OM轉貨"
+                    "ND2": "ND混合OM轉貨",
+                    "精簡SKU(限同OM)": "精簡SKU(限同OM)",
+                    "精簡SKU(跨OM)": "精簡SKU(跨OM)"
                 }
                 mode_name = mode_name_map.get(mode_code, "目標優化")
                 
