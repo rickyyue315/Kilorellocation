@@ -376,7 +376,7 @@ with st.sidebar:
     st.markdown("### 📦 系統資訊")
     st.markdown("""
     <div class="info-card">
-    <b>版本</b>: v2.9.1<br>
+    <b>版本</b>: v2.10.0<br>
     <b>開發者</b>: Ricky
     </div>
     """, unsafe_allow_html=True)
@@ -1179,7 +1179,7 @@ if uploaded_file is not None:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #6C757D; padding: 30px 0;">
-    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.9.1</p>
+    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 v2.10.0</p>
     <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
 </div>
 """, unsafe_allow_html=True)

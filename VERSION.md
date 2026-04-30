@@ -1,5 +1,62 @@
 # 版本更新記錄
 
+## v2.10.0 (2026-04-30)
+
+### 新增精簡SKU模式（限同OM / 跨OM）+ F/F2模式改善
+
+#### 精簡SKU模式核心規則
+- 新增兩個精簡SKU模式：`精簡SKU(限同OM)`、`精簡SKU(跨OM)`
+- 針對 SKU 精簡場景設計，將超出上限的庫存轉出至有需求的 RF 店舖
+- RF 店舖存貨上限 Cap = `Max(Safety Stock × 2, Last 2 Month Sold Qty × 2)`
+- ND 店舖全數可轉出
+- 轉給 RF 店舖最少 2 件起轉（參考 C1 模式）
+- 剩餘無法配對的數量一律退回 D001（無數量限制）
+- 精簡SKU(跨OM) 額外規則：Windy 只轉 Windy，HD 不能轉到 HA/HB/HC
+
+#### F/F2 模式改善
+- **Target 接收店舖不論 ND 或 RF 均可接收**（打破 ND 不可接收的全局限制）
+- **Target 數量直接作為接收量**（`needed_qty = Target Qty`，不考慮現有庫存與在途數量）
+- 現行邏輯：`needed_qty = Target - (SaSa Net Stock + Pending Received)`，僅 RF 可接收
+- 改善後：`needed_qty = Target`，ND/RF 均可接收
+- 非 Target 店舖邏輯不變（F 模式：RF 補0；F2 模式：不接收）
+
+#### 程式碼更新
+- [`business_logic.py`](business_logic.py)
+  - 版本升級至 v2.10.0（二十四模式系統）
+  - 新增 `mode_simplified_sku_same`、`mode_simplified_sku_cross` 常數
+  - 新增 `_is_simplified_sku_mode()` 家族判斷
+  - `identify_sources`：新增精簡SKU模式 ND 全轉出 + RF 超出 Cap 轉出邏輯
+  - `identify_destinations`：新增精簡SKU模式 RF 接收上限邏輯
+  - 新增 `_match_transfers_simplified_sku()` 專用匹配方法（Phase 1: RF-to-RF 配對，Phase 2: 剩餘退回 D001）
+  - `generate_transfer_recommendations`：新增精簡SKU模式到驗證白名單與跨OM分組
+  - `_create_recommendation_note`：新增精簡SKU模式 Notes 文案
+- [`app.py`](app.py)
+  - 版本升級至 v2.10.0（二十四模式系統）
+  - 側欄模式選單新增 `精簡SKU(限同OM)`、`精簡SKU(跨OM)`
+  - `mode_name_map`、模式說明、欄位要求同步更新
+  - 核心功能說明新增精簡SKU模式
+- [`excel_generator.py`](excel_generator.py)
+  - 更新 docstring：二十四模式系統
+
+#### 文件同步
+- [`README.md`](README.md)
+  - 系統概述改為二十四模式
+  - 模式對照表新增精簡SKU(限同OM)、精簡SKU(跨OM) 行
+  - F/F2 模式描述更新
+  - 補回 D2 模式描述
+- [`調貨模式詳解.txt`](調貨模式詳解.txt)
+  - 標題改為「二十四種調貨模式詳解」
+  - 新增精簡SKU(限同OM)、精簡SKU(跨OM) 完整說明段落
+  - F/F2 模式接收規則更新（ND/RF 均可接收、Target 直接作為接收量）
+  - 關鍵差異對比表新增精簡SKU 列
+  - 應用場景建議新增精簡SKU 說明
+  - 轉出/接收分類類型新增精簡SKU
+- [`transfer_logic_ai_brief.md`](transfer_logic_ai_brief.md)
+  - 新增精簡SKU(限同OM)、精簡SKU(跨OM) 模式說明
+  - 更新 Mode F / Mode F2 的 Destination rules
+
+---
+
 ## v2.9.1 (2026-04-27)
 
 ### 正式加入 C1 模式（重點補0-只補0/1）
