@@ -476,9 +476,13 @@ class TransferLogic:
                     continue
 
             elif mode in (self.mode_c, self.mode_c1, self.mode_c2):
-                # C模式(重點補0) / C2模式(附加C跨OM重點補0)
+                # C模式(重點補0) / C1模式(只補0/1) / C2模式(附加C跨OM重點補0)
                 # 中等強度，小量精準支援 0 / 低庫存店，不做大規模抽貨。
-                base_transferable = total_available - safety_stock
+                if mode == self.mode_c1:
+                    # C1：允許低於Safety Stock，以淨庫存-2為基準（至少保留2件）
+                    base_transferable = int(row['SaSa Net Stock']) - 2
+                else:
+                    base_transferable = total_available - safety_stock
                 if base_transferable <= 0:
                     continue
 
@@ -686,19 +690,21 @@ class TransferLogic:
             return destinations
 
         # 只考慮RF類型店鋪（ND店鋪在所有模式下都只能轉出，不能接收）
+        # 例外：F/F2模式下，有 Target > 0 的 ND 店舖可接收（打破 ND 不可接收規則）
         rf_destinations = group_df[group_df['RP Type'] == 'RF']
 
         # F/F2模式特殊處理：Target數字優先接收
         # - F：其餘店鋪按C模式補0
         # - F2：僅Target店舖可接收
         if mode in (self.mode_f, self.mode_f_target_only):
-            target_series = self._parse_target_series(rf_destinations)
+            target_series = self._parse_target_series(group_df)
 
-            for idx, row in rf_destinations.iterrows():
+            for idx, row in group_df.iterrows():
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
                 target_value = target_series.loc[idx]
+                rp_type = row['RP Type']
 
-                # Target數字：優先接收目標
+                # Target數字：優先接收目標（ND 和 RF 均可接收）
                 if pd.notna(target_value) and target_value > 0:
                     target_qty = int(target_value)
                     if total_available < target_qty:
@@ -707,7 +713,7 @@ class TransferLogic:
                         destinations.append({
                             'site': row['Site'],
                             'om': row['OM'],
-                            'rp_type': row['RP Type'],
+                            'rp_type': rp_type,
                             'needed_qty': needed_qty,
                             'priority': 1,
                             'current_stock': row['SaSa Net Stock'],
@@ -723,19 +729,23 @@ class TransferLogic:
                         })
                     continue
 
+                # ND 店舖無 Target 時不接收（ND 預設只能轉出）
+                if rp_type == 'ND':
+                    continue
+
                 # F2：非Target店舖不接收
                 if mode == self.mode_f_target_only:
                     continue
 
-                # 未標Target的店鋪，按C模式重點補0
-                if total_available <= 1:
+                # 未標Target的RF店鋪，按C模式重點補0（Safety Stock=0且無銷量的店舖不補）
+                if total_available <= 1 and (int(row['Safety Stock']) > 0 or int(row['Effective Sold Qty']) > 0):
                     target_qty = max(int(row['Safety Stock'] * 0.5), 3)
                     needed_qty = target_qty - total_available
                     if needed_qty > 0:
                         destinations.append({
                             'site': row['Site'],
                             'om': row['OM'],
-                            'rp_type': row['RP Type'],
+                            'rp_type': rp_type,
                             'needed_qty': needed_qty,
                             'priority': 2,
                             'current_stock': row['SaSa Net Stock'],
@@ -837,8 +847,8 @@ class TransferLogic:
                 safety_stock = int(row['Safety Stock'])
                 max_can_receive = max(safety_stock * 2, 3)
 
-                if total_available >= max_can_receive:
-                    continue
+                # 僅接受庫存不足安全庫存的店舖接收，目標補至安全庫存
+                # max_can_receive 作為累計接收硬上限（防止多來源疊加超量）
                 if total_available >= safety_stock:
                     continue
 
@@ -962,6 +972,9 @@ class TransferLogic:
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
                 if total_available > 1:
                     continue
+                # Safety Stock=0且無銷量的店舖不補
+                if int(row['Safety Stock']) <= 0 and int(row['Effective Sold Qty']) <= 0:
+                    continue
 
                 target_qty = max(int(row['Safety Stock'] * 0.5), 3)
                 needed_qty = target_qty - total_available
@@ -996,7 +1009,8 @@ class TransferLogic:
             total_available = row['SaSa Net Stock'] + row['Pending Received']
             
             # C模式/C2模式特殊處理：針對(SaSa Net Stock+Pending Received)<=1的店鋪
-            if mode in (self.mode_c, self.mode_c2) and total_available <= 1:
+            # Safety Stock=0且無銷量的店舖不補
+            if mode in (self.mode_c, self.mode_c2) and total_available <= 1 and (int(row['Safety Stock']) > 0 or int(row['Effective Sold Qty']) > 0):
                 # 計算需要補充的數量：根據Safety Stock的50%和3件的最高值來確定補充數量
                 target_qty = max(int(row['Safety Stock'] * 0.5), 3)
                 needed_qty = target_qty - total_available
@@ -1420,6 +1434,8 @@ class TransferLogic:
 
         # 所有轉出店舖先加入 transfer_sites，防止同時作為接收方
         transfer_sites = set(s['site'] for s in temp_sources if s['transferable_qty'] > 0)
+        # 追蹤已接收的站點，防止接收方再被選為轉出方
+        receive_sites = set()
 
         # 累計接收數量追蹤
         received_qty_by_site = {}
@@ -1442,6 +1458,8 @@ class TransferLogic:
                 if source['site'] == dest['site']:
                     continue
                 if dest['site'] in transfer_sites:
+                    continue
+                if source['site'] in receive_sites:
                     continue
 
                 # ND1 模式：同 OM 限制
@@ -1517,6 +1535,9 @@ class TransferLogic:
                 source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
                 source['transferable_qty'] -= transfer_qty
                 dest['needed_qty'] -= transfer_qty
+
+                # 標記接收站點，防止接收方再被選為轉出方
+                receive_sites.add(dest['site'])
 
                 matched_sites = source_to_receive_sites.setdefault(source['site'], set())
                 matched_sites.add(dest['site'])
@@ -1683,28 +1704,18 @@ class TransferLogic:
                         continue
                     if dest['site'] in transfer_sites:
                         continue
-                    if dest.get('rp_type') == 'ND':
+                    # priority=2（補0店鋪）：ND 不可接收，且限制同OM配對
+                    if priority_level == 2:
+                        if dest.get('rp_type') == 'ND':
+                            continue
+                        if source['om'] != dest['om']:
+                            continue
+
+                    # Windy限制：Windy轉出只能到Windy（跨OM通用規則）
+                    if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
                         continue
 
-                    # B3模式：Windy只能轉到Windy；但Windy可接收其他OM
-                    if self._is_b3_family_mode(mode) and source.get('om') == 'Windy' and dest.get('om') != 'Windy':
-                        continue
-
-                    # B3/B3a模式：HD不能轉到HA/HB/HC
-                    if self._is_b3_family_mode(mode):
-                        source_site = source.get('site')
-                        is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
-                        if is_source_hd:
-                            dest_site_upper = dest.get('site', '')
-                            dest_site_upper = dest_site_upper.upper() if isinstance(dest_site_upper, str) else ''
-                            if dest_site_upper.startswith(('HA', 'HB', 'HC')):
-                                continue
-
-                    # priority=2（補0店鋪）：限制同OM配對
-                    if priority_level == 2 and source['om'] != dest['om']:
-                        continue
-
-                    # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
+                    # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪（跨OM通用規則）
                     source_site = source['site']
                     is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
                     if is_source_hd:
@@ -2125,8 +2136,9 @@ class TransferLogic:
         
         # 關鍵：收集所有非E模式OM的接收目標sites（無論其needed_qty當前狀態）
         # 這些sites不應該再成為C模式的sources，因為它們已經被分配為接收方
+        # 僅排除仍有未滿足需求的接收目標站點（needed_qty > 0）
         non_e_mode_receiving_sites = set([d['site'] for d in temp_destinations 
-                                          if d['om'] not in e_mode_source_oms])
+                                           if d['om'] not in e_mode_source_oms and d['needed_qty'] > 0])
         
         # 篩選非E模式OM的未滿足接收需求
         unfulfilled_dests = [d for d in temp_destinations 
@@ -2624,7 +2636,10 @@ class TransferLogic:
             if total_qty <= 1:
                 continue
 
-            while True:
+            max_iterations = len(group_recs) + 2
+            iteration = 0
+            while iteration < max_iterations:
+                iteration += 1
                 singles = [r for r in group_recs if int(r.get('Transfer Qty', 0) or 0) == 1]
                 if not singles:
                     break
@@ -3159,14 +3174,7 @@ class TransferLogic:
         
         # E1/E2模式接收上限說明
         if mode in (self.mode_e1, self.mode_e1b, self.mode_e2) and 'target_qty' in dest:
-            _limit = self.b_special_max_receive_sites_per_source
-            if _limit == 1:
-                _multiplier_desc = "4倍(優先1間設定)"
-            elif _limit == 2:
-                _multiplier_desc = "3倍(最多2間設定)"
-            else:
-                _multiplier_desc = "2.5倍(不限制設定)"
-            notes_parts.append(f"【接收上限: E模式接收上限為安全庫存{_multiplier_desc}(最少3件)，目標{dest['target_qty']}件，累計已接收{current_received_qty + transfer_qty}件】")
+            notes_parts.append(f"【接收上限: E模式接收上限為安全庫存2倍(最少3件)，目標{dest['target_qty']}件，累計已接收{current_received_qty + transfer_qty}件】")
         
         # 6. 轉移數量說明
         if transfer_qty == 2 and source.get('original_stock', 0) == 1:

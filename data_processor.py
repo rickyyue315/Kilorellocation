@@ -451,6 +451,16 @@ class DataProcessor:
                 df_processed.loc[mask_outlier, col] = 100000
                 df_processed.loc[mask_outlier, 'Notes'] = df_processed.loc[mask_outlier, 'Notes'] + "銷量數據超出範圍;"
         
+        # Safety Stock 和 MOQ 負值校正
+        for col in ['Safety Stock', 'MOQ']:
+            if col in df_processed.columns:
+                mask_negative = df_processed[col] < 0
+                if mask_negative.any():
+                    df_processed.loc[mask_negative, col] = 0
+                    df_processed.loc[mask_negative, 'Notes'] = (
+                        df_processed.loc[mask_negative, 'Notes'].astype(str) + f"{col}負值已校正為0;"
+                    )
+        
         logger.info("異常值校正完成")
         return df_processed
     
@@ -466,12 +476,10 @@ class DataProcessor:
         """
         df_processed = df.copy()
         
-        # 計算有效銷量：優先使用上月銷量，若為0則使用本月銷量
+        # 計算有效銷量：上月銷量 + 本月MTD銷量
         if 'Last Month Sold Qty' in df_processed.columns and 'MTD Sold Qty' in df_processed.columns:
-            df_processed['Effective Sold Qty'] = np.where(
-                df_processed['Last Month Sold Qty'] > 0,
-                df_processed['Last Month Sold Qty'],
-                df_processed['MTD Sold Qty']
+            df_processed['Effective Sold Qty'] = (
+                df_processed['Last Month Sold Qty'] + df_processed['MTD Sold Qty']
             )
         else:
             df_processed['Effective Sold Qty'] = 0

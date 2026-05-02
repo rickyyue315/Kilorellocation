@@ -75,7 +75,7 @@ def test_c1_match_prefers_larger_source_before_one_piece_source():
             'OM': 'OM1',
             'RP Type': 'RF',
             'Site': 'SRC_ONE',
-            'SaSa Net Stock': 6,
+            'SaSa Net Stock': 3,
             'Pending Received': 0,
             'Safety Stock': 5,
             'Last Month Sold Qty': 1,
