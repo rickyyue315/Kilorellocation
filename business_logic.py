@@ -94,6 +94,14 @@ class TransferLogic:
     def _is_simplified_sku_mode(self, mode: str) -> bool:
         return mode in (self.mode_simplified_sku_same, self.mode_simplified_sku_cross)
 
+    @staticmethod
+    def _is_hd_to_hk_restricted(source_site: str, dest_site: str) -> bool:
+        if not isinstance(source_site, str) or not source_site.upper().startswith('HD'):
+            return False
+        if not isinstance(dest_site, str):
+            return False
+        return dest_site.upper().startswith(('HA', 'HB', 'HC'))
+
     def _get_b_special_sales_total(self, data: Dict) -> int:
         return int(data.get('last_month_sold_qty', 0) or 0) + int(data.get('mtd_sold_qty', 0) or 0)
 
@@ -716,11 +724,11 @@ class TransferLogic:
                             'rp_type': rp_type,
                             'needed_qty': needed_qty,
                             'priority': 1,
-                            'current_stock': row['SaSa Net Stock'],
-                            'pending_received': row['Pending Received'],
-                            'safety_stock': row['Safety Stock'],
-                            'moq': row['MOQ'],
-                            'effective_sold_qty': row['Effective Sold Qty'],
+                            'current_stock': int(row['SaSa Net Stock']),
+                            'pending_received': int(row['Pending Received']),
+                            'safety_stock': int(row['Safety Stock']),
+                            'moq': int(row['MOQ']),
+                            'effective_sold_qty': int(row['Effective Sold Qty']),
                             'dest_type': dest_type,
                             'target_qty': target_qty,
                             'received_qty': 0,
@@ -748,11 +756,11 @@ class TransferLogic:
                             'rp_type': rp_type,
                             'needed_qty': needed_qty,
                             'priority': 2,
-                            'current_stock': row['SaSa Net Stock'],
-                            'pending_received': row['Pending Received'],
-                            'safety_stock': row['Safety Stock'],
-                            'moq': row['MOQ'],
-                            'effective_sold_qty': row['Effective Sold Qty'],
+                            'current_stock': int(row['SaSa Net Stock']),
+                            'pending_received': int(row['Pending Received']),
+                            'safety_stock': int(row['Safety Stock']),
+                            'moq': int(row['MOQ']),
+                            'effective_sold_qty': int(row['Effective Sold Qty']),
                             'dest_type': '重點補0',
                             'target_qty': target_qty,
                             'received_qty': 0,
@@ -809,19 +817,19 @@ class TransferLogic:
                         'site': row['Site'],
                         'om': row['OM'],
                         'rp_type': row['RP Type'],
-                        'needed_qty': needed_qty,
+                        'needed_qty': int(needed_qty),
                         'priority': priority,
-                        'current_stock': row['SaSa Net Stock'],
-                        'pending_received': row['Pending Received'],
+                        'current_stock': int(row['SaSa Net Stock']),
+                        'pending_received': int(row['Pending Received']),
                         'safety_stock': safety_stock,
-                        'moq': row['MOQ'],
-                        'effective_sold_qty': row['Effective Sold Qty'],
+                        'moq': int(row['MOQ']),
+                        'effective_sold_qty': int(row['Effective Sold Qty']),
                         'dest_type': dest_type,
-                        'target_qty': max_can_receive,  # 目標為Safety Stock的2倍
-                        'received_qty': 0,  # 初始化累計接收數量
+                        'target_qty': max_can_receive,
+                        'received_qty': 0,
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
                         'mtd_sold_qty': int(row['MTD Sold Qty']),
-                        'max_receive_qty': max_can_receive  # 記錄最大接收限制
+                        'max_receive_qty': max_can_receive
                     })
             
             if mode == self.mode_e1b:
@@ -885,13 +893,13 @@ class TransferLogic:
                     'site': row['Site'],
                     'om': row['OM'],
                     'rp_type': row['RP Type'],
-                    'needed_qty': needed_qty,
+                    'needed_qty': int(needed_qty),
                     'priority': priority,
-                    'current_stock': row['SaSa Net Stock'],
-                    'pending_received': row['Pending Received'],
-                    'safety_stock': row['Safety Stock'],
-                    'moq': row['MOQ'],
-                    'effective_sold_qty': row['Effective Sold Qty'],
+                    'current_stock': int(row['SaSa Net Stock']),
+                    'pending_received': int(row['Pending Received']),
+                    'safety_stock': safety_stock,
+                    'moq': int(row['MOQ']),
+                    'effective_sold_qty': int(row['Effective Sold Qty']),
                     'dest_type': dest_type,
                     'target_qty': max_can_receive,
                     'received_qty': 0,
@@ -913,54 +921,60 @@ class TransferLogic:
         # D/D2模式特殊處理：放寬接收條件，不要求最高銷量限制
         if self._is_d_family_mode(mode):
             for _, row in rf_destinations.iterrows():
-                total_available = row['SaSa Net Stock'] + row['Pending Received']
+                total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+                safety_stock = int(row['Safety Stock'])
                 
                 # 優先級1：緊急缺貨補貨
-                is_no_stock = row['SaSa Net Stock'] == 0
-                has_sales_history = row['Effective Sold Qty'] > 0
+                is_no_stock = int(row['SaSa Net Stock']) == 0
+                has_sales_history = int(row['Effective Sold Qty']) > 0
                 
                 if is_no_stock and has_sales_history:
-                    needed_qty = row['Safety Stock']
+                    needed_qty = max(safety_stock, 2) - total_available
+                    if needed_qty <= 0:
+                        needed_qty = max(safety_stock, 2)
+                    max_receive = max(safety_stock, 2)
                     destinations.append({
                         'site': row['Site'],
                         'om': row['OM'],
                         'rp_type': row['RP Type'],
                         'needed_qty': needed_qty,
                         'priority': 1,
-                        'current_stock': row['SaSa Net Stock'],
-                        'pending_received': row['Pending Received'],
-                        'safety_stock': row['Safety Stock'],
-                        'moq': row['MOQ'],
-                        'effective_sold_qty': row['Effective Sold Qty'],
+                        'current_stock': int(row['SaSa Net Stock']),
+                        'pending_received': int(row['Pending Received']),
+                        'safety_stock': safety_stock,
+                        'moq': int(row['MOQ']),
+                        'effective_sold_qty': int(row['Effective Sold Qty']),
                         'dest_type': '緊急缺貨補貨',
-                        'target_qty': needed_qty,
+                        'target_qty': max_receive,
                         'received_qty': 0,
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                        'mtd_sold_qty': int(row['MTD Sold Qty'])
+                        'mtd_sold_qty': int(row['MTD Sold Qty']),
+                        'max_receive_qty': max_receive
                     })
                     continue
                 
                 # 優先級2：潛在缺貨補貨（D模式放寬：不要求最高銷量）
-                is_insufficient_stock = total_available < row['Safety Stock']
+                is_insufficient_stock = total_available < safety_stock
                 
                 if is_insufficient_stock:
-                    needed_qty = row['Safety Stock'] - total_available
+                    needed_qty = safety_stock - total_available
                     destinations.append({
                         'site': row['Site'],
                         'om': row['OM'],
                         'rp_type': row['RP Type'],
                         'needed_qty': needed_qty,
                         'priority': 2,
-                        'current_stock': row['SaSa Net Stock'],
-                        'pending_received': row['Pending Received'],
-                        'safety_stock': row['Safety Stock'],
-                        'moq': row['MOQ'],
-                        'effective_sold_qty': row['Effective Sold Qty'],
+                        'current_stock': int(row['SaSa Net Stock']),
+                        'pending_received': int(row['Pending Received']),
+                        'safety_stock': safety_stock,
+                        'moq': int(row['MOQ']),
+                        'effective_sold_qty': int(row['Effective Sold Qty']),
                         'dest_type': '潛在缺貨補貨',
-                        'target_qty': row['Safety Stock'],
+                        'target_qty': safety_stock,
                         'received_qty': 0,
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                        'mtd_sold_qty': int(row['MTD Sold Qty'])
+                        'mtd_sold_qty': int(row['MTD Sold Qty']),
+                        'max_receive_qty': safety_stock
                     })
             
             destinations.sort(key=lambda x: x['priority'])
@@ -985,15 +999,15 @@ class TransferLogic:
                     'site': row['Site'],
                     'om': row['OM'],
                     'rp_type': row['RP Type'],
-                    'needed_qty': needed_qty,
+                    'needed_qty': int(needed_qty),
                     'priority': 1,
-                    'current_stock': row['SaSa Net Stock'],
-                    'pending_received': row['Pending Received'],
-                    'safety_stock': row['Safety Stock'],
-                    'moq': row['MOQ'],
-                    'effective_sold_qty': row['Effective Sold Qty'],
+                    'current_stock': int(row['SaSa Net Stock']),
+                    'pending_received': int(row['Pending Received']),
+                    'safety_stock': int(row['Safety Stock']),
+                    'moq': int(row['MOQ']),
+                    'effective_sold_qty': int(row['Effective Sold Qty']),
                     'dest_type': '重點補0',
-                    'target_qty': target_qty,
+                    'target_qty': int(target_qty),
                     'received_qty': 0,
                     'last_month_sold_qty': int(row['Last Month Sold Qty']),
                     'mtd_sold_qty': int(row['MTD Sold Qty'])
@@ -1003,7 +1017,6 @@ class TransferLogic:
             return destinations
 
         # 找出該Article+OM組合中的最高有效銷量
-        max_sold_qty = rf_destinations['Effective Sold Qty'].max() if not rf_destinations.empty else 0
         
         for _, row in rf_destinations.iterrows():
             total_available = row['SaSa Net Stock'] + row['Pending Received']
@@ -1020,17 +1033,16 @@ class TransferLogic:
                         'site': row['Site'],
                         'om': row['OM'],
                         'rp_type': row['RP Type'],
-                        'needed_qty': needed_qty,
+                        'needed_qty': int(needed_qty),
                         'priority': 1,  # C/C2模式中優先級最高
-                        'current_stock': row['SaSa Net Stock'],
-                        'pending_received': row['Pending Received'],
-                        'safety_stock': row['Safety Stock'],
-                        'moq': row['MOQ'],
-                        'effective_sold_qty': row['Effective Sold Qty'],
+                        'current_stock': int(row['SaSa Net Stock']),
+                        'pending_received': int(row['Pending Received']),
+                        'safety_stock': int(row['Safety Stock']),
+                        'moq': int(row['MOQ']),
+                        'effective_sold_qty': int(row['Effective Sold Qty']),
                         'dest_type': '重點補0',
-                        'target_qty': target_qty,  # 添加目標數量信息
-                        'received_qty': 0,  # 初始化累計接收數量
-                        # 添加銷售數據
+                        'target_qty': int(target_qty),
+                        'received_qty': 0,
                         'last_month_sold_qty': int(row['Last Month Sold Qty']),
                         'mtd_sold_qty': int(row['MTD Sold Qty'])
                     })
@@ -1047,17 +1059,16 @@ class TransferLogic:
                     'site': row['Site'],
                     'om': row['OM'],
                     'rp_type': row['RP Type'],
-                    'needed_qty': needed_qty,
+                    'needed_qty': int(needed_qty),
                     'priority': 1,
-                    'current_stock': row['SaSa Net Stock'],
-                    'pending_received': row['Pending Received'],
-                    'safety_stock': row['Safety Stock'],
-                    'moq': row['MOQ'],
-                    'effective_sold_qty': row['Effective Sold Qty'],
+                    'current_stock': int(row['SaSa Net Stock']),
+                    'pending_received': int(row['Pending Received']),
+                    'safety_stock': int(row['Safety Stock']),
+                    'moq': int(row['MOQ']),
+                    'effective_sold_qty': int(row['Effective Sold Qty']),
                     'dest_type': '緊急缺貨補貨',
-                    'target_qty': needed_qty,  # 添加目標數量信息
-                    'received_qty': 0,  # 初始化累計接收數量
-                    # 添加銷售數據
+                    'target_qty': int(needed_qty),
+                    'received_qty': 0,
                     'last_month_sold_qty': int(row['Last Month Sold Qty']),
                     'mtd_sold_qty': int(row['MTD Sold Qty'])
                 })
@@ -1065,25 +1076,23 @@ class TransferLogic:
             
             # 優先級2：潛在缺貨補貨
             is_insufficient_stock = total_available < row['Safety Stock']
-            is_highest_sold = row['Effective Sold Qty'] == max_sold_qty
             
-            if is_insufficient_stock and is_highest_sold:
+            if is_insufficient_stock:
                 needed_qty = row['Safety Stock'] - total_available
                 destinations.append({
                     'site': row['Site'],
                     'om': row['OM'],
                     'rp_type': row['RP Type'],
-                    'needed_qty': needed_qty,
+                    'needed_qty': int(needed_qty),
                     'priority': 2,
-                    'current_stock': row['SaSa Net Stock'],
-                    'pending_received': row['Pending Received'],
-                    'safety_stock': row['Safety Stock'],
-                    'moq': row['MOQ'],
-                    'effective_sold_qty': row['Effective Sold Qty'],
+                    'current_stock': int(row['SaSa Net Stock']),
+                    'pending_received': int(row['Pending Received']),
+                    'safety_stock': int(row['Safety Stock']),
+                    'moq': int(row['MOQ']),
+                    'effective_sold_qty': int(row['Effective Sold Qty']),
                     'dest_type': '潛在缺貨補貨',
-                    'target_qty': row['Safety Stock'],  # 添加目標數量信息
-                    'received_qty': 0,  # 初始化累計接收數量
-                    # 添加銷售數據
+                    'target_qty': int(row['Safety Stock']),
+                    'received_qty': 0,
                     'last_month_sold_qty': int(row['Last Month Sold Qty']),
                     'mtd_sold_qty': int(row['MTD Sold Qty'])
                 })
@@ -1228,13 +1237,8 @@ class TransferLogic:
                 if cross_om and source.get('om') == 'Windy' and dest.get('om') != 'Windy':
                     continue
 
-                if cross_om:
-                    source_site = source['site']
-                    is_source_hd = isinstance(source_site, str) and source_site.upper().startswith('HD')
-                    if is_source_hd:
-                        dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
-                        if dest_site_upper.startswith(('HA', 'HB', 'HC')):
-                            continue
+                if cross_om and self._is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
+                    continue
 
                 receive_site_key = f"{dest['site']}_{article}"
                 current_received = received_qty_by_site.get(receive_site_key, 0)
@@ -1471,12 +1475,8 @@ class TransferLogic:
                     continue
 
                 # HD 限制：HD 不能轉到 HA/HB/HC（所有跨 OM 模式通用）
-                source_site = source['site']
-                is_source_hd = isinstance(source_site, str) and source_site.upper().startswith('HD')
-                if is_source_hd:
-                    dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
-                    if dest_site_upper.startswith(('HA', 'HB', 'HC')):
-                        continue
+                if self._is_hd_to_hk_restricted(source['site'], dest['site']):
+                    continue
 
                 # 同一 SKU 下每個 source 最多配對 N 個接收店鋪（可配置）
                 if max_receive_sites_per_source is not None:
@@ -1595,12 +1595,8 @@ class TransferLogic:
                     continue
 
                 # HD限制：HD店鋪不能轉到HA/HB/HC
-                source_site = source['site']
-                is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
-                if is_source_hd:
-                    dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
-                    if dest_site_upper.startswith(('HA', 'HB', 'HC')):
-                        continue
+                if self._is_hd_to_hk_restricted(source['site'], dest['site']):
+                    continue
 
                 transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
                 if transfer_qty <= 0:
@@ -1716,12 +1712,8 @@ class TransferLogic:
                         continue
 
                     # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪（跨OM通用規則）
-                    source_site = source['site']
-                    is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
-                    if is_source_hd:
-                        dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
-                        if dest_site_upper.startswith(('HA', 'HB', 'HC')):
-                            continue
+                    if self._is_hd_to_hk_restricted(source['site'], dest['site']):
+                        continue
 
                     transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_demand)
                     if transfer_qty <= 0:
@@ -1769,6 +1761,7 @@ class TransferLogic:
                     remaining_demand -= transfer_qty
 
                     if dest.get('target_qty') is not None and received_qty_by_site[receive_site_key] >= dest['target_qty']:
+                        remaining_demand -= dest['needed_qty']
                         dest['needed_qty'] = 0
 
         return recommendations
@@ -1830,13 +1823,9 @@ class TransferLogic:
                 if dest.get('rp_type') == 'ND':
                     continue
 
-                # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                source_site = source['site']
-                is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
-                if is_source_hd:
-                    dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
-                    if dest_site_upper.startswith(('HA', 'HB', 'HC')):
-                        continue
+# HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
+                if self._is_hd_to_hk_restricted(source['site'], dest['site']):
+                    continue
 
                 # 轉出限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
                 if max_receive_sites_per_source is not None:
@@ -1967,12 +1956,8 @@ class TransferLogic:
                     continue
                 
                 # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                source_site = source['site']
-                is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
-                if is_source_hd:
-                    dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
-                    if dest_site_upper.startswith(('HA', 'HB', 'HC')):
-                        continue  # 跳過不允許的目標
+                if self._is_hd_to_hk_restricted(source['site'], dest['site']):
+                    continue  # 跳過不允許的目標
 
                 # 轉出限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
                 if max_receive_sites_per_source is not None:
@@ -2041,10 +2026,6 @@ class TransferLogic:
             
             # 找出可用的跨OM接收店鋪
             source_om = source['om']
-            source_site = source['site']
-            
-            # 檢查轉出店鋪的Site是否以HD開頭（限制規則）
-            is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
             
             for dest in temp_destinations:
                 if dest['needed_qty'] <= 0:
@@ -2063,10 +2044,8 @@ class TransferLogic:
                     continue
                 
                 # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                if is_source_hd:
-                    dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
-                    if dest_site_upper.startswith(('HA', 'HB', 'HC')):
-                        continue  # 跳過不允許的目標
+                if self._is_hd_to_hk_restricted(source['site'], dest['site']):
+                    continue  # 跳過不允許的目標
 
                 # 轉出限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
                 if max_receive_sites_per_source is not None:
@@ -2138,7 +2117,7 @@ class TransferLogic:
         # 這些sites不應該再成為C模式的sources，因為它們已經被分配為接收方
         # 僅排除仍有未滿足需求的接收目標站點（needed_qty > 0）
         non_e_mode_receiving_sites = set([d['site'] for d in temp_destinations 
-                                           if d['om'] not in e_mode_source_oms and d['needed_qty'] > 0])
+                                           if d['om'] not in e_mode_source_oms])
         
         # 篩選非E模式OM的未滿足接收需求
         unfulfilled_dests = [d for d in temp_destinations 
@@ -2240,12 +2219,8 @@ class TransferLogic:
                         continue
                     
                     # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                    source_site = source['site']
-                    is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
-                    if is_source_hd:
-                        dest_site_upper = dest['site'].upper() if isinstance(dest['site'], str) else ''
-                        if dest_site_upper.startswith(('HA', 'HB', 'HC')):
-                            continue  # 跳過不允許的目標
+                    if self._is_hd_to_hk_restricted(source['site'], dest['site']):
+                        continue  # 跳過不允許的目標
                     
                     # 檢查累計接收數量，避免過量接收
                     receive_site_key = f"{dest['site']}_{article}"
@@ -2396,13 +2371,8 @@ class TransferLogic:
                 if self._is_b3_family_mode(mode):
                     if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
                         continue
-                    source_site = source.get('site')
-                    is_source_hd = source_site.upper().startswith('HD') if isinstance(source_site, str) else False
-                    if is_source_hd:
-                        dest_site_upper = dest.get('site', '')
-                        dest_site_upper = dest_site_upper.upper() if isinstance(dest_site_upper, str) else ''
-                        if dest_site_upper.startswith(('HA', 'HB', 'HC')):
-                            continue
+                    if self._is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
+                        continue
 
                 # B2/B2a/B3/B3a模式：Mix店舖銷售高於目標店時，不允許作為轉出
                 # 規則：Mix source 的 (MTD + Last 2 Month) > destination 的 (MTD + Last 2 Month) 時跳過
@@ -2427,6 +2397,11 @@ class TransferLogic:
                     if current_received_qty >= dest['target_qty']:
                         continue
                 
+                # D/D2模式：檢查累計接收上限（不超過Safety Stock）
+                if self._is_d_family_mode(mode) and 'target_qty' in dest:
+                    if current_received_qty >= dest['target_qty']:
+                        continue
+                
                 # 確定轉移數量
                 # B2/B2a/B3/B3a模式：考慮累計接收上限
                 if self._is_b_special_mode(mode) and 'target_qty' in dest:
@@ -2437,8 +2412,12 @@ class TransferLogic:
                     # 計算還需要接收的數量
                     remaining_needed = dest['target_qty'] - current_received_qty
                     transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_needed)
+                # D/D2模式：考慮累計接收上限
+                elif self._is_d_family_mode(mode) and 'target_qty' in dest:
+                    remaining_capacity = dest['target_qty'] - current_received_qty
+                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_capacity)
                 else:
-                    # A、B和D模式，使用原始邏輯
+                    # A和B模式，使用原始邏輯
                     transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
                 
                 # --- 數量調整邏輯 (D模式放寬限制以避免1件餘貨) ---
@@ -2543,6 +2522,11 @@ class TransferLogic:
 
                 # B2/B2a/B3/B3a模式：如果累計接收已達上限，將需求設為0
                 if self._is_b_special_mode(mode) and 'target_qty' in dest:
+                    if received_qty_by_site[receive_site_key] >= dest['target_qty']:
+                        dest['needed_qty'] = 0
+
+                # D/D2模式：如果累計接收已達安全庫存上限，將需求設為0
+                if self._is_d_family_mode(mode) and 'target_qty' in dest:
                     if received_qty_by_site[receive_site_key] >= dest['target_qty']:
                         dest['needed_qty'] = 0
 
@@ -2761,8 +2745,8 @@ class TransferLogic:
             # 識別接收候選店鋪
             destinations = self.identify_destinations(group_df, mode)
             
-            # E1/E1b/E2/F/F2/B3/B3a/B3L/B3La/C2/ND1/ND2/精簡SKU模式特殊處理：從destinations中過濾掉同時作為轉出源的店鋪
-            if mode in [self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la, self.mode_c2, self.mode_nd1, self.mode_nd2, self.mode_simplified_sku_same, self.mode_simplified_sku_cross]:
+            # E1/E1b/E2/F/F2/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C2/ND1/ND2/精簡SKU模式特殊處理：從destinations中過濾掉同時作為轉出源的店鋪
+            if mode in [self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b_special, self.mode_b_special_a, self.mode_b2l, self.mode_b2la, self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la, self.mode_c2, self.mode_nd1, self.mode_nd2, self.mode_simplified_sku_same, self.mode_simplified_sku_cross]:
                 source_sites = set([s['site'] for s in sources])
                 destinations = [d for d in destinations if d['site'] not in source_sites]
             
@@ -2910,7 +2894,7 @@ class TransferLogic:
         # 檢查7：接收店鋪不能是ND類型（ND店鋪在所有模式下都只能轉出，不能接收）
         # 例外：ND1/ND2 模式下允許 ND 互轉（ND 可作為接收方）
         # 使用已建好的索引查詢，避免每條建議全表掃描
-        if not self._is_nd_transfer_mode(mode):
+        if not self._is_nd_transfer_mode(mode) and mode not in (self.mode_f, self.mode_f_target_only):
             for rec in self.transfer_recommendations:
                 receive_site = rec['Receive Site']
                 article = rec['Article']
