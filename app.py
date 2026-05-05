@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import datetime
 import logging
 import os
+import textwrap
 import unicodedata
 
 try:
@@ -524,7 +525,7 @@ with st.sidebar:
         )
     _radio_html = '\n'.join(_radio_items)
     
-    st.markdown(f"""
+    st.markdown(textwrap.dedent(f"""
     <style>
     .kilo-mode-radio-group {{
         background: #F8F9FA;
@@ -616,7 +617,7 @@ with st.sidebar:
         }});
     }})();
     </script>
-    """, unsafe_allow_html=True)
+    """), unsafe_allow_html=True)
     
     transfer_mode = _current_mode
     transfer_mode = _fix_mojibake_text(transfer_mode)
