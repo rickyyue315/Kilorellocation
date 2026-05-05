@@ -449,44 +449,8 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # 模式選擇
-    st.markdown("### ⚙️ 模式選擇")
-    transfer_mode = st.radio(
-        "選擇轉貨模式",
-        [
-            "A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B2a: 附加B2a(特別模式-T遊客鋪不出貨)",
-            "B2L: 附加B2L(特別模式-Type=L保留2件)", "B2La: 附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨)",
-            "B3: 附加B(跨OM特別模式)", "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)",
-            "B3L: 附加B3L(跨OM特別模式-Type=L保留2件)", "B3La: 附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)",
-            "C: 重點補0", "C1: 重點補0(只補0/1)", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "D2: 清貨轉貨(ND限定)", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化", "F2: F指定模式",
-            "ND1: ND同OM轉貨", "ND2: ND混合OM轉貨",
-            "精簡SKU(限同OM): 精簡SKU限同OM", "精簡SKU(跨OM): 精簡SKU跨OM"
-        ],
-        key='transfer_mode',
-        help="選擇適合的調貨模式"
-    )
-    transfer_mode = _fix_mojibake_text(transfer_mode)
-    mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
-
-    receive_site_limit_mode_codes = ["B2", "B2a", "B2L", "B2La", "B3", "B3a", "B3L", "B3La", "E1", "E1b", "E2", "ND1", "ND2"]
-
-    b_special_receive_site_limit_option = "最多 2 間"
-    b_special_max_receive_sites_per_source = None
-    if mode_code in receive_site_limit_mode_codes:
-        b_special_receive_site_limit_option = st.radio(
-            "出貨店舖配對接收店數限制",
-            ["優先 1 間", "最多 2 間", "不限制"],
-            index=1,
-            key='b_special_receive_site_limit_option',
-            help="控制同一SKU下，每個出貨店舖最多可分配到多少個接收店舖（優先1間：盡量只配1間；最多2間；不限制）"
-        )
-        if b_special_receive_site_limit_option == "優先 1 間":
-            b_special_max_receive_sites_per_source = 1
-        elif b_special_receive_site_limit_option == "最多 2 間":
-            b_special_max_receive_sites_per_source = 2
-    
-    # 精簡模式說明
-    mode_descriptions = {
+    # 模式說明 (簡介)
+    _mode_descriptions = {
         "A: 保守轉貨": "轉出後保留安全庫存",
         "B: 加強轉貨": "積極處理滯銷品",
         "B2: 附加B(特別模式)": "B模式 + Type=L全轉出 + Mix高銷量保護",
@@ -513,7 +477,167 @@ with st.sidebar:
         "精簡SKU(跨OM): 精簡SKU跨OM": "精簡SKU模式：跨OM轉貨(Windy限制)，RF上限=Max(Safety×2,2月銷量×2)，剩餘退回D001"
     }
     
-    st.caption(mode_descriptions[transfer_mode])
+    # 模式選擇 (自訂HTML radio + info icon tooltip)
+    st.markdown("### ⚙️ 模式選擇")
+    _mode_options = [
+        "A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B2a: 附加B2a(特別模式-T遊客鋪不出貨)",
+        "B2L: 附加B2L(特別模式-Type=L保留2件)", "B2La: 附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨)",
+        "B3: 附加B(跨OM特別模式)", "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)",
+        "B3L: 附加B3L(跨OM特別模式-Type=L保留2件)", "B3La: 附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)",
+        "C: 重點補0", "C1: 重點補0(只補0/1)", "C2: 附加C(跨OM重點補0)", "D: 清貨轉貨", "D2: 清貨轉貨(ND限定)", "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)", "F: 目標優化", "F2: F指定模式",
+        "ND1: ND同OM轉貨", "ND2: ND混合OM轉貨",
+        "精簡SKU(限同OM): 精簡SKU限同OM", "精簡SKU(跨OM): 精簡SKU跨OM"
+    ]
+    
+    try:
+        _current_mode = st.query_params.get("tm", st.session_state.get('transfer_mode', _mode_options[0]))
+    except Exception:
+        _current_mode = st.session_state.get('transfer_mode', _mode_options[0])
+    if _current_mode not in _mode_options:
+        _current_mode = _mode_options[0]
+    
+    import urllib.parse
+    _radio_items = []
+    for _opt in _mode_options:
+        _desc = _mode_descriptions.get(_opt, "").replace('"', '&quot;')
+        _checked = 'checked' if _opt == _current_mode else ''
+        _escaped_opt = _opt.replace('"', '&quot;')
+        _radio_items.append(
+            '<div class="kilo-mode-option" onclick="document.getElementById(\'kilo_radio_'
+            + _escaped_opt.replace("'", r"\'").replace("(", r"\(").replace(")", r"\)")
+            + "').checked=true;"
+            + "var p=new URLSearchParams(window.location.search);p.set('tm','"
+            + urllib.parse.quote(_opt, safe='')
+            + "');window.location.search=p.toString();\">"
+            + '<input type="radio" name="kilo_mode" id="kilo_radio_' + _escaped_opt.replace('"', '&quot;') + '" '
+            + _checked + '>'
+            + '<label>' + _opt + '</label>'
+            + '<span class="kilo-info-icon" onclick="event.stopPropagation();'
+            + 'var t=document.getElementById(\'kilo_tooltip\');'
+            + 'var d=\'' + _desc.replace("'", r"\'") + '\';'
+            + 'if(t.classList.contains(\'kilo-visible\')&&t.getAttribute(\'data-desc\')===d){t.classList.remove(\'kilo-visible\');}else{t.innerHTML=d;t.setAttribute(\'data-desc\',d);t.classList.add(\'kilo-visible\');}'
+            + 'var r=this.getBoundingClientRect();'
+            + 't.style.top=r.top+\'px\';'
+            + 't.style.left=Math.min(r.right+8,window.innerWidth-290)+\'px\';'
+            + '">ℹ️</span>'
+            + '</div>'
+        )
+    _radio_html = '\n'.join(_radio_items)
+    
+    st.markdown(f"""
+    <style>
+    .kilo-mode-radio-group {{
+        background: #F8F9FA;
+        border-radius: 8px;
+        padding: 10px 12px;
+        max-height: 580px;
+        overflow-y: auto;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }}
+    .kilo-mode-option {{
+        display: flex;
+        align-items: center;
+        padding: 5px 8px;
+        margin: 1px 0;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.15s;
+    }}
+    .kilo-mode-option:hover {{
+        background: rgba(74, 144, 226, 0.08);
+    }}
+    .kilo-mode-option input[type="radio"] {{
+        margin: 0 8px 0 0;
+        accent-color: #4A90E2;
+        cursor: pointer;
+        flex-shrink: 0;
+    }}
+    .kilo-mode-option label {{
+        flex: 1;
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1.4;
+        color: #212529;
+    }}
+    .kilo-info-icon {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        font-style: normal;
+        color: #4A90E2;
+        border: 1.5px solid #4A90E2;
+        border-radius: 50%;
+        cursor: pointer;
+        flex-shrink: 0;
+        margin-left: 6px;
+        transition: all 0.15s;
+        user-select: none;
+        position: relative;
+    }}
+    .kilo-info-icon:hover {{
+        background: #4A90E2;
+        color: white;
+    }}
+    .kilo-tooltip {{
+        display: none;
+        position: fixed;
+        z-index: 99999;
+        background: white;
+        border: 1px solid #DEE2E6;
+        border-radius: 8px;
+        padding: 10px 14px;
+        max-width: 280px;
+        font-size: 13px;
+        color: #212529;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        line-height: 1.5;
+    }}
+    .kilo-tooltip.kilo-visible {{
+        display: block;
+    }}
+    </style>
+    <div class="kilo-mode-radio-group" id="kiloModeRadioGroup">
+        {_radio_html}
+    </div>
+    <div class="kilo-tooltip" id="kilo_tooltip"></div>
+    <script>
+    (function() {{
+        var tooltip = document.getElementById('kilo_tooltip');
+        var currentDesc = null;
+        document.addEventListener('click', function(e) {{
+            if (!e.target.classList.contains('kilo-info-icon')) {{
+                tooltip.classList.remove('kilo-visible');
+                currentDesc = null;
+            }}
+        }});
+    }})();
+    </script>
+    """, unsafe_allow_html=True)
+    
+    transfer_mode = _current_mode
+    transfer_mode = _fix_mojibake_text(transfer_mode)
+    mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
+
+    receive_site_limit_mode_codes = ["B2", "B2a", "B2L", "B2La", "B3", "B3a", "B3L", "B3La", "E1", "E1b", "E2", "ND1", "ND2"]
+
+    b_special_receive_site_limit_option = "最多 2 間"
+    b_special_max_receive_sites_per_source = None
+    if mode_code in receive_site_limit_mode_codes:
+        b_special_receive_site_limit_option = st.radio(
+            "出貨店舖配對接收店數限制",
+            ["優先 1 間", "最多 2 間", "不限制"],
+            index=1,
+            key='b_special_receive_site_limit_option',
+            help="控制同一SKU下，每個出貨店舖最多可分配到多少個接收店舖（優先1間：盡量只配1間；最多2間；不限制）"
+        )
+        if b_special_receive_site_limit_option == "優先 1 間":
+            b_special_max_receive_sites_per_source = 1
+        elif b_special_receive_site_limit_option == "最多 2 間":
+            b_special_max_receive_sites_per_source = 2
     
     with st.expander("📋 詳細模式說明", expanded=False):
         st.markdown("""
