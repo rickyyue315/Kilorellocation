@@ -17,7 +17,7 @@ ND2模式：ND店舖跨OM互轉，Windy只能轉Windy，其餘邏輯同ND1
 
 import pandas as pd
 import numpy as np
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional, Set
 import logging
 import unicodedata
 
@@ -125,7 +125,7 @@ class TransferLogic:
             return parsed
         return pd.Series(parsed, index=df.index)
     
-    def identify_sources(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
+    def identify_sources(self, group_df: pd.DataFrame, mode: str, protected_sites: Optional[Set[str]] = None) -> List[Dict]:
         """
         識別轉出候選店鋪
 
@@ -252,6 +252,10 @@ class TransferLogic:
                 target_value = target_series.loc[row.name]
                 if pd.notna(target_value) and target_value > 0:
                     continue
+                if mode == self.mode_f_target_only and protected_sites:
+                    site_key = str(row['Site']).strip().upper()
+                    if site_key in protected_sites:
+                        continue
                 net_stock = int(row['SaSa Net Stock'])
                 if net_stock > 0:
                     sources.append({
@@ -279,6 +283,10 @@ class TransferLogic:
                 target_value = target_series.loc[row.name]
                 if pd.notna(target_value) and target_value > 0:
                     continue
+                if mode == self.mode_f_target_only and protected_sites:
+                    site_key = str(row['Site']).strip().upper()
+                    if site_key in protected_sites:
+                        continue
                 net_stock = int(row['SaSa Net Stock'])
                 effective_sold = int(row['Effective Sold Qty'])
 
@@ -2725,6 +2733,17 @@ class TransferLogic:
         # 預先建立全局 (Article, Site) → Safety Stock / MOQ 索引，避免迴圈內重複建立（效能優化）
         article_site_index = df.set_index(['Article', 'Site'])[['Safety Stock', 'MOQ']]
         
+        # F2模式：預先計算全域有Target>0的店舖集合，避免Target店舖任何Article成為轉出源
+        target_stores = set()
+        if mode == self.mode_f_target_only:
+            target_series_full = self._parse_target_series(df)
+            if 'Target' in df.columns:
+                target_mask = target_series_full > 0
+                target_stores = set(
+                    df.loc[target_mask.fillna(False), 'Site']
+                    .astype(str).str.strip().str.upper()
+                )
+        
         for group_keys, group_df in grouped:
             # 獲取商品描述
             product_desc = group_df['Article Description'].iloc[0] if 'Article Description' in group_df.columns else ""
@@ -2740,7 +2759,10 @@ class TransferLogic:
                         break
             
             # 識別轉出候選店鋪
-            sources = self.identify_sources(group_df, mode)
+            sources = self.identify_sources(
+                group_df, mode,
+                protected_sites=target_stores if mode == self.mode_f_target_only else None
+            )
             
             # 識別接收候選店鋪
             destinations = self.identify_destinations(group_df, mode)
