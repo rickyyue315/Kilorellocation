@@ -725,12 +725,9 @@ class TransferLogic:
                     target_qty = int(target_value)
                     if mode == self.mode_f_target_only:
                         dest_type = 'F指定模式目標接收'
-                        needed_qty = target_qty
                     else:
-                        if total_available >= target_qty:
-                            continue
                         dest_type = 'F模式目標接收'
-                        needed_qty = target_qty - total_available
+                    needed_qty = target_qty
                     destinations.append({
                         'site': row['Site'],
                         'om': row['OM'],
@@ -1716,8 +1713,8 @@ class TransferLogic:
                 if dest['needed_qty'] <= 0 or remaining_demand <= 0:
                     continue
 
-                # F2模式：轉出優先級 ND > 同OM RF > 其他OM RF
-                if mode == self.mode_f_target_only:
+                # F/F2模式：轉出優先級 ND > 同OM RF > 其他OM RF
+                if mode in (self.mode_f, self.mode_f_target_only):
                     sorted_sources = sorted(
                         temp_sources,
                         key=lambda s: _f_source_sort_key(s, dest.get('om', ''))
