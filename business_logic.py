@@ -723,26 +723,31 @@ class TransferLogic:
                 # Target數字：優先接收目標（ND 和 RF 均可接收）
                 if pd.notna(target_value) and target_value > 0:
                     target_qty = int(target_value)
-                    if total_available < target_qty:
-                        dest_type = 'F模式目標接收' if mode == self.mode_f else 'F指定模式目標接收'
+                    if mode == self.mode_f_target_only:
+                        dest_type = 'F指定模式目標接收'
+                        needed_qty = target_qty
+                    else:
+                        if total_available >= target_qty:
+                            continue
+                        dest_type = 'F模式目標接收'
                         needed_qty = target_qty - total_available
-                        destinations.append({
-                            'site': row['Site'],
-                            'om': row['OM'],
-                            'rp_type': rp_type,
-                            'needed_qty': needed_qty,
-                            'priority': 1,
-                            'current_stock': int(row['SaSa Net Stock']),
-                            'pending_received': int(row['Pending Received']),
-                            'safety_stock': int(row['Safety Stock']),
-                            'moq': int(row['MOQ']),
-                            'effective_sold_qty': int(row['Effective Sold Qty']),
-                            'dest_type': dest_type,
-                            'target_qty': target_qty,
-                            'received_qty': 0,
-                            'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                            'mtd_sold_qty': int(row['MTD Sold Qty'])
-                        })
+                    destinations.append({
+                        'site': row['Site'],
+                        'om': row['OM'],
+                        'rp_type': rp_type,
+                        'needed_qty': needed_qty,
+                        'priority': 1,
+                        'current_stock': int(row['SaSa Net Stock']),
+                        'pending_received': int(row['Pending Received']),
+                        'safety_stock': int(row['Safety Stock']),
+                        'moq': int(row['MOQ']),
+                        'effective_sold_qty': int(row['Effective Sold Qty']),
+                        'dest_type': dest_type,
+                        'target_qty': target_qty,
+                        'received_qty': 0,
+                        'last_month_sold_qty': int(row['Last Month Sold Qty']),
+                        'mtd_sold_qty': int(row['MTD Sold Qty'])
+                    })
                     continue
 
                 # ND 店舖無 Target 時不接收（ND 預設只能轉出）
@@ -1687,6 +1692,17 @@ class TransferLogic:
         total_needed = sum([int(d.get('needed_qty', 0)) for d in temp_destinations])
         remaining_demand = total_needed
 
+        def _f_source_sort_key(src, dest_om):
+            rp = str(src.get('rp_type', '')).upper()
+            same_om = 1 if src.get('om') == dest_om else 2
+            if rp == 'ND':
+                tier = 0
+            elif same_om == 1:
+                tier = 1
+            else:
+                tier = 2
+            return (tier, src.get('effective_sold_qty', 0))
+
         # 分階段匹配：先處理priority=1（Target店鋪），再處理priority=2（補0店鋪）
         for priority_level in [1, 2]:
             priority_dests = [d for d in temp_destinations if d['priority'] == priority_level]
@@ -1699,8 +1715,17 @@ class TransferLogic:
             for dest in priority_dests:
                 if dest['needed_qty'] <= 0 or remaining_demand <= 0:
                     continue
+
+                # F2模式：轉出優先級 ND > 同OM RF > 其他OM RF
+                if mode == self.mode_f_target_only:
+                    sorted_sources = sorted(
+                        temp_sources,
+                        key=lambda s: _f_source_sort_key(s, dest.get('om', ''))
+                    )
+                else:
+                    sorted_sources = temp_sources
                 
-                for source in temp_sources:
+                for source in sorted_sources:
                     if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0 or remaining_demand <= 0:
                         continue
 
