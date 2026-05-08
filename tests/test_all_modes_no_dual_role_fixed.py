@@ -1,80 +1,175 @@
 ﻿"""
-æª¢æŸ¥æ‰€æœ‰æ¨¡å¼ä¸‹æ˜¯å¦å‡ºç¾åŒä¸€SKUçš„åº—èˆ–åŒæ™‚åšè½‰å‡ºèˆ‡æŽ¥æ”¶
+檢查所有模式下是否出現同一SKU的店舖同時做轉出與接收（使用模擬資料）
 """
 
-import os
-import sys
-from collections import defaultdict
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
+import pytest
+import pandas as pd
 from business_logic import TransferLogic
-from data_processor import DataProcessor
 
-FILE_PATH = r"C:\Users\kf_yue\Dropbox\SASA\AI\Sep2025_App\KiLo Reallocation\PIP_JosephJoey_09Feb2026.XLSX"
 
-MODES = [
-    "ä¿å®ˆè½‰è²¨",
-    "åŠ å¼·è½‰è²¨",
-    "é™„åŠ B(ç‰¹åˆ¥æ¨¡å¼)",
-    "é™„åŠ B2a(ç‰¹åˆ¥æ¨¡å¼-TéŠå®¢é‹ªä¸å‡ºè²¨)",
-    "é™„åŠ B3(è·¨OMç‰¹åˆ¥æ¨¡å¼)",
-    "é™„åŠ B3a(è·¨OMç‰¹åˆ¥æ¨¡å¼-TéŠå®¢é‹ªä¸å‡ºè²¨)",
-    "é‡é»žè£œ0",
-    "é‡é»žè£œ0-åªè£œ0/1",
-    "æ¸…è²¨è½‰è²¨",
-    "æ¸…è²¨è½‰è²¨(NDé™å®š)",
-    "å¼·åˆ¶è½‰å‡º",
-    "ç›®æ¨™å„ªåŒ–",
-    "FæŒ‡å®šæ¨¡å¼",
+def _build_test_df():
+    rows = [
+        {
+            'Article': '000000000001',
+            'Article Description': 'Product A',
+            'OM': 'Ivy',
+            'RP Type': 'RF',
+            'Site': 'HA02',
+            'SaSa Net Stock': 10,
+            'Pending Received': 0,
+            'Safety Stock': 3,
+            'MOQ': 1,
+            'Last Month Sold Qty': 5,
+            'MTD Sold Qty': 3,
+            'Effective Sold Qty': 8,
+            'Type': 'T',
+            'ALL': '',
+            'Target': '',
+        },
+        {
+            'Article': '000000000001',
+            'Article Description': 'Product A',
+            'OM': 'Ivy',
+            'RP Type': 'RF',
+            'Site': 'HA06',
+            'SaSa Net Stock': 0,
+            'Pending Received': 0,
+            'Safety Stock': 3,
+            'MOQ': 1,
+            'Last Month Sold Qty': 4,
+            'MTD Sold Qty': 2,
+            'Effective Sold Qty': 6,
+            'Type': 'M',
+            'ALL': '',
+            'Target': '',
+        },
+        {
+            'Article': '000000000001',
+            'Article Description': 'Product A',
+            'OM': 'Ivy',
+            'RP Type': 'RF',
+            'Site': 'HA15',
+            'SaSa Net Stock': 8,
+            'Pending Received': 0,
+            'Safety Stock': 3,
+            'MOQ': 1,
+            'Last Month Sold Qty': 3,
+            'MTD Sold Qty': 1,
+            'Effective Sold Qty': 4,
+            'Type': 'M',
+            'ALL': '',
+            'Target': '',
+        },
+        {
+            'Article': '000000000001',
+            'Article Description': 'Product A',
+            'OM': 'Ivy',
+            'RP Type': 'ND',
+            'Site': 'HA19',
+            'SaSa Net Stock': 5,
+            'Pending Received': 0,
+            'Safety Stock': 2,
+            'MOQ': 1,
+            'Last Month Sold Qty': 0,
+            'MTD Sold Qty': 0,
+            'Effective Sold Qty': 0,
+            'Type': 'L',
+            'ALL': '',
+            'Target': '',
+        },
+        {
+            'Article': '000000000002',
+            'Article Description': 'Product B',
+            'OM': 'Windy',
+            'RP Type': 'RF',
+            'Site': 'HD02',
+            'SaSa Net Stock': 12,
+            'Pending Received': 0,
+            'Safety Stock': 3,
+            'MOQ': 1,
+            'Last Month Sold Qty': 6,
+            'MTD Sold Qty': 2,
+            'Effective Sold Qty': 8,
+            'Type': 'L',
+            'ALL': '*',
+            'Target': '',
+        },
+        {
+            'Article': '000000000002',
+            'Article Description': 'Product B',
+            'OM': 'Windy',
+            'RP Type': 'RF',
+            'Site': 'HD03',
+            'SaSa Net Stock': 1,
+            'Pending Received': 0,
+            'Safety Stock': 4,
+            'MOQ': 1,
+            'Last Month Sold Qty': 5,
+            'MTD Sold Qty': 3,
+            'Effective Sold Qty': 8,
+            'Type': 'T',
+            'ALL': '',
+            'Target': '5',
+        },
+    ]
+    return pd.DataFrame(rows)
+
+
+MODES_SAME_OM = [
+    "保守轉貨",
+    "加強轉貨",
+    "附加B(特別模式)",
+    "附加B2a(特別模式-T遊客鋪不出貨)",
+    "重點補0",
+    "重點補0-只補0/1",
+    "清貨轉貨",
+    "清貨轉貨(ND限定)",
+    "強制轉出",
+    "強制轉出(優先類型接收)",
+    "目標優化",
+    "F指定模式",
+    "ND同OM轉貨",
+    "精簡SKU(限同OM)",
+]
+
+MODES_CROSS_OM = [
+    "附加B3(跨OM特別模式)",
+    "附加B3a(跨OM特別模式-T遊客鋪不出貨)",
+    "附加C2(跨OM重點補0)",
+    "強制轉出(跨OM)",
+    "ND混合OM轉貨",
+    "精簡SKU(跨OM)",
 ]
 
 
-def check_mode(df, mode):
+@pytest.mark.parametrize("mode", MODES_SAME_OM + MODES_CROSS_OM)
+def test_no_dual_role_all_modes(mode):
+    df = _build_test_df()
     logic = TransferLogic()
     recommendations = logic.generate_transfer_recommendations(df, mode)
 
-    article_sources = defaultdict(set)
-    article_dests = defaultdict(set)
+    article_sources = {}
+    article_dests = {}
 
     for rec in recommendations:
-]
-]
-]
+        art = rec['Article']
+        src = rec['Transfer Site']
+        dst = rec['Receive Site']
 
-]
-    for article in article_sources:
-]
-        if overlap:
-            violations.append((article, overlap))
+        if art not in article_sources:
+            article_sources[art] = set()
+        if art not in article_dests:
+            article_dests[art] = set()
 
-    return violations, len(recommendations)
+        article_sources[art].add(src)
+        article_dests[art].add(dst)
 
-
-def main():
-    if not os.path.exists(FILE_PATH):
-        print(f"âŒ æ‰¾ä¸åˆ°æ¸¬è©¦æª”æ¡ˆ: {FILE_PATH}")
-        return
-
-    processor = DataProcessor()
-    df, info = processor.preprocess_data(FILE_PATH)
-
-    any_violations = False
-    for mode in MODES:
-        violations, total = check_mode(df, mode)
-        if violations:
-            any_violations = True
-]
-]
-                print(f"  Article {article}: è¡çªåº—èˆ– {sorted(sites)}")
-            if len(violations) > 10:
-                print(f"  ... å¦æœ‰ {len(violations) - 10} ç­†è¡çªæœªé¡¯ç¤º")
-        else:
-]
-
-    if not any_violations:
-        print("\nâœ… å…¨éƒ¨æ¨¡å¼æª¢æŸ¥å®Œæˆï¼Œæœªç™¼ç¾åŒæºæŽ¥æ”¶/å‡ºè²¨å•é¡Œ")
+    for art in article_sources:
+        overlap = article_sources[art] & article_dests[art]
+        assert not overlap, (
+            f"Mode [{mode}]: dual role for article {art} at sites {overlap}"
+        )
 
 
 if __name__ == "__main__":
-    main()
+    pytest.main([__file__, "-v"])

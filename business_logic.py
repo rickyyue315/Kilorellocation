@@ -941,7 +941,7 @@ class TransferLogic:
                 if is_no_stock and has_sales_history:
                     needed_qty = max(safety_stock, 2) - total_available
                     if needed_qty <= 0:
-                        needed_qty = max(safety_stock, 2)
+                        continue
                     max_receive = max(safety_stock, 2)
                     destinations.append({
                         'site': row['Site'],
@@ -2753,7 +2753,11 @@ class TransferLogic:
         global_received_qty_by_site = {}
         
         # 預先建立全局 (Article, Site) → Safety Stock / MOQ 索引，避免迴圈內重複建立（效能優化）
-        article_site_index = df.set_index(['Article', 'Site'])[['Safety Stock', 'MOQ']]
+        _index_cols = [c for c in ['Safety Stock', 'MOQ'] if c in df.columns]
+        if _index_cols:
+            article_site_index = df.set_index(['Article', 'Site'])[_index_cols]
+        else:
+            article_site_index = pd.DataFrame(index=pd.MultiIndex.from_tuples([]))
         
         # F2模式：預先計算全域有Target>0的店舖集合，避免Target店舖任何Article成為轉出源
         target_stores = set()
@@ -2837,12 +2841,14 @@ class TransferLogic:
                 global_received_qty_by_site[receive_site_key] = current_received_qty + rec['Transfer Qty']
             
             # 更新安全庫存和MOQ信息（使用迴圈外預建索引，O(1) 查詢）
-            if recommendations:
+            if recommendations and not article_site_index.empty:
                 for rec in recommendations:
                     key = (rec['Article'], rec['Transfer Site'])
                     if key in article_site_index.index:
-                        rec['Safety Stock'] = article_site_index.at[key, 'Safety Stock']
-                        rec['MOQ'] = article_site_index.at[key, 'MOQ']
+                        if 'Safety Stock' in article_site_index.columns:
+                            rec['Safety Stock'] = article_site_index.at[key, 'Safety Stock']
+                        if 'MOQ' in article_site_index.columns:
+                            rec['MOQ'] = article_site_index.at[key, 'MOQ']
             
             all_recommendations.extend(recommendations)
         

@@ -198,11 +198,12 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - ND: full transfer (unless Target > 0 set for that site — then site becomes receiver)
   - RF: can transfer (protect highest sales store)
 - Destination priority:
-  1. Sites with Target > 0: receive exactly Target Qty (regardless of ND/RF type, regardless of current stock or pending received)
-  2. Sites with Total Available <= 1: zero stock replenishment logic (RF only)
+  1. Sites with Target > 0: receive exactly Target Qty (cross-OM allowed; regardless of ND/RF type, regardless of current stock or pending received)
+  2. Sites with Total Available <= 1: zero stock replenishment logic (RF only; **same-OM only** — the C-mode fallback does not cross OM boundaries)
 - Grouping: by Article only (allow cross-OM)
 - Extra constraints:
   - HD source cannot transfer to HA/HB/HC destinations
+  - Windy source can only transfer to Windy destinations
 - Key change: Target Qty is used directly as needed_qty (no subtraction of current stock or pending); ND stores with Target can receive
 - Goal: Target-driven allocation, zero stock replenishment for non-Target RF sites
 
@@ -211,11 +212,12 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - ND: full transfer (unless Target > 0 set for that site — then site becomes receiver)
   - RF: can transfer (protect highest sales store)
 - Destination priority:
-  1. Sites with Target > 0: receive exactly Target Qty (regardless of ND/RF type, regardless of current stock or pending received)
+  1. Sites with Target > 0: receive exactly Target Qty (cross-OM allowed; regardless of ND/RF type, regardless of current stock or pending received)
   2. Non-Target sites do not receive
 - Grouping: by Article only (allow cross-OM)
 - Extra constraints:
   - HD source cannot transfer to HA/HB/HC destinations
+  - Windy source can only transfer to Windy destinations
 - Key change: Target Qty is used directly as needed_qty (no subtraction of current stock or pending); ND stores with Target can receive
 - Goal: Target-only allocation, concentrate transfer to designated stores
 
