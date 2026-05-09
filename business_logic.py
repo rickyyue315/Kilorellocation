@@ -1592,6 +1592,9 @@ class TransferLogic:
         # 先將所有source sites加入transfer_sites，避免同時接收
         transfer_sites = set([s['site'] for s in temp_sources if s['transferable_qty'] > 0])
 
+        # 記錄已接收的站點，防止接收方再被選為轉出方
+        receive_sites = set()
+
         # 接收店鋪累計接收數量
         received_qty_by_site = {}
 
@@ -1666,6 +1669,9 @@ class TransferLogic:
                 source['transferable_qty'] -= transfer_qty
                 dest['needed_qty'] -= transfer_qty
 
+                # 記錄接收店鋪（防止同時作為轉出方）
+                receive_sites.add(dest['site'])
+
                 # C模式重點補0：如果累計接收已達目標，將需求設為0
                 if dest.get('dest_type') == '重點補0' and 'target_qty' in dest:
                     if received_qty_by_site[receive_site_key] >= dest['target_qty']:
@@ -1696,6 +1702,9 @@ class TransferLogic:
 
         # 先將所有source sites加入transfer_sites，避免同時接收
         transfer_sites = set([s['site'] for s in temp_sources if s['transferable_qty'] > 0])
+        
+        # 記錄已接收的站點，防止接收方再被選為轉出方
+        receive_sites = set()
 
         # 接收店鋪累計接收數量
         received_qty_by_site = {}
@@ -1804,6 +1813,9 @@ class TransferLogic:
                     dest['needed_qty'] -= transfer_qty
                     remaining_demand -= transfer_qty
 
+                    # 記錄接收店鋪（防止同時作為轉出方）
+                    receive_sites.add(dest['site'])
+
                     if dest.get('target_qty') is not None and received_qty_by_site[receive_site_key] >= dest['target_qty']:
                         remaining_demand -= dest['needed_qty']
                         dest['needed_qty'] = 0
@@ -1838,6 +1850,9 @@ class TransferLogic:
 
         # 記錄已經作為轉出店鋪的站點
         transfer_sites = set([s['site'] for s in temp_sources if s['transferable_qty'] > 0])
+        
+        # 記錄已接收的站點，防止接收方再被選為轉出方
+        receive_sites = set()
 
         # 記錄接收店鋪的累計接收數量
         received_qty_by_site = {}
@@ -1926,6 +1941,9 @@ class TransferLogic:
                 source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
                 source['transferable_qty'] -= transfer_qty
                 dest['needed_qty'] -= transfer_qty
+
+                # 記錄接收店鋪（防止同時作為轉出方）
+                receive_sites.add(dest['site'])
 
                 # 記錄此 source 已配對的 receive 店鋪
                 matched = source_to_receive_sites.setdefault(source['site'], set())
@@ -2245,6 +2263,7 @@ class TransferLogic:
                             'transferable_qty': actual_transferable,
                             'priority': 2,
                             'original_stock': int(row['SaSa Net Stock']),
+                            'total_transferred': 0,
                             'effective_sold_qty': effective_sold,
                             'source_type': source_type,
                             'last_month_sold_qty': int(row['Last Month Sold Qty']),
@@ -2269,6 +2288,10 @@ class TransferLogic:
                     
                     # 關鍵：嚴格避免轉出店舖同時作為接收店舖
                     if dest['site'] in transfer_sites:
+                        continue
+                    
+                    # 避免接收店同時作為轉出方
+                    if dest['site'] in receive_sites:
                         continue
                     
                     # 確保接收店舖不是ND類型
@@ -2307,7 +2330,7 @@ class TransferLogic:
                         'Receive Site': dest['site'],
                         'Transfer Qty': transfer_qty,
                         'Original Stock': source['original_stock'],
-                        'After Transfer Stock': source['original_stock'] - transfer_qty,
+                        'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
                         'Safety Stock': 0,
                         'MOQ': 0,
                         'Source Priority': source['priority'],
@@ -2328,9 +2351,13 @@ class TransferLogic:
                     recommendations.append(recommendation)
                     
                     # 更新數量
+                    source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
                     source['transferable_qty'] -= transfer_qty
                     dest['needed_qty'] -= transfer_qty
                     received_qty_by_site[receive_site_key] = current_received + transfer_qty
+                    
+                    # 記錄接收店鋪（防止同時作為轉出方）
+                    receive_sites.add(dest['site'])
                     
                     if source['transferable_qty'] <= 0:
                         break
@@ -2521,6 +2548,18 @@ class TransferLogic:
                 
                 # 最終保護：確保優化後的數量不超過各限制
                 transfer_qty = min(transfer_qty, source['transferable_qty'])
+                
+                # 重新應用模式特定的接收上限（優化可能將 transfer_qty 推高超出上限）
+                if self._is_b_special_mode(mode) and 'target_qty' in dest:
+                    remaining_cap = dest['target_qty'] - current_received_qty
+                    transfer_qty = min(transfer_qty, max(remaining_cap, 0))
+                elif dest['dest_type'] == '重點補0' and 'target_qty' in dest:
+                    remaining_need = dest['target_qty'] - current_received_qty
+                    transfer_qty = min(transfer_qty, max(remaining_need, 0))
+                elif self._is_d_family_mode(mode) and 'target_qty' in dest:
+                    remaining_cap = dest['target_qty'] - current_received_qty
+                    transfer_qty = min(transfer_qty, max(remaining_cap, 0))
+                
                 if transfer_qty <= 0:
                     continue
                 
@@ -3189,10 +3228,10 @@ class TransferLogic:
             notes_parts.append("【轉出分析: F模式ND類型店鋪，無庫存限制，全數轉出】")
         elif source['rp_type'] == 'ND' and self._is_d_family_mode(mode):
             mode_label = 'D2' if mode == self.mode_d2 else 'D'
-            remaining_after_transfer = source['original_stock'] - transfer_qty
+            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
             notes_parts.append(f"【轉出分析: ND店鋪清貨(模式{mode_label})，轉出後剩餘庫存({remaining_after_transfer})件，已優化避免1件餘貨】")
         elif source['source_type'] == 'F模式RF轉出':
-            remaining_after_transfer = source['original_stock'] - transfer_qty
+            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
             notes_parts.append(f"【轉出分析: F模式RF轉出，可忽視最小庫存要求，轉出後剩餘庫存({remaining_after_transfer})件】")
         elif source['source_type'] == 'E模式強制轉出':
             remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
@@ -3277,7 +3316,7 @@ class TransferLogic:
         if source['source_type'] == 'E模式強制轉出':
             remaining_stock = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
         else:
-            remaining_stock = source['original_stock'] - transfer_qty
+            remaining_stock = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
         notes_parts.append(f"【轉移後狀況: 轉出店鋪剩餘庫存{remaining_stock}件，接收店鋪累計接收{current_received_qty + transfer_qty}件】")
         
         # 8. 特殊標記
