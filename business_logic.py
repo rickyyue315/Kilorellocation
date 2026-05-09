@@ -164,7 +164,7 @@ class TransferLogic:
             rf_sources = group_df[group_df['RP Type'] == 'RF']
             max_sold_qty = rf_sources['Effective Sold Qty'].max() if not rf_sources.empty else 0
             if not rf_sources.empty:
-                if max_sold_qty == 0 or (rf_sources['Effective Sold Qty'] == max_sold_qty).sum() >= len(rf_sources):
+                if len(rf_sources) == 1 or max_sold_qty == 0 or (rf_sources['Effective Sold Qty'] == max_sold_qty).sum() >= len(rf_sources):
                     max_sold_qty = float('inf')
 
             for _, row in rf_sources.iterrows():
@@ -274,9 +274,9 @@ class TransferLogic:
             # RF類型：可忽視最小庫存要求，但保護最高銷量店鋪
             rf_sources = group_df[group_df['RP Type'] == 'RF']
             max_sold_qty = rf_sources['Effective Sold Qty'].max() if not rf_sources.empty else 0
-            # 如果所有RF店鋪銷量相同（包括全為0），則不保護任何店鋪
+            # 如果所有RF店鋪銷量相同（包括全為0）或只有1家RF店，則不保護任何店鋪
             if not rf_sources.empty:
-                if max_sold_qty == 0 or (rf_sources['Effective Sold Qty'] == max_sold_qty).sum() >= len(rf_sources):
+                if len(rf_sources) == 1 or max_sold_qty == 0 or (rf_sources['Effective Sold Qty'] == max_sold_qty).sum() >= len(rf_sources):
                     max_sold_qty = float('inf')
 
             for _, row in rf_sources.iterrows():
@@ -434,12 +434,17 @@ class TransferLogic:
 
         # 找出該Article+OM組合中的最高有效銷量（用於避免從最高動銷店轉出）
         max_sold_qty = rf_sources['Effective Sold Qty'].max() if not rf_sources.empty else 0
-        # 如果所有RF店鋪銷量相同（包括全為0），則不保護任何店鋪
+        # 如果所有RF店鋪銷量相同（包括全為0）或只有1家RF店，則不保護任何店鋪
         if not rf_sources.empty:
-            if max_sold_qty == 0 or (rf_sources['Effective Sold Qty'] == max_sold_qty).sum() >= len(rf_sources):
+            if len(rf_sources) == 1 or max_sold_qty == 0 or (rf_sources['Effective Sold Qty'] == max_sold_qty).sum() >= len(rf_sources):
                 max_sold_qty = float('inf')
 
+        rf_source_count_before_filter = 0
+        rf_source_count_after_filter = 0
+
         for _, row in rf_sources.iterrows():
+            rf_source_count_before_filter += 1
+
             if self._is_b_tourist_no_source_mode(mode) and type_series is not None and type_series.loc[row.name] == 'T':
                 continue
 
@@ -467,6 +472,8 @@ class TransferLogic:
             else:
                 if not (is_stock_above_safety and is_not_highest_sold):
                     continue
+
+            rf_source_count_after_filter += 1
 
             # 根據模式計算可轉出數量（已明確階梯：A < C < B）
             if mode == self.mode_a:
@@ -574,6 +581,13 @@ class TransferLogic:
                     'last_month_sold_qty': last_month_sold,
                     'mtd_sold_qty': int(row['MTD Sold Qty'])
                 })
+
+        if rf_source_count_before_filter > 0 and rf_source_count_after_filter == 0:
+            logger.warning(
+                f"[P1-1] RF sources全部被過濾: Article={group_df['Article'].iloc[0] if not group_df.empty else '?'}, "
+                f"mode={mode}, RF總數={rf_source_count_before_filter}, "
+                f"max_sold_qty={'inf' if max_sold_qty == float('inf') else max_sold_qty}"
+            )
 
         # 按優先級排序（ND優先，RF其次）
         sources.sort(key=lambda x: x['priority'])
@@ -1953,6 +1967,9 @@ class TransferLogic:
         # 關鍵：先將所有E模式source sites添加到transfer_sites，防止它們同時作為接收方
         transfer_sites = set([s['site'] for s in temp_sources if s['transferable_qty'] > 0])
         
+        # 記錄已經作為接收店鋪的站點，防止它們同時作為轉出方（P1-2修復）
+        receive_sites = set()
+        
         # 記錄接收店鋪的累計接收數量
         received_qty_by_site = {}
 
@@ -2045,6 +2062,9 @@ class TransferLogic:
                 source['transferable_qty'] -= transfer_qty
                 dest['needed_qty'] -= transfer_qty
 
+                # 記錄接收店鋪（防止同時作為轉出方）
+                receive_sites.add(dest['site'])
+
                 # 記錄此 source 已配對的 receive 店鋪
                 matched = source_to_receive_sites.setdefault(source['site'], set())
                 matched.add(dest['site'])
@@ -2133,6 +2153,9 @@ class TransferLogic:
                 source['transferable_qty'] -= transfer_qty
                 dest['needed_qty'] -= transfer_qty
 
+                # 記錄接收店鋪（防止同時作為轉出方）
+                receive_sites.add(dest['site'])
+
                 # 記錄此 source 已配對的 receive 店鋪
                 matched = source_to_receive_sites.setdefault(source['site'], set())
                 matched.add(dest['site'])
@@ -2168,6 +2191,10 @@ class TransferLogic:
                 if row['Site'] in transfer_sites:
                     continue
                 
+                # 跳過已經作為接收店舖的（P1-2修復：防止接收店同時做轉出）
+                if row['Site'] in receive_sites:
+                    continue
+                
                 # 關鍵：不能同時作為接收目標的sites
                 if row['Site'] in non_e_mode_receiving_sites:
                     continue
@@ -2179,9 +2206,9 @@ class TransferLogic:
                 # 找出該OM的最高銷量（保護最高動銷店）
                 om_rf_stores = group_df[(group_df['RP Type'] == 'RF') & (group_df['OM'] == row['OM'])]
                 max_sold_qty = om_rf_stores['Effective Sold Qty'].max() if not om_rf_stores.empty else 0
-                # 如果所有同OM的RF店鋪銷量相同（包括全為0），則不保護任何店鋪
+                # 如果所有同OM的RF店鋪銷量相同（包括全為0）或只有1家RF店，則不保護任何店鋪
                 if not om_rf_stores.empty:
-                    if max_sold_qty == 0 or (om_rf_stores['Effective Sold Qty'] == max_sold_qty).sum() >= len(om_rf_stores):
+                    if len(om_rf_stores) == 1 or max_sold_qty == 0 or (om_rf_stores['Effective Sold Qty'] == max_sold_qty).sum() >= len(om_rf_stores):
                         max_sold_qty = float('inf')
                 
                 # C模式條件：庫存高於安全庫存，且不是最高銷量店
@@ -2403,13 +2430,21 @@ class TransferLogic:
                         continue
                     if self._is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
                         continue
+                
+                # 全域安全網：跨OM配對時一律執行HD/Windy限制（P1-3防禦性加固）
+                if source.get('om') and dest.get('om') and source.get('om') != dest.get('om'):
+                    if self._is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
+                        continue
+                    if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
+                        continue
 
                 # B2/B2a/B3/B3a模式：Mix店舖銷售高於目標店時，不允許作為轉出
-                # 規則：Mix source 的 (MTD + Last 2 Month) > destination 的 (MTD + Last 2 Month) 時跳過
+                # 規則：Mix source 的 (Last Month + MTD) > destination 的 (Last Month + MTD) 時跳過
+                # 例外：若source也無銷量，則不阻擋（避免全部被擋住導致無調貨）
                 if self._is_b_special_mode(mode) and str(source.get('store_type', '')).upper() == 'M':
                     source_sales_total = self._get_b_special_sales_total(source)
                     dest_sales_total = self._get_b_special_sales_total(dest)
-                    if source_sales_total > dest_sales_total:
+                    if source_sales_total > 0 and source_sales_total > dest_sales_total:
                         continue
                 
                 # 檢查接收店鋪是否已達到目標數量
@@ -2488,6 +2523,17 @@ class TransferLogic:
                 transfer_qty = min(transfer_qty, source['transferable_qty'])
                 if transfer_qty <= 0:
                     continue
+                
+                # D/D2模式最終安全網：確認轉出後不會留下1件（P2-6加固）
+                if self._is_d_family_mode(mode) and source['rp_type'] == 'ND':
+                    final_remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
+                    if final_remaining == 1:
+                        if source['transferable_qty'] >= transfer_qty + 1:
+                            transfer_qty += 1
+                        elif transfer_qty > 1:
+                            transfer_qty -= 1
+                        if transfer_qty <= 0:
+                            continue
                 
                 # 創建調貨建議
                 recommendation = {
@@ -2702,6 +2748,15 @@ class TransferLogic:
                             single_rec['Transfer Qty'] = 0
                             group_changed = True
                             has_change = True
+                        else:
+                            # 方案3：銷量較高的1件單不願合併，改從2件單挪1件使其變2件
+                            donor_ge2 = [r for r in other_recs if int(r.get('Transfer Qty', 0) or 0) >= 2]
+                            if donor_ge2 and len(group_recs) >= 3:
+                                donor = max(donor_ge2, key=lambda r: int(r.get('Transfer Qty', 0) or 0))
+                                donor['Transfer Qty'] = int(donor.get('Transfer Qty', 0) or 0) - 1
+                                single_rec['Transfer Qty'] = 2
+                                group_changed = True
+                                has_change = True
 
                 group_recs[:] = [r for r in group_recs if int(r.get('Transfer Qty', 0) or 0) > 0]
 
