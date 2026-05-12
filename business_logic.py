@@ -1,7 +1,8 @@
 """
-業務邏輯模組 v2.10.0
+業務邏輯模組 v2.11.1
 實現調貨規則、源/目的地識別和匹配算法
 支持二十四模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B2L(附加B特別模式-Type=L保留2件)/B2La(附加B特別模式-Type=L保留2件-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/B3L(附加B跨OM特別模式-Type=L保留2件)/B3La(附加B跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
+A模式：當actual_transferable=1且remaining_stock>=3時，上調至2件（放寬Safety Stock -1）
 優化接收條件和避免同一SKU的轉出店鋪同時接收
 基於累計接收數量判斷是否達到最低保障標準的機制
 強化ND店鋪限制：所有模式下ND店鋪只能轉出，不能接收（ND1/ND2模式除外）
@@ -21,14 +22,26 @@ from typing import Any, Dict, List, Tuple, Optional, Set
 import logging
 import unicodedata
 
+from config import (
+    A_MODE_PERCENTAGE_CAP, A_MODE_MIN_TRANSFER,
+    B_MODE_PERCENTAGE_CAP, B_MODE_MIN_TRANSFER,
+    C_MODE_PERCENTAGE_CAP, C_MODE_ABS_CAP,
+    C1_MODE_MIN_TRANSFER,
+    SAFETY_RECEIVE_MULTIPLIER, MIN_RECEIVE_FLOOR,
+    F_TARGET_MULTIPLIER, F_TARGET_FLOOR,
+    SIMPLIFIED_SKU_RECEIVE_MULTIPLIER,
+    ND_RECEIVE_MULTIPLIER,
+)
+
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.10.0"""
+    """調貨業務邏輯類 v2.11.0"""
     
-    def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None):
+    def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
+                 f2_allow_hd_transfer: bool = False):
         self.transfer_recommendations = []
         self.quality_check_passed = True
         self.quality_errors = []
@@ -37,6 +50,7 @@ class TransferLogic:
             if isinstance(b_special_max_receive_sites_per_source, int) and b_special_max_receive_sites_per_source > 0
             else None
         )
+        self.f2_allow_hd_transfer = f2_allow_hd_transfer
         self.mode_a = "保守轉貨"  # A模式
         self.mode_b = "加強轉貨"  # B模式
         self.mode_b_special = "附加B(特別模式)"  # B2模式
@@ -171,7 +185,7 @@ class TransferLogic:
                 total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
                 safety_stock = int(row['Safety Stock'])
                 last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else int(row['Last Month Sold Qty'])
-                cap = max(safety_stock * 2, last_two_month_sold * 2)
+                cap = max(safety_stock * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER, last_two_month_sold * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER)
                 effective_sold = int(row['Effective Sold Qty'])
 
                 if effective_sold >= max_sold_qty:
@@ -484,7 +498,7 @@ class TransferLogic:
                     continue
 
                 # 上限：20% total_available，至少 2 件
-                upper_limit = max(int(total_available * 0.2), 2)
+                upper_limit = max(int(total_available * A_MODE_PERCENTAGE_CAP), A_MODE_MIN_TRANSFER)
 
                 actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
                 if actual_transferable <= 0:
@@ -495,6 +509,14 @@ class TransferLogic:
                 # 僅當仍維持 >= Safety Stock 才允許轉出
                 if remaining_stock >= safety_stock:
                     source_type = 'RF過剩轉出'
+                    # 若轉出僅1件且淨庫存餘3件以上，上調至2件 (避免單件調貨；放寬Safety Stock -1)
+                    if actual_transferable == 1 and remaining_stock >= 3:
+                        bump_remaining = int(row['SaSa Net Stock']) - 2
+                        # 放寬安全線: bump_remaining >= safety_stock - 1
+                        # 等價於 remaining_stock >= safety_stock (原始已通過), 故此處僅檢查上限
+                        if 2 <= upper_limit:
+                            actual_transferable = 2
+                            remaining_stock = bump_remaining
                 else:
                     continue
 
@@ -513,8 +535,8 @@ class TransferLogic:
                 # - 比例：最多 30% total_available
                 # - 件數：最多 3 件
                 # - 並允許至少 1 件（支援補0微調貨）
-                ratio_cap = int(total_available * 0.3)
-                abs_cap = 3
+                ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
+                abs_cap = C_MODE_ABS_CAP
                 # 有效上限不能為負
                 capped_ratio = max(ratio_cap, 0)
                 raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
@@ -542,7 +564,7 @@ class TransferLogic:
                     continue
 
                 # 上限：最多 50% total_available，至少 2 件
-                upper_limit = max(int(total_available * 0.5), 2)
+                upper_limit = max(int(total_available * B_MODE_PERCENTAGE_CAP), B_MODE_MIN_TRANSFER)
 
                 actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
                 if actual_transferable <= 0:
@@ -614,8 +636,7 @@ class TransferLogic:
                 total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
                 safety_stock = int(row['Safety Stock'])
                 last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else int(row['Last Month Sold Qty'])
-                cap = max(safety_stock * 2, last_two_month_sold * 2)
-
+                cap = max(safety_stock * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER, last_two_month_sold * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER)
                 if total_available >= cap:
                     continue
 
@@ -688,7 +709,7 @@ class TransferLogic:
                 if total_sales <= 0:
                     continue
 
-                max_receive = 2 * total_sales  # 接收上限 = 2倍兩月銷量
+                max_receive = ND_RECEIVE_MULTIPLIER * total_sales
                 current_stock = int(row['SaSa Net Stock']) + int(row['Pending Received'])
 
                 if current_stock >= max_receive:
@@ -771,7 +792,7 @@ class TransferLogic:
 
                 # 未標Target的RF店鋪，按C模式重點補0（Safety Stock=0且無銷量的店舖不補）
                 if total_available <= 1 and (int(row['Safety Stock']) > 0 or int(row['Effective Sold Qty']) > 0):
-                    target_qty = max(int(row['Safety Stock'] * 0.5), 3)
+                    target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
                     needed_qty = target_qty - total_available
                     if needed_qty > 0:
                         destinations.append({
@@ -807,7 +828,7 @@ class TransferLogic:
                 safety_stock = int(row['Safety Stock'])
                 
                 # E模式：接收上限固定為 Safety Stock * 2，最少為3件
-                max_can_receive = max(int(safety_stock * 2), 3)
+                max_can_receive = max(int(safety_stock * SAFETY_RECEIVE_MULTIPLIER), MIN_RECEIVE_FLOOR)
                 
                 # 如果目前庫存低於接收上限，則允許接收
                 if total_available < max_can_receive:
@@ -877,7 +898,7 @@ class TransferLogic:
             for idx, row in rf_destinations.iterrows():
                 total_available = row['SaSa Net Stock'] + row['Pending Received']
                 safety_stock = int(row['Safety Stock'])
-                max_can_receive = max(safety_stock * 2, 3)
+                max_can_receive = max(safety_stock * SAFETY_RECEIVE_MULTIPLIER, MIN_RECEIVE_FLOOR)
 
                 # 僅接受庫存不足安全庫存的店舖接收，目標補至安全庫存
                 # max_can_receive 作為累計接收硬上限（防止多來源疊加超量）
@@ -1014,7 +1035,7 @@ class TransferLogic:
                 if int(row['Safety Stock']) <= 0 and int(row['Effective Sold Qty']) <= 0:
                     continue
 
-                target_qty = max(int(row['Safety Stock'] * 0.5), 3)
+                target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
                 needed_qty = target_qty - total_available
                 if needed_qty <= 0:
                     continue
@@ -1049,7 +1070,7 @@ class TransferLogic:
             # Safety Stock=0且無銷量的店舖不補
             if mode in (self.mode_c, self.mode_c2) and total_available <= 1 and (int(row['Safety Stock']) > 0 or int(row['Effective Sold Qty']) > 0):
                 # 計算需要補充的數量：根據Safety Stock的50%和3件的最高值來確定補充數量
-                target_qty = max(int(row['Safety Stock'] * 0.5), 3)
+                target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
                 needed_qty = target_qty - total_available
                 
                 if needed_qty > 0:
@@ -1712,7 +1733,7 @@ class TransferLogic:
         total_needed = sum([int(d.get('needed_qty', 0)) for d in temp_destinations])
         remaining_demand = total_needed
 
-        def _f_source_sort_key(src, dest_om):
+        def _f_source_sort_key(src, dest_om, dest_site=''):
             rp = str(src.get('rp_type', '')).upper()
             same_om = 1 if src.get('om') == dest_om else 2
             if rp == 'ND':
@@ -1721,7 +1742,12 @@ class TransferLogic:
                 tier = 1
             else:
                 tier = 2
-            return (tier, src.get('effective_sold_qty', 0))
+            hd_penalty = 0
+            if (mode == self.mode_f_target_only and self.f2_allow_hd_transfer
+                    and str(src.get('site', '')).upper().startswith('HD')
+                    and dest_site.upper().startswith(('HA', 'HB', 'HC'))):
+                hd_penalty = 10
+            return (tier + hd_penalty, src.get('effective_sold_qty', 0))
 
         # 分階段匹配：先處理priority=1（Target店鋪），再處理priority=2（補0店鋪）
         for priority_level in [1, 2]:
@@ -1736,11 +1762,11 @@ class TransferLogic:
                 if dest['needed_qty'] <= 0 or remaining_demand <= 0:
                     continue
 
-                # F/F2模式：轉出優先級 ND > 同OM RF > 其他OM RF
+                # F/F2模式：轉出優先級 ND > 同OM RF > 其他OM RF > HD(僅F2+允許HD轉出)
                 if mode in (self.mode_f, self.mode_f_target_only):
                     sorted_sources = sorted(
                         temp_sources,
-                        key=lambda s: _f_source_sort_key(s, dest.get('om', ''))
+                        key=lambda s: _f_source_sort_key(s, dest.get('om', ''), dest.get('site', ''))
                     )
                 else:
                     sorted_sources = temp_sources
@@ -1765,8 +1791,10 @@ class TransferLogic:
                         continue
 
                     # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪（跨OM通用規則）
+                    # F2模式例外：若啟用f2_allow_hd_transfer，則允許HD轉出（排序已降為最低優先）
                     if self._is_hd_to_hk_restricted(source['site'], dest['site']):
-                        continue
+                        if not (mode == self.mode_f_target_only and self.f2_allow_hd_transfer):
+                            continue
 
                     transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_demand)
                     if transfer_qty <= 0:
@@ -1817,7 +1845,10 @@ class TransferLogic:
                     receive_sites.add(dest['site'])
 
                     if dest.get('target_qty') is not None and received_qty_by_site[receive_site_key] >= dest['target_qty']:
-                        remaining_demand -= dest['needed_qty']
+                        # dest['needed_qty'] 已在之前的每次轉移中逐步扣除
+                        # 若因單次轉移量大於剩餘 needed_qty 而導致 needed_qty 變為負值，
+                        # 則之前扣除的 transfer_qty 已大於實際 needed_qty，remaining_demand 已多扣
+                        # 此處將 needed_qty 歸零即可，不再額外扣除，否則會重複計算
                         dest['needed_qty'] = 0
 
         return recommendations
@@ -2184,11 +2215,10 @@ class TransferLogic:
         
         # Phase 3: C模式回退邏輯 - 當其他OM未有店舖涉及強制轉出時，可按照C模式照常做重點補0
         
-        # 關鍵：收集所有非E模式OM的接收目標sites（無論其needed_qty當前狀態）
+        # 關鍵：收集所有非E模式OM的**仍有未滿足需求**的接收目標sites
         # 這些sites不應該再成為C模式的sources，因為它們已經被分配為接收方
-        # 僅排除仍有未滿足需求的接收目標站點（needed_qty > 0）
-        non_e_mode_receiving_sites = set([d['site'] for d in temp_destinations 
-                                           if d['om'] not in e_mode_source_oms])
+        non_e_mode_receiving_sites = set([d['site'] for d in temp_destinations
+                                           if d['om'] not in e_mode_source_oms and d['needed_qty'] > 0])
         
         # 篩選非E模式OM的未滿足接收需求
         unfulfilled_dests = [d for d in temp_destinations 
@@ -2239,8 +2269,8 @@ class TransferLogic:
                         continue
                     
                     # C模式上限：30% total_available，最多3件，至少1件
-                    ratio_cap = int(total_available * 0.3)
-                    abs_cap = 3
+                    ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
+                    abs_cap = C_MODE_ABS_CAP
                     capped_ratio = max(ratio_cap, 0)
                     raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
                     upper_limit = max(1, raw_upper)
@@ -2529,7 +2559,7 @@ class TransferLogic:
                 # 2. 調貨數量優化：如果只有1件，嘗試調高到2件 (避免小額調撥)
                 if transfer_qty == 1 and source['transferable_qty'] >= 2:
                     # 檢查是否為允許優化的類型
-                    if source['source_type'] in ['ND轉出', 'ND清貨轉出', 'RF加強轉出']:
+                    if source['source_type'] in ['ND轉出', 'ND清貨轉出', 'RF加強轉出', 'RF過剩轉出']:
                         potential_qty = 2
                         already_out_opt = source.get('total_transferred', 0)
                         remaining_after_opt = source['original_stock'] - already_out_opt - potential_qty
@@ -2542,8 +2572,8 @@ class TransferLogic:
                                 # 如果不能調到3，則保持1件 (避免1件餘貨優先於避免小額調撥)
                                 pass
                         else:
-                            # 其他情況正常優化到2件
-                            if dest['needed_qty'] >= 2:
+                            # A模式的RF過剩轉出允許直接補到2件，避免最後仍殘留1件調貨。
+                            if dest['needed_qty'] >= 2 or (mode == self.mode_a and source['source_type'] == 'RF過剩轉出'):
                                 transfer_qty = 2
                 
                 # 最終保護：確保優化後的數量不超過各限制
@@ -2839,13 +2869,7 @@ class TransferLogic:
             grouped = df.groupby(['Article', 'OM'])
         
         all_recommendations = []
-        
-        # 記錄所有已經作為轉出店鋪的站點，避免它們同時作為接收店鋪
-        global_transfer_sites = set()
-        
-        # 記錄所有接收店鋪的累計接收數量
-        global_received_qty_by_site = {}
-        
+
         # 預先建立全局 (Article, Site) → Safety Stock / MOQ 索引，避免迴圈內重複建立（效能優化）
         _index_cols = [c for c in ['Safety Stock', 'MOQ'] if c in df.columns]
         if _index_cols:
@@ -2921,19 +2945,11 @@ class TransferLogic:
             else:
                 recommendations = self.match_transfers(article, om, sources, destinations, product_desc, mode)
             
-            # 更新全局轉出店鋪集合
             for rec in recommendations:
                 # 統一補上品牌欄位，供Excel輸出使用
                 rec['Product Hierarchy'] = product_brand
                 rec['Brand'] = product_brand
 
-                global_transfer_sites.add(rec['Transfer Site'])
-                
-                # 更新全局累計接收數量
-                receive_site_key = f"{rec['Receive Site']}_{rec['Article']}"
-                current_received_qty = global_received_qty_by_site.get(receive_site_key, 0)
-                global_received_qty_by_site[receive_site_key] = current_received_qty + rec['Transfer Qty']
-            
             # 更新安全庫存和MOQ信息（使用迴圈外預建索引，O(1) 查詢）
             if recommendations and not article_site_index.empty:
                 for rec in recommendations:

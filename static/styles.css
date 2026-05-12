@@ -1,0 +1,142 @@
+<style>
+    /* 全局樣式 */
+    .stApp {
+        background-color: #FFFFFF;
+        color: #212529;
+    }
+    
+    /* 側邊欄 */
+    section[data-testid="stSidebar"] {
+        background-color: #F8F9FA;
+        border-right: 1px solid #DEE2E6;
+    }
+    
+    /* 標題優化 */
+    h1, h2, h3 {
+        color: #212529;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+    }
+    
+    /* 主按鈕樣式 */
+    .stButton > button {
+        background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 28px;
+        font-weight: 600;
+        font-size: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+    }
+    
+    /* 卡片樣式 */
+    .info-card {
+        background: #F8F9FA;
+        border: 1px solid #DEE2E6;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 8px 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    /* 上傳區域 */
+    .uploadedFile {
+        background: #F8F9FA;
+        border: 2px dashed #DEE2E6;
+        border-radius: 8px;
+        padding: 20px;
+    }
+    
+    /* 數據表格 */
+    .dataframe {
+        background: #F8F9FA;
+        border-radius: 8px;
+    }
+    
+    /* Metric卡片 */
+    div[data-testid="stMetricValue"] {
+        color: #4A90E2;
+        font-weight: 700;
+    }
+    
+    /* 成功/錯誤訊息 */
+    .stSuccess {
+        background-color: #D4EDDA !important;
+        color: #155724 !important;
+        border-left: 4px solid #28A745;
+        border-radius: 6px;
+        padding: 12px 16px;
+    }
+    
+    .stSuccess svg {
+        color: #28A745 !important;
+    }
+    
+    .stInfo {
+        background-color: #D1ECF1 !important;
+        color: #0C5460 !important;
+        border-left: 4px solid #17A2B8;
+        border-radius: 6px;
+        padding: 12px 16px;
+    }
+    
+    .stInfo svg {
+        color: #17A2B8 !important;
+    }
+    
+    .stWarning {
+        background-color: #FFF3CD !important;
+        color: #856404 !important;
+        border-left: 4px solid #FFC107;
+        border-radius: 6px;
+        padding: 12px 16px;
+    }
+    
+    .stWarning svg {
+        color: #FFC107 !important;
+    }
+    
+    .stError {
+        background-color: #F8D7DA !important;
+        color: #721C24 !important;
+        border-left: 4px solid #DC3545;
+        border-radius: 6px;
+        padding: 12px 16px;
+    }
+    
+    .stError svg {
+        color: #DC3545 !important;
+    }
+    
+    /* 確保所有文字都有足夠對比度 */
+    p, span, div, label {
+        color: #212529;
+    }
+    
+    .stMarkdown {
+        color: #212529;
+    }
+    
+    /* 精簡進度條 */
+    .stProgress > div > div {
+        background-color: #4A90E2;
+    }
+    
+    /* 下載按鈕 */
+    .stDownloadButton > button {
+        background: #28A745;
+        color: white;
+        border-radius: 8px;
+        padding: 12px 28px;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+</style>

@@ -7,130 +7,41 @@
 
 import pandas as pd
 import numpy as np
+import json
+from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import logging
 
-# 設置日誌
+from config import (
+    REQUIRED_COLUMNS, OPTIONAL_COLUMNS, INTEGER_COLUMNS, STRING_COLUMNS,
+    OUTLIER_CAP, FILE_SIZE_LIMIT_BYTES,
+)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ============================================================================
-# 預設店舖資料（來自 stores-template.csv）
-# 當用戶上傳的Excel缺少OM或Type資料時，系統會根據Site自動填充這些預設值
-# ============================================================================
-DEFAULT_STORE_DATA = {
-    'HA02': {'shop': '駱克', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'S', 'om': 'Ivy', 'type': 'T'},
-    'HA06': {'shop': '北角', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Ivy', 'type': 'M'},
-    'HA15': {'shop': '新中環', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A3', 'size': 'L', 'om': 'Ivy', 'type': 'M'},
-    'HA19': {'shop': '康山', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Violet', 'type': 'L'},
-    'HA20': {'shop': '新香港仔', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Queenie', 'type': 'L'},
-    'HA21': {'shop': '柴灣新翠', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'S', 'om': 'Candy', 'type': 'L'},
-    'HA30': {'shop': '禮頓中心', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'L', 'om': 'Ivy', 'type': 'M'},
-    'HA32': {'shop': '皇室堡', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'L', 'om': 'Queenie', 'type': 'T'},
-    'HA33': {'shop': '羅素街8號', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'S', 'om': 'Queenie', 'type': 'T'},
-    'HA37': {'shop': '新信德', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'XS', 'om': 'Queenie', 'type': 'T'},
-    'HA39': {'shop': '金百利', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A3', 'size': 'M', 'om': 'Queenie', 'type': 'T'},
-    'HA40': {'shop': '新山頂', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Candy', 'type': 'T'},
-    'HA42': {'shop': '啟超道', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B1', 'size': 'S', 'om': 'Queenie', 'type': 'T'},
-    'HA43': {'shop': '德己立街2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Ivy', 'type': 'M'},
-    'HA44': {'shop': '黃竹坑', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Queenie', 'type': 'M'},
-    'HA45': {'shop': '合和商場', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'L', 'om': 'Queenie', 'type': 'M'},
-    'HA46': {'shop': '莊士敦道2', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'S', 'om': 'Queenie', 'type': 'M'},
-    'HB01': {'shop': '加連威', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'S', 'om': 'Ivy', 'type': 'T'},
-    'HB10': {'shop': '彌敦88', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A2', 'size': 'L', 'om': 'Ivy', 'type': 'T'},
-    'HB11': {'shop': '德福', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
-    'HB12': {'shop': '黃埔', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
-    'HB24': {'shop': '始創', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Eva', 'type': 'M'},
-    'HB25': {'shop': '奧海城', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Candy', 'type': 'L'},
-    'HB29': {'shop': '重慶站', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A1', 'size': 'XL', 'om': 'Ivy', 'type': 'T'},
-    'HB30': {'shop': '淘大', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Hippo', 'type': 'L'},
-    'HB38': {'shop': '新港', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Candy', 'type': 'T'},
-    'HB41': {'shop': '九龍城', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'M', 'om': 'Hippo', 'type': 'L'},
-    'HB49': {'shop': '新蒲崗', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Hippo', 'type': 'L'},
-    'HB62': {'shop': '油塘', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'L', 'om': 'Violet', 'type': 'L'},
-    'HB63': {'shop': '佐敦道31', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Ivy', 'type': 'M'},
-    'HB66': {'shop': 'PopCorn', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Ivy', 'type': 'L'},
-    'HB68': {'shop': '新都城', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'S', 'om': 'Ivy', 'type': 'L'},
-    'HB69': {'shop': '西九龍', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Violet', 'type': 'L'},
-    'HB72': {'shop': '黃大仙', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
-    'HB75': {'shop': '東港城2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Ivy', 'type': 'L'},
-    'HB77': {'shop': '新樂富', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'XS', 'om': 'Hippo', 'type': 'L'},
-    'HB80': {'shop': '新世紀Moko', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Eva', 'type': 'T'},
-    'HB83': {'shop': '新加拿芬道', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B1', 'size': 'L', 'om': 'Ivy', 'type': 'T'},
-    'HB86': {'shop': '新都會駅', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'S', 'om': 'Violet', 'type': 'L'},
-    'HB87': {'shop': '西九高鐵站', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A3', 'size': 'XS', 'om': 'Hippo', 'type': 'T'},
-    'HB91': {'shop': '南昌站V Walk', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'XS', 'om': 'Violet', 'type': 'L'},
-    'HB93': {'shop': '新好望角', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A3', 'size': 'M', 'om': 'Violet', 'type': 'T'},
-    'HB94': {'shop': '康城', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Ivy', 'type': 'L'},
-    'HB95': {'shop': '觀塘APM2', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'S', 'om': 'Violet', 'type': 'L'},
-    'HB96': {'shop': '啟德', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
-    'HB97': {'shop': '新旺角文華', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A2', 'size': 'M', 'om': 'Violet', 'type': 'T'},
-    'HB98': {'shop': '星光行2', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A3', 'size': 'M', 'om': 'Candy', 'type': 'T'},
-    'HBA2': {'shop': '廣東道2', 'regional': 'HK', 'class_1': 'A', 'class_2': 'A3', 'size': 'M', 'om': 'Hippo', 'type': 'T'},
-    'HBA3': {'shop': '荷里活廣場2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Hippo', 'type': 'L'},
-    'HBA4': {'shop': '中港城2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Candy', 'type': 'T'},
-    'HBA5': {'shop': '旺角中心', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'XS', 'om': 'Violet', 'type': 'T'},
-    'HC02': {'shop': '荃灣', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Eva', 'type': 'L'},
-    'HC05': {'shop': '上水', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Candy', 'type': 'T'},
-    'HC13': {'shop': '沙田中心', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Queenie', 'type': 'M'},
-    'HC15': {'shop': '悅來坊', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Eva', 'type': 'M'},
-    'HC19': {'shop': '錦薈坊', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Hippo', 'type': 'L'},
-    'HC25': {'shop': '新青衣', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'L', 'om': 'Candy', 'type': 'L'},
-    'HC26': {'shop': '沙田第一城', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Candy', 'type': 'L'},
-    'HC27': {'shop': '大埔超級城', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Queenie', 'type': 'L'},
-    'HC31': {'shop': '新屯門', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
-    'HC33': {'shop': '太和', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Queenie', 'type': 'L'},
-    'HC42': {'shop': '上水新都2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Candy', 'type': 'M'},
-    'HC44': {'shop': '新頌富', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Eva', 'type': 'L'},
-    'HC45': {'shop': '新馬鞍山', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Candy', 'type': 'L'},
-    'HC49': {'shop': '形點', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Eva', 'type': 'L'},
-    'HC51': {'shop': '新荃灣廣場', 'regional': 'HK', 'class_1': 'D', 'class_2': 'D1', 'size': 'M', 'om': 'Eva', 'type': 'M'},
-    'HC55': {'shop': '新新都會', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'L', 'om': 'Eva', 'type': 'L'},
-    'HC60': {'shop': '新大埔新達', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Queenie', 'type': 'L'},
-    'HC61': {'shop': '如心廣場', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Eva', 'type': 'M'},
-    'HC62': {'shop': '新元朗', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'S', 'om': 'Eva', 'type': 'L'},
-    'HC63': {'shop': '新東涌', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Candy', 'type': 'M'},
-    'HC64': {'shop': '嘉湖', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'M', 'om': 'Eva', 'type': 'L'},
-    'HC66': {'shop': '新沙田', 'regional': 'HK', 'class_1': 'B', 'class_2': 'B2', 'size': 'M', 'om': 'Queenie', 'type': 'M'},
-    'HC67': {'shop': '新V City', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'M', 'om': 'Hippo', 'type': 'M'},
-    'HC68': {'shop': '新大圍', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'XS', 'om': 'Candy', 'type': 'L'},
-    'HC69': {'shop': '元朗廣場2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C2', 'size': 'S', 'om': 'Eva', 'type': 'M'},
-    'HC70': {'shop': '青衣2', 'regional': 'HK', 'class_1': 'C', 'class_2': 'C1', 'size': 'L', 'om': 'Candy', 'type': 'L'},
-    'HD02': {'shop': '高士德', 'regional': 'MO', 'class_1': 'B', 'class_2': 'B1', 'size': 'L', 'om': 'Windy', 'type': 'L'},
-    'HD03': {'shop': '議事亭', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A1', 'size': 'XL', 'om': 'Windy', 'type': 'T'},
-    'HD09': {'shop': '新威尼斯人', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A1', 'size': 'L', 'om': 'Windy', 'type': 'T'},
-    'HD11': {'shop': '新澳門廣場', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A2', 'size': 'L', 'om': 'Windy', 'type': 'T'},
-    'HD15': {'shop': '信達廣場', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A2', 'size': 'L', 'om': 'Windy', 'type': 'T'},
-    'HD16': {'shop': '澳門南灣中心', 'regional': 'MO', 'class_1': 'B', 'class_2': 'B2', 'size': 'L', 'om': 'Windy', 'type': 'T'},
-    'HD18': {'shop': '倫敦人', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A2', 'size': 'XL', 'om': 'Windy', 'type': 'T'},
-    'HD19': {'shop': '板樟堂', 'regional': 'MO', 'class_1': 'A', 'class_2': 'A2', 'size': 'L', 'om': 'Windy', 'type': 'T'},
-    'HD20': {'shop': '澳門銀河2', 'regional': 'MO', 'class_1': 'B', 'class_2': 'B1', 'size': 'S', 'om': 'Windy', 'type': 'T'},
-}
+_store_data_cache = None
+
+
+def _load_store_data():
+    global _store_data_cache
+    if _store_data_cache is None:
+        path = Path(__file__).parent / 'data' / 'stores.json'
+        with open(path, 'r', encoding='utf-8') as f:
+            _store_data_cache = json.load(f)
+    return _store_data_cache
+
+
+DEFAULT_STORE_DATA = _load_store_data()
 
 class DataProcessor:
     """數據預處理類 v2.10.0"""
     
     def __init__(self):
-        self.required_columns = [
-            'Article', 'OM', 'RP Type', 'Site',
-            'SaSa Net Stock', 'Pending Received', 'Safety Stock',
-            'Last Month Sold Qty', 'MTD Sold Qty', 'MOQ'
-        ]
-        
-        self.optional_columns = [
-            'Article Description',  # 商品描述
-            'Article Long Text (60 Chars)',  # 商品長描述
-            'ALL',  # E1/E2模式：強制轉出標記（不分大小寫）
-            'Target',  # F模式：目標接收數量（不分大小寫）
-            'Type'  # 附加B模式：Type欄位（不分大小寫）
-        ]
-        
-        self.integer_columns = [
-            'SaSa Net Stock', 'Pending Received', 'Safety Stock',
-            'Last Month Sold Qty', 'MTD Sold Qty', 'MOQ'
-        ]
-        
-        self.string_columns = ['OM', 'RP Type', 'Site']
+        self.required_columns = list(REQUIRED_COLUMNS)
+        self.optional_columns = list(OPTIONAL_COLUMNS)
+        self.integer_columns = list(INTEGER_COLUMNS)
+        self.string_columns = list(STRING_COLUMNS)
         
         # 記錄填充統計
         self.fill_stats = {
@@ -338,7 +249,7 @@ class DataProcessor:
             return False, "文件格式不正確，請上傳.xlsx或.xls格式的Excel文件"
         
         # 檢查文件大小（限制為50MB）
-        if hasattr(uploaded_file, 'size') and uploaded_file.size > 50 * 1024 * 1024:
+        if hasattr(uploaded_file, 'size') and uploaded_file.size > FILE_SIZE_LIMIT_BYTES:
             return False, "文件大小超過限制（最大50MB）"
         
         return True, ""
@@ -447,8 +358,8 @@ class DataProcessor:
                 df_processed.loc[mask_negative, col] = 0
                 
                 # 大於100,000的值設為100,000並標註
-                mask_outlier = df_processed[col] > 100000
-                df_processed.loc[mask_outlier, col] = 100000
+                mask_outlier = df_processed[col] > OUTLIER_CAP
+                df_processed.loc[mask_outlier, col] = OUTLIER_CAP
                 df_processed.loc[mask_outlier, 'Notes'] = df_processed.loc[mask_outlier, 'Notes'] + "銷量數據超出範圍;"
         
         # Safety Stock 和 MOQ 負值校正
