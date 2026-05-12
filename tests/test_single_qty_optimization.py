@@ -119,3 +119,63 @@ def test_c1_match_prefers_larger_source_before_one_piece_source():
     assert recs[0]['Transfer Site'] == 'SRC_BIG'
     assert recs[0]['Receive Site'] == 'DST_MAIN'
     assert recs[0]['Transfer Qty'] == 2
+
+
+def test_mode_a_avoids_single_piece_rf_overplus_source():
+    logic = TransferLogic()
+
+    df = pd.DataFrame([
+        {
+            'Article': '100000000002',
+            'Article Description': 'Test Product',
+            'OM': 'OM1',
+            'RP Type': 'RF',
+            'Site': 'SRC',
+            'SaSa Net Stock': 10,
+            'Pending Received': 0,
+            'Safety Stock': 8,
+            'Last Month Sold Qty': 0,
+            'MTD Sold Qty': 0,
+            'Effective Sold Qty': 0,
+            'MOQ': 1,
+            'Type': 'R',
+        },
+        {
+            'Article': '100000000002',
+            'Article Description': 'Test Product',
+            'OM': 'OM1',
+            'RP Type': 'RF',
+            'Site': 'DST_ONE',
+            'SaSa Net Stock': 7,
+            'Pending Received': 0,
+            'Safety Stock': 8,
+            'Last Month Sold Qty': 1,
+            'MTD Sold Qty': 0,
+            'Effective Sold Qty': 1,
+            'MOQ': 1,
+            'Type': 'R',
+        },
+        {
+            'Article': '100000000002',
+            'Article Description': 'Test Product',
+            'OM': 'OM1',
+            'RP Type': 'RF',
+            'Site': 'DST_TWO',
+            'SaSa Net Stock': 4,
+            'Pending Received': 0,
+            'Safety Stock': 8,
+            'Last Month Sold Qty': 2,
+            'MTD Sold Qty': 0,
+            'Effective Sold Qty': 2,
+            'MOQ': 1,
+            'Type': 'R',
+        },
+    ])
+
+    recs = logic.generate_transfer_recommendations(df, logic.mode_a)
+
+    assert len(recs) == 1
+    assert recs[0]['Transfer Site'] == 'SRC'
+    assert recs[0]['Receive Site'] == 'DST_ONE'
+    assert recs[0]['Transfer Qty'] == 2
+    assert recs[0]['Source Type'] == 'RF過剩轉出'

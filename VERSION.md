@@ -1,5 +1,59 @@
 # 版本更新記錄
 
+## v2.11.1 (2026-05-11)
+
+### 模式A單件調貨上調優化
+
+#### 核心改動
+- 模式A（保守轉貨）來源識別階段，當 `actual_transferable` 計算為 1 件且 `remaining_stock >= 3`（轉出 1 件後淨庫存餘 3 件以上）時，自動上調至 2 件轉出
+- 上調後以 `Safety Stock - 1` 作為放寬安全線（數學等價於原始安全檢查，不降低實際安全水準）
+- 避免來源店被限制只能轉出 1 件的低效調撥情況
+
+#### 條件總結
+1. `actual_transferable == 1`（由 `base_transferable = total_available - safety_stock` 限制所致）
+2. `remaining_stock >= 3`（SaSa Net Stock ≥ 4，確保上調至 2 件後來源仍餘 ≥ 2 件）
+3. `2 <= upper_limit`（20% 上限允許，因 floor=2 故本條件永遠成立）
+
+#### 程式碼更新
+- [`business_logic.py`](business_logic.py)
+  - 版本升級至 v2.11.1
+  - `identify_sources()` 模式 A 區塊新增上調邏輯（第 500-507 行）
+  - 放寬安全線由數學等價性隱式保證，無需額外顯式檢查
+
+#### 文件同步
+- [`README.md`](README.md)
+  - 版本號更新至 v2.11.1
+- [`調貨模式詳解.txt`](調貨模式詳解.txt)
+  - 模式A說明新增單件上調規則
+- [`transfer_logic_ai_brief.md`](transfer_logic_ai_brief.md)
+  - 模式A說明新增上調規則
+
+---
+
+## v2.11.0 (2026-05-11)
+
+### F2模式新增HD轉出選項
+
+#### 核心功能
+- F2模式新增「HD 店舖轉出設定」選項，提供兩種選擇：
+  - **HD 不能轉出（預設）**：維持原有行為，HD 店舖不可轉貨到 HA/HB/HC 店舖
+  - **HD 可轉出（最後優先）**：允許 HD 店舖轉貨到 HA/HB/HC，但排在最低優先級，僅在其他來源（ND、同OM RF、跨OM RF）都不足時才使用
+
+#### 使用場景
+- 當 HA/HB/HC 店舖不夠貨，且 HD 店舖有庫存可轉出時，可啟用此選項
+- HD 轉出會被排在配對排序的最後，確保優先使用非 HD 來源
+
+#### 程式碼更新
+- [`business_logic.py`](business_logic.py)
+  - 版本升級至 v2.11.0
+  - `TransferLogic.__init__` 新增 `f2_allow_hd_transfer: bool = False` 參數
+  - `_match_transfers_f_mode`：`_f_source_sort_key` 新增 `dest_site` 參數與 HD 懲罰項（`hd_penalty=10`）
+  - `_match_transfers_f_mode`：HD 限制檢查改為條件式，F2 + `f2_allow_hd_transfer=True` 時不跳過
+- [`app.py`](app.py)
+  - 新增 F2 模式「HD 店舖轉出設定」radio button（僅 F2 模式下顯示）
+  - 將 `f2_allow_hd_transfer` 傳入 `TransferLogic` 建構子
+  - 更新模式描述、詳細模式說明、欄位說明
+
 ## v2.10.0 (2026-04-30)
 
 ### 新增精簡SKU模式（限同OM / 跨OM）+ F/F2模式改善

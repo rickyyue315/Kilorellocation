@@ -37,12 +37,8 @@ def test_b2_destination_priority_order():
 
     expected_order = ['T1', 'T2', 'M1', 'M2', 'T3', 'T4', 'M3', 'M4']
 
-    if ordered_sites != expected_order:
-        raise AssertionError(
-            f"B2 優先排序不符: expected {expected_order}, got {ordered_sites}"
-        )
-
-    print("✅ B2 接收優先排序測試通過")
+    assert ordered_sites == expected_order, \
+        f"B2 優先排序不符: expected {expected_order}, got {ordered_sites}"
 
 
 if __name__ == '__main__':

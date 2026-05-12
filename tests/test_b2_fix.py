@@ -22,7 +22,7 @@ def test_b2_no_dual_role():
     file_path = os.getenv('TEST_DATA_PATH', os.path.join(os.path.dirname(__file__), '..', 'data', 'PIP_JosephJoey_09Feb2026.XLSX'))
     
     if not os.path.exists(file_path):
-        print(f"⚠️ 測試檔案不存在: {file_path}")
+        print(f"[WARN] 測試檔案不存在: {file_path}")
         print("改用模擬數據進行測試...")
         test_with_mock_data()
         return
@@ -50,27 +50,25 @@ def test_b2_no_dual_role():
             violations.append((article, overlap))
     
     if violations:
-        print("❌ 仍有衝突：")
+        print("[FAIL] 仍有衝突：")
         for article, sites in violations:
             print(f"  Article {article}: 衝突店舖 {sites}")
-            # 顯示相關的建議
             for rec in recommendations:
                 if rec['Article'] == article and (rec['Transfer Site'] in sites or rec['Receive Site'] in sites):
-                    print(f"    {rec['Transfer Site']} → {rec['Receive Site']} (Qty: {rec['Transfer Qty']}, "
+                    print(f"    {rec['Transfer Site']} -> {rec['Receive Site']} (Qty: {rec['Transfer Qty']}, "
                           f"Source: {rec['Source Type']}, Dest: {rec['Destination Type']})")
     else:
-        print("✅ 修正成功！所有 Article 中沒有店舖同時做轉出和接收")
+        print("[PASS] 所有 Article 中沒有店舖同時做轉出和接收")
     
-    # 額外檢查 Article 109249904001
     target_article = '109249904001'
     article_recs = [r for r in recommendations if r['Article'] == target_article]
     if article_recs:
-        print(f"\n📋 Article {target_article} 的調貨建議：")
+        print(f"\n[INFO] Article {target_article} 的調貨建議：")
         for rec in article_recs:
-            print(f"  {rec['Transfer Site']} ({rec['Source Type']}) → "
+            print(f"  {rec['Transfer Site']} ({rec['Source Type']}) -> "
                   f"{rec['Receive Site']} ({rec['Destination Type']}), Qty: {rec['Transfer Qty']}")
     
-    print(f"\n📊 總計建議數: {len(recommendations)}")
+    print(f"\n[SUMMARY] 總計建議數: {len(recommendations)}")
 
 
 def test_with_mock_data():
@@ -105,14 +103,14 @@ def test_with_mock_data():
     overlap = sources_set & dests_set
     
     if overlap:
-        print(f"❌ 模擬測試失敗：衝突店舖 {overlap}")
+        print(f"[FAIL] 模擬測試失敗：衝突店舖 {overlap}")
         for rec in recommendations:
-            print(f"  {rec['Transfer Site']} ({rec['Source Type']}) → "
+            print(f"  {rec['Transfer Site']} ({rec['Source Type']}) -> "
                   f"{rec['Receive Site']} ({rec['Destination Type']}), Qty: {rec['Transfer Qty']}")
     else:
-        print("✅ 模擬測試通過：沒有店舖同時做轉出和接收")
+        print("[PASS] 模擬測試通過：沒有店舖同時做轉出和接收")
         for rec in recommendations:
-            print(f"  {rec['Transfer Site']} ({rec['Source Type']}) → "
+            print(f"  {rec['Transfer Site']} ({rec['Source Type']}) -> "
                   f"{rec['Receive Site']} ({rec['Destination Type']}), Qty: {rec['Transfer Qty']}")
 
 

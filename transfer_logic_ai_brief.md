@@ -73,6 +73,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - Base = Total Available - Safety Stock
   - Cap = max(20% of Total Available, 2)
   - Actual = min(Base, Cap, SaSa Net Stock)
+- **Single-piece bump (v2.11.1)**: if Actual=1 and remaining stock after 1-piece transfer >= 3, bump to 2 with safety stock relaxed by -1 (mathematically equivalent to original safety check)
 - Destination rules: Emergency Replenishment, Potential Replenishment
 - Goal: stable operations, strict safety stock protection
 
@@ -216,7 +217,8 @@ Draw one logic image that lets users compare all current transfer modes and unde
   2. Non-Target sites do not receive
 - Grouping: by Article only (allow cross-OM)
 - Extra constraints:
-  - HD source cannot transfer to HA/HB/HC destinations
+  - HD source cannot transfer to HA/HB/HC destinations (default behavior)
+  - **HD transfer option (configurable)**: when `f2_allow_hd_transfer=True`, HD sources CAN transfer to HA/HB/HC destinations, but are sorted at the lowest priority tier (hd_penalty=10 added to sort key), only used when all other sources are insufficient
   - Windy source can only transfer to Windy destinations
 - Key change: Target Qty is used directly as needed_qty (no subtraction of current stock or pending); ND stores with Target can receive
 - Goal: Target-only allocation, concentrate transfer to designated stores
