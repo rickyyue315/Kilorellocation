@@ -1203,6 +1203,58 @@ class TransferLogic:
                 if source['transferable_qty'] <= 0:
                     break
 
+    def _compute_transfer_qty(self, source: Dict, dest: Dict, mode: str, current_received_qty: int) -> int:
+        transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
+
+        if self._is_b_special_mode(mode) and 'target_qty' in dest:
+            remaining_capacity = dest['target_qty'] - current_received_qty
+            transfer_qty = min(transfer_qty, remaining_capacity)
+        elif dest['dest_type'] == '重點補0':
+            remaining_needed = dest['target_qty'] - current_received_qty
+            transfer_qty = min(transfer_qty, remaining_needed)
+        elif self._is_d_family_mode(mode) and 'target_qty' in dest:
+            remaining_capacity = dest['target_qty'] - current_received_qty
+            transfer_qty = min(transfer_qty, remaining_capacity)
+
+        if self._is_d_family_mode(mode) and source['rp_type'] == 'ND':
+            already_out = source.get('total_transferred', 0)
+            remaining_after = source['original_stock'] - already_out - transfer_qty
+            if remaining_after == 1:
+                if source['transferable_qty'] >= transfer_qty + 1:
+                    transfer_qty += 1
+                elif transfer_qty > 1:
+                    transfer_qty -= 1
+
+        if transfer_qty == 1 and source['transferable_qty'] >= 2:
+            if source['source_type'] in ['ND轉出', 'ND清貨轉出', 'RF加強轉出', 'RF過剩轉出']:
+                already_out_opt = source.get('total_transferred', 0)
+                remaining_after_opt = source['original_stock'] - already_out_opt - 2
+                if self._is_d_family_mode(mode) and source['rp_type'] == 'ND' and remaining_after_opt == 1:
+                    if source['transferable_qty'] >= 3:
+                        transfer_qty = 3
+                else:
+                    if dest['needed_qty'] >= 2 or (mode == self.mode_a and source['source_type'] == 'RF過剩轉出'):
+                        transfer_qty = 2
+
+        transfer_qty = min(transfer_qty, source['transferable_qty'])
+
+        if self._is_b_special_mode(mode) and 'target_qty' in dest:
+            transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
+        elif dest['dest_type'] == '重點補0' and 'target_qty' in dest:
+            transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
+        elif self._is_d_family_mode(mode) and 'target_qty' in dest:
+            transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
+
+        if self._is_d_family_mode(mode) and source['rp_type'] == 'ND':
+            final_remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
+            if final_remaining == 1:
+                if source['transferable_qty'] >= transfer_qty + 1:
+                    transfer_qty += 1
+                elif transfer_qty > 1:
+                    transfer_qty -= 1
+
+        return max(transfer_qty, 0)
+
     def _match_by_priority(self, sources: List[Dict], destinations: List[Dict], 
                           recommendations: List[Dict], article: str, group_id: str, 
                           product_desc: str, source_priority: int, dest_priority: int,
@@ -1334,84 +1386,11 @@ class TransferLogic:
                         continue
                 
                 # 確定轉移數量
-                # B2/B2a/B3/B3a模式：考慮累計接收上限
-                if self._is_b_special_mode(mode) and 'target_qty' in dest:
-                    remaining_capacity = dest['target_qty'] - current_received_qty
-                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_capacity)
-                # 對於C模式(重點補0)，考慮累計接收數量
-                elif dest['dest_type'] == '重點補0':
-                    # 計算還需要接收的數量
-                    remaining_needed = dest['target_qty'] - current_received_qty
-                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_needed)
-                # D/D2模式：考慮累計接收上限
-                elif self._is_d_family_mode(mode) and 'target_qty' in dest:
-                    remaining_capacity = dest['target_qty'] - current_received_qty
-                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_capacity)
-                else:
-                    # A和B模式，使用原始邏輯
-                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
-                
-                # --- 數量調整邏輯 (D模式放寬限制以避免1件餘貨) ---
-                
-                # 1. D/D2模式特殊處理：避免ND轉出後剩餘1件 (涵蓋ND清貨轉出和一般ND轉出)
-                if self._is_d_family_mode(mode) and source['rp_type'] == 'ND':
-                    already_out = source.get('total_transferred', 0)
-                    remaining_after_transfer = source['original_stock'] - already_out - transfer_qty
-                    if remaining_after_transfer == 1:
-                        # 嘗試多轉1件，使剩餘為0件 (放寬接收店鋪的 needed_qty 限制)
-                        if source['transferable_qty'] >= transfer_qty + 1:
-                            transfer_qty += 1
-                        # 如果無法多轉1件，則少轉1件，使剩餘為2件
-                        elif transfer_qty > 1:
-                            transfer_qty -= 1
-                
-                # 2. 調貨數量優化：如果只有1件，嘗試調高到2件 (避免小額調撥)
-                if transfer_qty == 1 and source['transferable_qty'] >= 2:
-                    # 檢查是否為允許優化的類型
-                    if source['source_type'] in ['ND轉出', 'ND清貨轉出', 'RF加強轉出', 'RF過剩轉出']:
-                        potential_qty = 2
-                        already_out_opt = source.get('total_transferred', 0)
-                        remaining_after_opt = source['original_stock'] - already_out_opt - potential_qty
-                        
-                        # 在模式D/D2下，ND店鋪要特別避免優化後留下1件餘貨
-                        if self._is_d_family_mode(mode) and source['rp_type'] == 'ND' and remaining_after_opt == 1:
-                            if source['transferable_qty'] >= 3:
-                                transfer_qty = 3
-                            else:
-                                # 如果不能調到3，則保持1件 (避免1件餘貨優先於避免小額調撥)
-                                pass
-                        else:
-                            # A模式的RF過剩轉出允許直接補到2件，避免最後仍殘留1件調貨。
-                            if dest['needed_qty'] >= 2 or (mode == self.mode_a and source['source_type'] == 'RF過剩轉出'):
-                                transfer_qty = 2
-                
-                # 最終保護：確保優化後的數量不超過各限制
-                transfer_qty = min(transfer_qty, source['transferable_qty'])
-                
-                # 重新應用模式特定的接收上限（優化可能將 transfer_qty 推高超出上限）
-                if self._is_b_special_mode(mode) and 'target_qty' in dest:
-                    remaining_cap = dest['target_qty'] - current_received_qty
-                    transfer_qty = min(transfer_qty, max(remaining_cap, 0))
-                elif dest['dest_type'] == '重點補0' and 'target_qty' in dest:
-                    remaining_need = dest['target_qty'] - current_received_qty
-                    transfer_qty = min(transfer_qty, max(remaining_need, 0))
-                elif self._is_d_family_mode(mode) and 'target_qty' in dest:
-                    remaining_cap = dest['target_qty'] - current_received_qty
-                    transfer_qty = min(transfer_qty, max(remaining_cap, 0))
+                transfer_qty = self._compute_transfer_qty(
+                    source, dest, mode, current_received_qty)
                 
                 if transfer_qty <= 0:
                     continue
-                
-                # D/D2模式最終安全網：確認轉出後不會留下1件（P2-6加固）
-                if self._is_d_family_mode(mode) and source['rp_type'] == 'ND':
-                    final_remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-                    if final_remaining == 1:
-                        if source['transferable_qty'] >= transfer_qty + 1:
-                            transfer_qty += 1
-                        elif transfer_qty > 1:
-                            transfer_qty -= 1
-                        if transfer_qty <= 0:
-                            continue
                 
                 # 創建調貨建議
                 notes = self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode)
@@ -1965,6 +1944,84 @@ class TransferLogic:
             'source_type_stats': source_type_stats,
             'dest_type_stats': dest_type_stats
         }
+
+    def _note_source_analysis(self, source: Dict, dest: Dict, mode: str, transfer_qty: int) -> str:
+        src_type = source['source_type']
+        remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
+
+        if src_type == 'ND智能轉出':
+            total_sales = source.get('last_month_sold_qty', 0) + source.get('mtd_sold_qty', 0)
+            if total_sales == 0:
+                return f"【轉出分析: ND智能轉出，0銷量店舖優先轉出，轉出後剩餘{remaining}件】"
+            return f"【轉出分析: ND智能轉出，兩月銷量{total_sales}件(按銷量升序排序)，轉出後剩餘{remaining}件】"
+        if src_type == 'ND轉出' and not self._is_d_family_mode(mode):
+            return "【轉出分析: ND類型店鋪，無庫存限制，可全數轉出】"
+        if src_type == 'F模式ND轉出':
+            return "【轉出分析: F模式ND類型店鋪，無庫存限制，全數轉出】"
+        if source['rp_type'] == 'ND' and self._is_d_family_mode(mode):
+            mode_label = 'D2' if mode == self.mode_d2 else 'D'
+            return f"【轉出分析: ND店鋪清貨(模式{mode_label})，轉出後剩餘庫存({remaining})件，已優化避免1件餘貨】"
+        if src_type == 'F模式RF轉出':
+            return f"【轉出分析: F模式RF轉出，可忽視最小庫存要求，轉出後剩餘庫存({remaining})件】"
+        if src_type == 'E模式強制轉出':
+            rp_type = source.get('rp_type', '')
+            is_cross_om = mode == self.mode_e2 and source['om'] != dest['om']
+            cross_om_desc = "跨OM" if is_cross_om else "同OM"
+            return f"【轉出分析: E模式強制轉出({cross_om_desc}配對)，{rp_type}店鋪被標記為*ALL*全數轉出，原始庫存{source['original_stock']}件，轉出後剩餘{remaining}件】"
+        if src_type == 'Local店舖全轉出':
+            if self._is_b_l_retain_mode(mode):
+                return "【轉出分析: Local店舖低銷量特例（附加B-L系列模式），保留2件後轉出】"
+            return "【轉出分析: Local店舖全轉出（附加B系列模式），可全數轉出】"
+        if src_type == 'RF過剩轉出':
+            return f"【轉出分析: RF過剩轉出，轉出後剩餘庫存({remaining})仍高於安全庫存({source.get('safety_stock', 'N/A')})】"
+        if src_type == 'RF加強轉出':
+            return f"【轉出分析: RF加強轉出，轉出後剩餘庫存({remaining})可能低於安全庫存({source.get('safety_stock', 'N/A')})】"
+        if src_type == '精簡SKU ND轉出':
+            return f"【轉出分析: 精簡SKU模式ND轉出，全數可轉出，轉出後剩餘{remaining}件】"
+        if src_type == '精簡SKU RF轉出':
+            last_2m = source.get('last_2_month_sold_qty', 0)
+            return f"【轉出分析: 精簡SKU模式RF轉出，超出Cap(Safety×2與2月銷量×2取高者)部分轉出，2月銷量{last_2m}件，轉出後剩餘{remaining}件】"
+        return ""
+
+    def _note_dest_analysis(self, dest: Dict, current_received_qty: int, transfer_qty: int) -> str:
+        dest_type = dest['dest_type']
+        cumulative = current_received_qty + transfer_qty
+
+        if dest_type in ('F模式目標接收', 'F指定模式目標接收'):
+            target_qty = dest.get('target_qty', 0)
+            prefix = "F指定模式目標接收，僅Target店舖可接收" if dest_type == 'F指定模式目標接收' else "F模式目標接收"
+            return f"【接收分析: {prefix}，目標數量{target_qty}件，累計已接收{cumulative}件】"
+        if dest_type == 'E模式接收' or str(dest_type).startswith('E1b'):
+            target_qty = dest.get('target_qty', 0)
+            safety_stock = dest.get('safety_stock', 0)
+            current_stock = dest.get('current_stock', 0)
+            pending = dest.get('pending_received', 0)
+            total_available = current_stock + pending
+            return f"【接收分析: E模式接收，RF店鋪當前總庫存{total_available}件(現有{current_stock}件+待收{pending}件)，安全庫存{safety_stock}件，接收上限為安全庫存2倍({target_qty}件)，累計已接收{cumulative}件】"
+        if dest_type == '重點補0':
+            if 'target_qty' in dest:
+                return f"【接收分析: 重點補0，目標數量{dest['target_qty']}件，累計已接收{cumulative}件，缺口{abs(cumulative - dest['target_qty'])}件】"
+            return "【接收分析: 重點補0，針對低庫存店鋪補貨】"
+        if dest_type == 'ND潛在缺貨接收':
+            total_sales = dest.get('total_sales', 0)
+            max_receive = dest.get('max_receive_qty', total_sales * 2)
+            return f"【接收分析: ND潛在缺貨接收，兩月銷量{total_sales}件，接收上限{max_receive}件(2×兩月銷量)，累計已接收{cumulative}件】"
+        if dest_type == 'RF緊急缺貨補貨':
+            return "【接收分析: RF緊急缺貨補貨，RF店鋪零庫存但有銷售記錄（ND模式優先滿足）】"
+        if dest_type == '緊急缺貨補貨':
+            return "【接收分析: 緊急缺貨補貨，該店鋪零庫存但有銷售記錄】"
+        if dest_type == '潛在缺貨補貨':
+            current_stock = dest.get('current_stock', 0)
+            pending = dest.get('pending_received', 0)
+            safety_stock = dest.get('safety_stock', 0)
+            total_available = current_stock + pending
+            shortage = safety_stock - total_available
+            return f"【接收分析: 潛在缺貨補貨，庫存不足{shortage}件，補充至安全庫存{safety_stock}件】"
+        if dest_type == '精簡SKU接收':
+            target_qty = dest.get('target_qty', 0)
+            return f"【接收分析: 精簡SKU接收，接收上限Cap=Max(Safety×2, 2月銷量×2)={target_qty}件，累計已接收{cumulative}件】"
+        return ""
+
     def _create_recommendation_note(self, source: Dict, dest: Dict, current_received_qty: int, transfer_qty: int, mode: str) -> str:
         """
         創建調貨建議的Notes欄位內容
@@ -2003,86 +2060,10 @@ class TransferLogic:
         notes_parts.append(f"【接收優先級: {priority_desc}】")
         
         # 4. 庫存狀況分析
-        if source['source_type'] == 'ND智能轉出':
-            total_sales = source.get('last_month_sold_qty', 0) + source.get('mtd_sold_qty', 0)
-            remaining_after = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-            if total_sales == 0:
-                notes_parts.append(f"【轉出分析: ND智能轉出，0銷量店舖優先轉出，轉出後剩餘{remaining_after}件】")
-            else:
-                notes_parts.append(f"【轉出分析: ND智能轉出，兩月銷量{total_sales}件(按銷量升序排序)，轉出後剩餘{remaining_after}件】")
-        elif source['source_type'] == 'ND轉出' and not self._is_d_family_mode(mode):
-            notes_parts.append("【轉出分析: ND類型店鋪，無庫存限制，可全數轉出】")
-        elif source['source_type'] == 'F模式ND轉出':
-            notes_parts.append("【轉出分析: F模式ND類型店鋪，無庫存限制，全數轉出】")
-        elif source['rp_type'] == 'ND' and self._is_d_family_mode(mode):
-            mode_label = 'D2' if mode == self.mode_d2 else 'D'
-            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-            notes_parts.append(f"【轉出分析: ND店鋪清貨(模式{mode_label})，轉出後剩餘庫存({remaining_after_transfer})件，已優化避免1件餘貨】")
-        elif source['source_type'] == 'F模式RF轉出':
-            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-            notes_parts.append(f"【轉出分析: F模式RF轉出，可忽視最小庫存要求，轉出後剩餘庫存({remaining_after_transfer})件】")
-        elif source['source_type'] == 'E模式強制轉出':
-            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-            rp_type = source.get('rp_type', '')
-            is_cross_om = mode == self.mode_e2 and source['om'] != dest['om']
-            cross_om_desc = "跨OM" if is_cross_om else "同OM"
-            notes_parts.append(f"【轉出分析: E模式強制轉出({cross_om_desc}配對)，{rp_type}店鋪被標記為*ALL*全數轉出，原始庫存{source['original_stock']}件，轉出後剩餘{remaining_after_transfer}件】")
-        elif source['source_type'] == 'Local店舖全轉出':
-            if self._is_b_l_retain_mode(mode):
-                notes_parts.append("【轉出分析: Local店舖低銷量特例（附加B-L系列模式），保留2件後轉出】")
-            else:
-                notes_parts.append("【轉出分析: Local店舖全轉出（附加B系列模式），可全數轉出】")
-        elif source['source_type'] == 'RF過剩轉出':
-            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-            notes_parts.append(f"【轉出分析: RF過剩轉出，轉出後剩餘庫存({remaining_after_transfer})仍高於安全庫存({source.get('safety_stock', 'N/A')})】")
-        elif source['source_type'] == 'RF加強轉出':
-            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-            notes_parts.append(f"【轉出分析: RF加強轉出，轉出後剩餘庫存({remaining_after_transfer})可能低於安全庫存({source.get('safety_stock', 'N/A')})】")
-        elif source['source_type'] == '精簡SKU ND轉出':
-            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-            notes_parts.append(f"【轉出分析: 精簡SKU模式ND轉出，全數可轉出，轉出後剩餘{remaining_after_transfer}件】")
-        elif source['source_type'] == '精簡SKU RF轉出':
-            remaining_after_transfer = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-            last_2m = source.get('last_2_month_sold_qty', 0)
-            notes_parts.append(f"【轉出分析: 精簡SKU模式RF轉出，超出Cap(Safety×2與2月銷量×2取高者)部分轉出，2月銷量{last_2m}件，轉出後剩餘{remaining_after_transfer}件】")
+        notes_parts.append(self._note_source_analysis(source, dest, mode, transfer_qty))
         
         # 5. 接收需求分析
-        if dest['dest_type'] in ('F模式目標接收', 'F指定模式目標接收'):
-            target_qty = dest.get('target_qty', 0)
-            if dest['dest_type'] == 'F指定模式目標接收':
-                notes_parts.append(f"【接收分析: F指定模式目標接收，僅Target店舖可接收，目標數量{target_qty}件，累計已接收{current_received_qty + transfer_qty}件】")
-            else:
-                notes_parts.append(f"【接收分析: F模式目標接收，目標數量{target_qty}件，累計已接收{current_received_qty + transfer_qty}件】")
-        elif dest['dest_type'] == 'E模式接收' or str(dest.get('dest_type', '')).startswith('E1b'):
-            target_qty = dest.get('target_qty', 0)
-            safety_stock = dest.get('safety_stock', 0)
-            current_stock = dest.get('current_stock', 0)
-            pending = dest.get('pending_received', 0)
-            total_available = current_stock + pending
-            notes_parts.append(f"【接收分析: E模式接收，RF店鋪當前總庫存{total_available}件(現有{current_stock}件+待收{pending}件)，安全庫存{safety_stock}件，接收上限為安全庫存2倍({target_qty}件)，累計已接收{current_received_qty + transfer_qty}件】")
-        elif dest['dest_type'] == '重點補0':
-            if 'target_qty' in dest:
-                notes_parts.append(f"【接收分析: 重點補0，目標數量{dest['target_qty']}件，累計已接收{current_received_qty + transfer_qty}件，缺口{abs((current_received_qty + transfer_qty) - dest['target_qty'])}件】")
-            else:
-                notes_parts.append("【接收分析: 重點補0，針對低庫存店鋪補貨】")
-        elif dest['dest_type'] == 'ND潛在缺貨接收':
-            total_sales = dest.get('total_sales', 0)
-            max_receive = dest.get('max_receive_qty', total_sales * 2)
-            notes_parts.append(f"【接收分析: ND潛在缺貨接收，兩月銷量{total_sales}件，接收上限{max_receive}件(2×兩月銷量)，累計已接收{current_received_qty + transfer_qty}件】")
-        elif dest['dest_type'] == 'RF緊急缺貨補貨':
-            notes_parts.append("【接收分析: RF緊急缺貨補貨，RF店鋪零庫存但有銷售記錄（ND模式優先滿足）】")
-        elif dest['dest_type'] == '緊急缺貨補貨':
-            notes_parts.append("【接收分析: 緊急缺貨補貨，該店鋪零庫存但有銷售記錄】")
-        elif dest['dest_type'] == '潛在缺貨補貨':
-            current_stock = dest.get('current_stock', 0)
-            pending = dest.get('pending_received', 0)
-            safety_stock = dest.get('safety_stock', 0)
-            total_available = current_stock + pending
-            shortage = safety_stock - total_available
-            notes_parts.append(f"【接收分析: 潛在缺貨補貨，庫存不足{shortage}件，補充至安全庫存{safety_stock}件】")
-        elif dest['dest_type'] == '精簡SKU接收':
-            target_qty = dest.get('target_qty', 0)
-            notes_parts.append(f"【接收分析: 精簡SKU接收，接收上限Cap=Max(Safety×2, 2月銷量×2)={target_qty}件，累計已接收{current_received_qty + transfer_qty}件】")
+        notes_parts.append(self._note_dest_analysis(dest, current_received_qty, transfer_qty))
 
         # 附加B系列模式接收上限說明
         if self._is_b_special_mode(mode) and 'target_qty' in dest:

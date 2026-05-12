@@ -49,20 +49,6 @@ class DataProcessor:
             'sites_not_found': set()
         }
     
-    def get_store_default_info(self, site: str) -> Dict:
-        """
-        根據店舖編號獲取預設資料
-        
-        Args:
-            site: 店舖編號（如 HA02, HA06 等）
-            
-        Returns:
-            預設資料字典，如果找不到則返回空字典
-        """
-        # 標準化 site（去除前後空白，轉大寫）
-        site_normalized = str(site).strip().upper()
-        return DEFAULT_STORE_DATA.get(site_normalized, {})
-    
     def fill_default_store_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         使用預設資料填充缺失的 OM 和 Type 欄位
