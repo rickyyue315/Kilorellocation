@@ -3,10 +3,13 @@ Base match strategy abstract class
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 class BaseMatchStrategy(ABC):
+    def __init__(self, create_note: Optional[Callable] = None):
+        self._create_note = create_note
+
     @abstractmethod
     def match(
         self,

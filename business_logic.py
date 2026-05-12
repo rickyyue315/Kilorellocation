@@ -81,6 +81,31 @@ class TransferLogic:
         self.mode_simplified_sku_same = "精簡SKU(限同OM)"
         self.mode_simplified_sku_cross = "精簡SKU(跨OM)"
 
+        self._strategies = self._init_strategies()
+
+    def _init_strategies(self):
+        from strategies.simplified_sku import SimplifiedSKUStrategy
+        from strategies.c2_mode import C2ModeStrategy
+        from strategies.f_mode import FModeStrategy
+        from strategies.e1_mode import E1ModeStrategy
+        from strategies.nd_mode import NDModeStrategy
+        return {
+            'simplified_sku': SimplifiedSKUStrategy(),
+            'c2_mode': C2ModeStrategy(),
+            'f_mode': FModeStrategy(
+                create_note=self._create_recommendation_note,
+                f2_allow_hd_transfer=self.f2_allow_hd_transfer,
+            ),
+            'e1_mode': E1ModeStrategy(
+                create_note=self._create_recommendation_note,
+                max_receive_sites_per_source=self.b_special_max_receive_sites_per_source,
+            ),
+            'nd_mode': NDModeStrategy(
+                create_note=self._create_recommendation_note,
+                max_receive_sites_per_source=self.b_special_max_receive_sites_per_source,
+            ),
+        }
+
     def _is_b_special_mode(self, mode: str) -> bool:
         return mode in (
             self.mode_b_special,
@@ -1179,11 +1204,11 @@ class TransferLogic:
 
         # F/F2模式特殊處理：Target優先接收 + 跨OM匹配
         if mode in (self.mode_f, self.mode_f_target_only):
-            return self._match_transfers_f_mode(sources, destinations, article, product_desc, mode)
+            return self._strategies['f_mode'].match(sources, destinations, article, product_desc, mode)
         
         # C2模式特殊處理：C模式邏輯 + 跨OM匹配
         if mode == self.mode_c2:
-            return self._match_transfers_c2_mode(sources, destinations, article, product_desc, mode)
+            return self._strategies['c2_mode'].match(sources, destinations, article, product_desc, mode)
 
         # 精簡SKU模式特殊處理
         if self._is_simplified_sku_mode(mode):
@@ -2628,20 +2653,20 @@ class TransferLogic:
             
             # E1/E1b模式：僅同OM配對
             if mode in (self.mode_e1, self.mode_e1b):
-                recommendations = self._match_transfers_e1_mode(sources, destinations, article, om, product_desc, mode)
+                recommendations = self._strategies['e1_mode'].match(sources, destinations, article, product_desc, mode, om=om)
             # E2模式需要傳入group_df以支持Phase 3邏輯
             elif mode == self.mode_e2:
                 recommendations = self._match_transfers_e_mode(sources, destinations, article, om, product_desc, group_df)
             elif mode in (self.mode_f, self.mode_f_target_only):
-                recommendations = self._match_transfers_f_mode(sources, destinations, article, product_desc, mode)
+                recommendations = self._strategies['f_mode'].match(sources, destinations, article, product_desc, mode)
             elif mode == self.mode_c2:
-                recommendations = self._match_transfers_c2_mode(sources, destinations, article, product_desc, mode)
+                recommendations = self._strategies['c2_mode'].match(sources, destinations, article, product_desc, mode)
             # ND1 模式：同 OM 配對
             elif mode == self.mode_nd1:
-                recommendations = self._match_transfers_nd_mode(sources, destinations, article, om, product_desc, mode, cross_om=False)
+                recommendations = self._strategies['nd_mode'].match(sources, destinations, article, product_desc, mode, om=om)
             # ND2 模式：跨 OM 配對 + Windy 限制
             elif mode == self.mode_nd2:
-                recommendations = self._match_transfers_nd_mode(sources, destinations, article, om, product_desc, mode, cross_om=True)
+                recommendations = self._strategies['nd_mode'].match(sources, destinations, article, product_desc, mode, om=om)
             # 精簡SKU模式
             elif self._is_simplified_sku_mode(mode):
                 recommendations = _SIMPLIFIED_SKU_STRATEGY.match(sources, destinations, article, product_desc, mode)
