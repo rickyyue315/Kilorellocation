@@ -18,7 +18,7 @@ ND2模式：ND店舖跨OM互轉，Windy只能轉Windy，其餘邏輯同ND1
 
 import pandas as pd
 import numpy as np
-from typing import Any, Dict, List, Tuple, Optional, Set
+from typing import Any, Dict, List, Tuple, Optional, Set  # noqa: F401 — Set used in signature defaults
 import logging
 import unicodedata
 
@@ -54,11 +54,11 @@ def _make_source(row, transferable_qty: int, priority: int, source_type: str, **
         'transferable_qty': transferable_qty,
         'priority': priority,
         'original_stock': int(row['SaSa Net Stock']),
-        'effective_sold_qty': int(row['Effective Sold Qty']),
+        'effective_sold_qty': int(row['Effective Sold Qty']) if pd.notna(row.get('Effective Sold Qty', 0)) else 0,
         'source_type': source_type,
         'store_type': '',
-        'last_month_sold_qty': int(row['Last Month Sold Qty']),
-        'mtd_sold_qty': int(row['MTD Sold Qty']),
+        'last_month_sold_qty': int(row['Last Month Sold Qty']) if pd.notna(row.get('Last Month Sold Qty', 0)) else 0,
+        'mtd_sold_qty': int(row['MTD Sold Qty']) if pd.notna(row.get('MTD Sold Qty', 0)) else 0,
         'last_2_month_sold_qty': _safe_get_last2m(row),
     }
     source.update(extra)
@@ -75,14 +75,14 @@ def _make_dest(row, needed_qty: int, priority: int, dest_type: str,
         'priority': priority,
         'current_stock': int(row['SaSa Net Stock']),
         'pending_received': int(row['Pending Received']),
-        'safety_stock': int(row['Safety Stock']),
-        'moq': int(row['MOQ']),
-        'effective_sold_qty': int(row['Effective Sold Qty']),
+        'safety_stock': int(row['Safety Stock']) if pd.notna(row.get('Safety Stock', 0)) else 0,
+        'moq': int(row['MOQ']) if pd.notna(row.get('MOQ', 0)) else 0,
+        'effective_sold_qty': int(row['Effective Sold Qty']) if pd.notna(row.get('Effective Sold Qty', 0)) else 0,
         'dest_type': dest_type,
         'target_qty': target_qty,
         'received_qty': 0,
-        'last_month_sold_qty': int(row['Last Month Sold Qty']),
-        'mtd_sold_qty': int(row['MTD Sold Qty']),
+        'last_month_sold_qty': int(row['Last Month Sold Qty']) if pd.notna(row.get('Last Month Sold Qty', 0)) else 0,
+        'mtd_sold_qty': int(row['MTD Sold Qty']) if pd.notna(row.get('MTD Sold Qty', 0)) else 0,
     }
     if max_receive_qty is not None:
         dest['max_receive_qty'] = max_receive_qty
@@ -100,7 +100,7 @@ def _compute_max_protected_sold(df) -> float:
 
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.11.0"""
+    """調貨業務邏輯類 v2.11.1"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False):

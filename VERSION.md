@@ -1,5 +1,67 @@
 # 版本更新記錄
 
+## v2.11.1-hotfix (2026-05-12)
+
+### 系統架構重構（Phase 1-5）
+
+#### 核心改動
+本日進行了大規模系統架構重構，共計 12 個 commit，涵蓋以下範圍：
+
+**Phase 1 — 清理**
+- 刪除 `debug/` 目錄（30+ 除錯腳本）
+- 刪除根目錄重複腳本（60+ 檔案）
+- 刪除 `Geminiapp.py` 替代版本
+- 將臨時測試腳本遷移至 `tests/legacy/`
+
+**Phase 2 — 模組抽取**
+- 新增 `config.py`：集中所有魔術數字與配置常數
+- 新增 `models/mode.py`：MODE_NAME_MAP、MODE_DESCRIPTIONS、RECEIVE_SITE_LIMIT_MODE_CODES
+- 新增 `ui/` 目錄：sidebar.py、display.py、styles.py、mojibake.py
+- `app.py` 從 1201 行精簡至 266 行
+
+**Phase 3 — 工廠模式**
+- 新增 `services/recommendation_factory.py`：`build_recommendation()` + `apply_transfer()` 統一建構
+- 新增 `_make_source()` / `_make_dest()` 工廠函式
+- 抽取 `_compute_transfer_qty()` 方法
+- 抽取 `_note_source_analysis()` / `_note_dest_analysis()` 方法
+
+**Phase 4 — 策略模式抽取**
+- 新增 `strategies/base.py`：BaseMatchStrategy 抽象基類
+- 新增 `strategies/predicates.py`：`is_hd_to_hk_restricted()` 共用判斷
+- 新增 `strategies/simplified_sku.py`：SimplifiedSKUStrategy
+- 新增 `strategies/c2_mode.py`：C2ModeStrategy
+- 新增 `strategies/f_mode.py`：FModeStrategy
+- 新增 `strategies/e1_mode.py`：E1ModeStrategy（E1/E1b）
+- 新增 `strategies/nd_mode.py`：NDModeStrategy（ND1/ND2）
+- 新增 `strategies/b_special.py`：BSpecialStrategy（委派至 `_match_by_priority`）
+
+**Phase 5 — 程式碼清理**
+- 刪除 6 個已抽取的死方法
+- `business_logic.py` 從 3400+ 行精簡至 2144 行
+- 統一所有模式使用 `build_recommendation()` + `apply_transfer()`
+
+#### Bug 修復
+- **ND 模式 NaN 崩潰**：`_make_dest()` 中 `int(row['Safety Stock'])` 在 NaN 時崩潰，新增 `pd.notna()` 防禦
+- **Streamlit Cloud import 錯誤**：保留 `_parse_target_for_ui` 和 `_find_f_mode_nd_target_conflicts` 在 app.py 中的本地副本
+
+#### 版本號修正
+- `business_logic.py` class docstring：v2.11.0 → v2.11.1
+- `data_processor.py` docstring：v2.10.0 → v2.11.1
+- `excel_generator.py` docstring：v2.10.0 → v2.11.1
+- `DEBUG_CHECKLIST.md` 版本：v2.10.0 → v2.11.1
+
+#### 測試結果
+- 全部 175 個測試通過（0 失敗）
+- 涵蓋所有 24 個模式的：dual-role 防護、HD 限制、Windy 限制、Mix 銷量保護、接收上限、單件優化、ND 模式等
+
+#### 已知限制（待後續處理）
+1. `_parse_target_for_ui()` 和 `_find_f_mode_nd_target_conflicts()` 重複定義於 app.py 和 business_logic.py，待合併至共用模組
+2. E2 模式匹配邏輯仍留在 business_logic.py 中（`_match_transfers_e_mode` + `_e_mode_phase3_c_fallback`），待抽取至 `strategies/e2_mode.py`
+3. SimplifiedSKUStrategy 和 C2ModeStrategy 的 Notes 使用簡化格式，與其他策略的詳細格式不完全一致
+4. 無 data_processor.py 和 excel_generator.py 的單元測試
+
+---
+
 ## v2.11.1 (2026-05-11)
 
 ### 模式A單件調貨上調優化
