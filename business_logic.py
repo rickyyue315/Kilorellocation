@@ -32,6 +32,7 @@ from config import (
     SIMPLIFIED_SKU_RECEIVE_MULTIPLIER,
     ND_RECEIVE_MULTIPLIER,
 )
+from services.recommendation_factory import build_recommendation, apply_transfer
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
@@ -1295,78 +1296,27 @@ class TransferLogic:
                 if transfer_qty <= 0:
                     continue
 
-                rec = {
-                    'Article': article,
-                    'Product Desc': product_desc,
-                    'Transfer OM': source['om'],
-                    'Transfer Site': source['site'],
-                    'Receive OM': dest['om'],
-                    'Receive Site': dest['site'],
-                    'Transfer Qty': transfer_qty,
-                    'Original Stock': source['original_stock'],
-                    'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
-                    'Safety Stock': 0,
-                    'MOQ': 0,
-                    'Source Priority': source['priority'],
-                    'Destination Priority': dest['priority'],
-                    'Source Type': source['source_type'],
-                    'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received, transfer_qty, mode),
-                    'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                    'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                    'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
-                    'Receive Original Stock': dest.get('current_stock', 0),
-                }
-                if 'target_qty' in dest:
-                    rec['Target Qty'] = dest['target_qty']
-                rec['Cumulative Received Qty'] = current_received + transfer_qty
-
+                notes = self._create_recommendation_note(source, dest, current_received, transfer_qty, mode)
+                rec = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
                 recommendations.append(rec)
 
-                received_qty_by_site[receive_site_key] = current_received + transfer_qty
-                source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
-                source['transferable_qty'] -= transfer_qty
-                dest['needed_qty'] -= transfer_qty
+                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
 
                 if not source_added_to_transfer:
                     transfer_sites.add(source['site'])
                     source_added_to_transfer = True
                 receive_sites.add(dest['site'])
 
-                if dest['needed_qty'] <= 0:
-                    dest['needed_qty'] = 0
-
         for source in temp_sources:
             remaining = source['transferable_qty']
             if remaining <= 0:
                 continue
 
-            rec = {
-                'Article': article,
-                'Product Desc': product_desc,
-                'Transfer OM': source['om'],
-                'Transfer Site': source['site'],
-                'Receive OM': source['om'],
-                'Receive Site': 'D001',
-                'Transfer Qty': remaining,
-                'Original Stock': source['original_stock'],
-                'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - remaining,
-                'Safety Stock': 0,
-                'MOQ': 0,
-                'Source Priority': source['priority'],
-                'Destination Priority': 99,
-                'Source Type': source['source_type'],
-                'Destination Type': '退回D001',
-                'Notes': f"精簡SKU模式：剩餘庫存{remaining}件退回D001",
-                'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                'Receive Site Last Month Sold Qty': 0,
-                'Receive Site MTD Sold Qty': 0,
-                'Receive Original Stock': 0,
-                'Target Qty': 0,
-                'Cumulative Received Qty': remaining,
-            }
+            notes = f"精簡SKU模式：剩餘庫存{remaining}件退回D001"
+            rec = build_recommendation(
+                article, product_desc, source, {}, remaining, notes, 0,
+                is_d001_return=True, dest_priority_override=99,
+            )
             recommendations.append(rec)
 
         return recommendations
@@ -1545,41 +1495,11 @@ class TransferLogic:
                 if transfer_qty <= 0:
                     continue
 
-                recommendation = {
-                    'Article': article,
-                    'Product Desc': product_desc,
-                    'Transfer OM': source['om'],
-                    'Transfer Site': source['site'],
-                    'Receive OM': dest['om'],
-                    'Receive Site': dest['site'],
-                    'Transfer Qty': transfer_qty,
-                    'Original Stock': source['original_stock'],
-                    'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
-                    'Safety Stock': 0,
-                    'MOQ': 0,
-                    'Source Priority': source['priority'],
-                    'Destination Priority': dest['priority'],
-                    'Source Type': source['source_type'],
-                    'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received, transfer_qty, mode),
-                    'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                    'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                    'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
-                    'Receive Original Stock': dest.get('current_stock', 0)
-                }
-
-                if 'target_qty' in dest:
-                    recommendation['Target Qty'] = dest['target_qty']
-
-                recommendation['Cumulative Received Qty'] = current_received + transfer_qty
-
+                notes = self._create_recommendation_note(source, dest, current_received, transfer_qty, mode)
+                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
                 recommendations.append(recommendation)
 
-                received_qty_by_site[receive_key] = current_received + transfer_qty
-                source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
-                source['transferable_qty'] -= transfer_qty
-                dest['needed_qty'] -= transfer_qty
+                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_key, current_received)
 
                 # 標記接收站點，防止接收方再被選為轉出方
                 receive_sites.add(dest['site'])
@@ -1653,42 +1573,11 @@ class TransferLogic:
                 receive_site_key = f"{dest['site']}_{article}"
                 current_received_qty = received_qty_by_site.get(receive_site_key, 0)
 
-                recommendation = {
-                    'Article': article,
-                    'Product Desc': product_desc,
-                    'Transfer OM': source['om'],
-                    'Transfer Site': source['site'],
-                    'Receive OM': dest['om'],
-                    'Receive Site': dest['site'],
-                    'Transfer Qty': transfer_qty,
-                    'Original Stock': source['original_stock'],
-                    'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
-                    'Safety Stock': 0,
-                    'MOQ': 0,
-                    'Source Priority': source['priority'],
-                    'Destination Priority': dest['priority'],
-                    'Source Type': source['source_type'],
-                    'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, self.mode_c2),
-                    'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                    'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                    'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
-                    'Receive Original Stock': dest.get('current_stock', 0)
-                }
-
-                if 'target_qty' in dest:
-                    recommendation['Target Qty'] = dest['target_qty']
-
-                recommendation['Cumulative Received Qty'] = current_received_qty + transfer_qty
-
+                notes = self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, self.mode_c2)
+                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received_qty)
                 recommendations.append(recommendation)
 
-                received_qty_by_site[receive_site_key] = current_received_qty + transfer_qty
-
-                source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
-                source['transferable_qty'] -= transfer_qty
-                dest['needed_qty'] -= transfer_qty
+                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received_qty)
 
                 # 記錄接收店鋪（防止同時作為轉出方）
                 receive_sites.add(dest['site'])
@@ -1803,42 +1692,11 @@ class TransferLogic:
                     receive_site_key = f"{dest['site']}_{article}"
                     current_received_qty = received_qty_by_site.get(receive_site_key, 0)
 
-                    recommendation = {
-                        'Article': article,
-                        'Product Desc': product_desc,
-                        'Transfer OM': source['om'],
-                        'Transfer Site': source['site'],
-                        'Receive OM': dest['om'],
-                        'Receive Site': dest['site'],
-                        'Transfer Qty': transfer_qty,
-                        'Original Stock': source['original_stock'],
-                        'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
-                        'Safety Stock': 0,
-                        'MOQ': 0,
-                        'Source Priority': source['priority'],
-                        'Destination Priority': dest['priority'],
-                        'Source Type': source['source_type'],
-                        'Destination Type': dest['dest_type'],
-                        'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode),
-                        'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                        'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                        'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                        'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
-                        'Receive Original Stock': dest.get('current_stock', 0)
-                    }
-
-                    if 'target_qty' in dest:
-                        recommendation['Target Qty'] = dest['target_qty']
-
-                    recommendation['Cumulative Received Qty'] = current_received_qty + transfer_qty
-
+                    notes = self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode)
+                    recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received_qty)
                     recommendations.append(recommendation)
 
-                    received_qty_by_site[receive_site_key] = current_received_qty + transfer_qty
-
-                    source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
-                    source['transferable_qty'] -= transfer_qty
-                    dest['needed_qty'] -= transfer_qty
+                    apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received_qty)
                     remaining_demand -= transfer_qty
 
                     # 記錄接收店鋪（防止同時作為轉出方）
@@ -1936,42 +1794,11 @@ class TransferLogic:
                 if transfer_qty <= 0:
                     continue
 
-                recommendation = {
-                    'Article': article,
-                    'Product Desc': product_desc,
-                    'Transfer OM': source['om'],
-                    'Transfer Site': source['site'],
-                    'Receive OM': dest['om'],
-                    'Receive Site': dest['site'],
-                    'Transfer Qty': transfer_qty,
-                    'Original Stock': source['original_stock'],
-                    'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
-                    'Safety Stock': 0,
-                    'MOQ': 0,
-                    'Source Priority': source['priority'],
-                    'Destination Priority': dest['priority'],
-                    'Source Type': source['source_type'],
-                    'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received, transfer_qty, mode),
-                    'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                    'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                    'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
-                    'Receive Original Stock': dest.get('current_stock', 0)
-                }
-
-                if 'target_qty' in dest:
-                    recommendation['Target Qty'] = dest['target_qty']
-
-                recommendation['Cumulative Received Qty'] = current_received + transfer_qty
-
+                notes = self._create_recommendation_note(source, dest, current_received, transfer_qty, mode)
+                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
                 recommendations.append(recommendation)
 
-                # 更新庫存和累計追蹤
-                received_qty_by_site[receive_site_key] = current_received + transfer_qty
-                source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
-                source['transferable_qty'] -= transfer_qty
-                dest['needed_qty'] -= transfer_qty
+                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
 
                 # 記錄接收店鋪（防止同時作為轉出方）
                 receive_sites.add(dest['site'])
@@ -2053,7 +1880,7 @@ class TransferLogic:
                 
                 # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
                 if self._is_hd_to_hk_restricted(source['site'], dest['site']):
-                    continue  # 跳過不允許的目標
+                    continue
 
                 # 轉出限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
                 if max_receive_sites_per_source is not None:
@@ -2074,42 +1901,11 @@ class TransferLogic:
                 if transfer_qty <= 0:
                     continue
                 
-                recommendation = {
-                    'Article': article,
-                    'Product Desc': product_desc,
-                    'Transfer OM': source['om'],
-                    'Transfer Site': source['site'],
-                    'Receive OM': dest['om'],
-                    'Receive Site': dest['site'],
-                    'Transfer Qty': transfer_qty,
-                    'Original Stock': source['original_stock'],
-                    'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
-                    'Safety Stock': 0,
-                    'MOQ': 0,
-                    'Source Priority': source['priority'],
-                    'Destination Priority': dest['priority'],
-                    'Source Type': source['source_type'],
-                    'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received, transfer_qty, self.mode_e2),
-                    'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                    'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                    'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
-                    'Receive Original Stock': dest.get('current_stock', 0)
-                }
-                
-                if 'target_qty' in dest:
-                    recommendation['Target Qty'] = dest['target_qty']
-                
-                recommendation['Cumulative Received Qty'] = current_received + transfer_qty
-                
+                notes = self._create_recommendation_note(source, dest, current_received, transfer_qty, self.mode_e2)
+                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
                 recommendations.append(recommendation)
-                
-                # 更新庫存和累計追蹤
-                received_qty_by_site[receive_site_key] = current_received + transfer_qty
-                source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
-                source['transferable_qty'] -= transfer_qty
-                dest['needed_qty'] -= transfer_qty
+
+                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
 
                 # 記錄接收店鋪（防止同時作為轉出方）
                 receive_sites.add(dest['site'])
@@ -2165,42 +1961,11 @@ class TransferLogic:
                 if transfer_qty <= 0:
                     continue
                 
-                recommendation = {
-                    'Article': article,
-                    'Product Desc': product_desc,
-                    'Transfer OM': source['om'],
-                    'Transfer Site': source['site'],
-                    'Receive OM': dest['om'],
-                    'Receive Site': dest['site'],
-                    'Transfer Qty': transfer_qty,
-                    'Original Stock': source['original_stock'],
-                    'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
-                    'Safety Stock': 0,
-                    'MOQ': 0,
-                    'Source Priority': source['priority'],
-                    'Destination Priority': dest['priority'],
-                    'Source Type': source['source_type'],
-                    'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received, transfer_qty, self.mode_e2),
-                    'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                    'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                    'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
-                    'Receive Original Stock': dest.get('current_stock', 0)
-                }
-                
-                if 'target_qty' in dest:
-                    recommendation['Target Qty'] = dest['target_qty']
-                
-                recommendation['Cumulative Received Qty'] = current_received + transfer_qty
-                
+                notes = self._create_recommendation_note(source, dest, current_received, transfer_qty, self.mode_e2)
+                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
                 recommendations.append(recommendation)
-                
-                # 更新庫存和累計追蹤
-                received_qty_by_site[receive_site_key] = current_received + transfer_qty
-                source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
-                source['transferable_qty'] -= transfer_qty
-                dest['needed_qty'] -= transfer_qty
+
+                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
 
                 # 記錄接收店鋪（防止同時作為轉出方）
                 receive_sites.add(dest['site'])
@@ -2351,41 +2116,12 @@ class TransferLogic:
                         continue
                     
                     # 創建建議
-                    recommendation = {
-                        'Article': article,
-                        'Product Desc': product_desc,
-                        'Transfer OM': source['om'],
-                        'Transfer Site': source['site'],
-                        'Receive OM': dest['om'],
-                        'Receive Site': dest['site'],
-                        'Transfer Qty': transfer_qty,
-                        'Original Stock': source['original_stock'],
-                        'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
-                        'Safety Stock': 0,
-                        'MOQ': 0,
-                        'Source Priority': source['priority'],
-                        'Destination Priority': dest['priority'],
-                        'Source Type': source['source_type'],
-                        'Destination Type': dest['dest_type'],
-                        'Notes': f'E模式Phase3 - C模式回退（非E模式OM的重點補0）',
-                        'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                        'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                        'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                        'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
-                        'Receive Original Stock': dest.get('current_stock', 0)
-                    }
-                    
-                    if 'target_qty' in dest:
-                        recommendation['Target Qty'] = dest['target_qty']
-                    
+                    notes = f'E模式Phase3 - C模式回退（非E模式OM的重點補0）'
+                    recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
                     recommendations.append(recommendation)
-                    
-                    # 更新數量
-                    source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
-                    source['transferable_qty'] -= transfer_qty
-                    dest['needed_qty'] -= transfer_qty
-                    received_qty_by_site[receive_site_key] = current_received + transfer_qty
-                    
+
+                    apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
+
                     # 記錄接收店鋪（防止同時作為轉出方）
                     receive_sites.add(dest['site'])
                     
@@ -2605,41 +2341,12 @@ class TransferLogic:
                             continue
                 
                 # 創建調貨建議
-                recommendation = {
-                    'Article': article,
-                    'Product Desc': product_desc,
-                    'Transfer OM': source['om'],
-                    'Transfer Site': source['site'],
-                    'Receive OM': dest['om'],
-                    'Receive Site': dest['site'],
-                    'Transfer Qty': transfer_qty,
-                    'Original Stock': source['original_stock'],
-                    'After Transfer Stock': source['original_stock'] - source.get('total_transferred', 0) - transfer_qty,
-                    'Safety Stock': 0,  # 需要從原始數據獲取
-                    'MOQ': 0,  # 需要從原始數據獲取
-                    'Source Priority': source['priority'],
-                    'Destination Priority': dest['priority'],
-                    'Source Type': source['source_type'],
-                    'Destination Type': dest['dest_type'],
-                    'Notes': self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode),
-                    # 新增銷售數據欄位
-                    'Transfer Site Last Month Sold Qty': source.get('last_month_sold_qty', 0),
-                    'Transfer Site MTD Sold Qty': source.get('mtd_sold_qty', 0),
-                    'Receive Site Last Month Sold Qty': dest.get('last_month_sold_qty', 0),
-                    'Receive Site MTD Sold Qty': dest.get('mtd_sold_qty', 0),
-                    # 新增Receive Original Stock欄位
-                    'Receive Original Stock': dest.get('current_stock', 0)
-                }
-                
-                # 添加目標數量信息（如果有）
-                if 'target_qty' in dest:
-                    recommendation['Target Qty'] = dest['target_qty']
-                
-                # 添加累計接收數量信息
-                recommendation['Cumulative Received Qty'] = current_received_qty + transfer_qty
-                
+                notes = self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode)
+                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received_qty)
                 recommendations.append(recommendation)
-                
+
+                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received_qty)
+
                 # 將轉出店鋪添加到轉出集合（只在實際產生轉移後才添加）
                 if not source_added_to_transfer:
                     transfer_sites.add(source['site'])
@@ -2652,14 +2359,6 @@ class TransferLogic:
                 source_site = source.get('site')
                 matched_sites = source_to_receive_sites.setdefault(source_site, set())
                 matched_sites.add(dest['site'])
-                
-                # 更新接收店鋪的累計接收數量
-                received_qty_by_site[receive_site_key] = current_received_qty + transfer_qty
-                
-                # 更新剩餘可轉出數量和需求數量
-                source['total_transferred'] = source.get('total_transferred', 0) + transfer_qty
-                source['transferable_qty'] -= transfer_qty
-                dest['needed_qty'] -= transfer_qty
                 
                 # 對於C模式(重點補0)，如果累計接收數量已達到目標，將需求設為0
                 if dest['dest_type'] == '重點補0' and received_qty_by_site[receive_site_key] >= dest['target_qty']:
@@ -3360,3 +3059,32 @@ class TransferLogic:
                 notes_parts.append(f"【特殊標記: 精簡SKU模式({mode_variant})，RF存貨上限=Max(Safety×2, 2月銷量×2)，參考C1模式最少2件起轉】")
         
         return " | ".join(notes_parts)
+
+
+def _parse_target_for_ui(value):
+    """將 Target 欄位轉為可比較數值，支援全形數字與千分位逗號"""
+    if pd.isna(value):
+        return float('nan')
+
+    text = str(value).strip()
+    if text == "":
+        return float('nan')
+
+    text = unicodedata.normalize('NFKC', text).replace(',', '')
+    return pd.to_numeric(text, errors='coerce')
+
+
+def _find_f_mode_nd_target_conflicts(df: pd.DataFrame) -> pd.DataFrame:
+    """找出 F/F2 模式下 ND 且 Target>0 的店舖資料"""
+    if 'RP Type' not in df.columns or 'Target' not in df.columns:
+        return pd.DataFrame()
+
+    target_numeric = df['Target'].map(_parse_target_for_ui)
+    nd_mask = df['RP Type'].astype(str).str.strip().str.upper() == 'ND'
+    target_mask = pd.Series(target_numeric, index=df.index).fillna(0) > 0
+    conflicts = df[nd_mask & target_mask].copy()
+    if conflicts.empty:
+        return conflicts
+
+    conflicts['Target Numeric'] = target_numeric[conflicts.index]
+    return conflicts

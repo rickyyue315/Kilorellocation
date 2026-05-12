@@ -1,0 +1,27 @@
+from typing import TypedDict
+
+Recommendation = TypedDict('Recommendation', {
+    'Article': str,
+    'Product Desc': str,
+    'Transfer OM': str,
+    'Transfer Site': str,
+    'Receive OM': str,
+    'Receive Site': str,
+    'Transfer Qty': int,
+    'Original Stock': int,
+    'After Transfer Stock': int,
+    'Safety Stock': int,
+    'MOQ': int,
+    'Source Priority': int,
+    'Destination Priority': int,
+    'Source Type': str,
+    'Destination Type': str,
+    'Notes': str,
+    'Transfer Site Last Month Sold Qty': int,
+    'Transfer Site MTD Sold Qty': int,
+    'Receive Site Last Month Sold Qty': int,
+    'Receive Site MTD Sold Qty': int,
+    'Receive Original Stock': int,
+    'Target Qty': int,
+    'Cumulative Received Qty': int,
+}, total=False)
