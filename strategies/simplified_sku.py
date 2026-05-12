@@ -1,0 +1,103 @@
+"""
+精簡SKU模式匹配策略
+"""
+
+from typing import Any, Dict, List, Optional
+
+from strategies.base import BaseMatchStrategy
+from strategies.predicates import is_hd_to_hk_restricted
+from services.recommendation_factory import build_recommendation, apply_transfer
+
+
+class SimplifiedSKUStrategy(BaseMatchStrategy):
+    def match(
+        self,
+        sources: List[Dict[str, Any]],
+        destinations: List[Dict[str, Any]],
+        article: str,
+        product_desc: str,
+        mode: str,
+        om: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        recommendations = []
+        cross_om = (mode == "精簡SKU(跨OM)")
+
+        temp_sources = [s.copy() for s in sources]
+        for s in temp_sources:
+            s['total_transferred'] = 0
+        temp_destinations = [d.copy() for d in destinations]
+
+        transfer_sites = set()
+        receive_sites = set()
+        received_qty_by_site = {}
+
+        pending_sources = sorted(
+            [s for s in temp_sources if s['transferable_qty'] >= 2],
+            key=lambda x: -x['transferable_qty']
+        )
+
+        for source in pending_sources:
+            source_added_to_transfer = False
+            for dest in temp_destinations:
+                if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
+                    continue
+                if source['site'] == dest['site']:
+                    continue
+                if dest['site'] in transfer_sites:
+                    continue
+                if source['site'] in receive_sites:
+                    continue
+                if dest.get('rp_type') == 'ND':
+                    continue
+
+                if not cross_om and source['om'] != dest['om']:
+                    continue
+
+                if cross_om and source.get('om') == 'Windy' and dest.get('om') != 'Windy':
+                    continue
+
+                if cross_om and is_hd_to_hk_restricted(source['site'], dest['site']):
+                    continue
+
+                receive_site_key = f"{dest['site']}_{article}"
+                current_received = received_qty_by_site.get(receive_site_key, 0)
+                max_receive = dest.get('max_receive_qty', float('inf'))
+                if current_received >= max_receive:
+                    continue
+
+                transfer_qty = min(source['transferable_qty'], dest['needed_qty'], max_receive - current_received)
+                if transfer_qty <= 0:
+                    continue
+
+                notes = _make_sku_note(source, dest, current_received, transfer_qty, mode)
+                rec = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
+                recommendations.append(rec)
+
+                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
+
+                if not source_added_to_transfer:
+                    transfer_sites.add(source['site'])
+                    source_added_to_transfer = True
+                receive_sites.add(dest['site'])
+
+        for source in temp_sources:
+            remaining = source['transferable_qty']
+            if remaining <= 0:
+                continue
+
+            notes = f"精簡SKU模式：剩餘庫存{remaining}件退回D001"
+            rec = build_recommendation(
+                article, product_desc, source, {}, remaining, notes, 0,
+                is_d001_return=True, dest_priority_override=99,
+            )
+            recommendations.append(rec)
+
+        return recommendations
+
+
+def _make_sku_note(source, dest, current_received, transfer_qty, mode):
+    """Generate note for simplified SKU transfers."""
+    mode_variant = "限同OM" if mode == "精簡SKU(限同OM)" else "跨OM"
+    return (f"【精簡SKU模式({mode_variant})】"
+            f"{source['site']}→{dest['site']} {transfer_qty}件, "
+            f"RF存貨上限=Max(Safety×2, 2月銷量×2)")

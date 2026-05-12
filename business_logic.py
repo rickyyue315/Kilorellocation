@@ -33,10 +33,14 @@ from config import (
     ND_RECEIVE_MULTIPLIER,
 )
 from services.recommendation_factory import build_recommendation, apply_transfer
+from strategies.simplified_sku import SimplifiedSKUStrategy
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+_SIMPLIFIED_SKU_STRATEGY = SimplifiedSKUStrategy()
 
 class TransferLogic:
     """調貨業務邏輯類 v2.11.0"""
@@ -2640,7 +2644,7 @@ class TransferLogic:
                 recommendations = self._match_transfers_nd_mode(sources, destinations, article, om, product_desc, mode, cross_om=True)
             # 精簡SKU模式
             elif self._is_simplified_sku_mode(mode):
-                recommendations = self._match_transfers_simplified_sku(sources, destinations, article, product_desc, mode)
+                recommendations = _SIMPLIFIED_SKU_STRATEGY.match(sources, destinations, article, product_desc, mode)
             else:
                 recommendations = self.match_transfers(article, om, sources, destinations, product_desc, mode)
             
