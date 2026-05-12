@@ -23,8 +23,36 @@ from ui.display import (
     render_download_button,
 )
 from data_processor import DataProcessor
-from business_logic import TransferLogic, _parse_target_for_ui, _find_f_mode_nd_target_conflicts
+from business_logic import TransferLogic
 from excel_generator import ExcelGenerator
+
+
+def _parse_target_for_ui(value):
+    if pd.isna(value):
+        return float('nan')
+
+    text = str(value).strip()
+    if text == "":
+        return float('nan')
+
+    import unicodedata
+    text = unicodedata.normalize('NFKC', text).replace(',', '')
+    return pd.to_numeric(text, errors='coerce')
+
+
+def _find_f_mode_nd_target_conflicts(df: pd.DataFrame) -> pd.DataFrame:
+    if 'RP Type' not in df.columns or 'Target' not in df.columns:
+        return pd.DataFrame()
+
+    target_numeric = df['Target'].map(_parse_target_for_ui)
+    nd_mask = df['RP Type'].astype(str).str.strip().str.upper() == 'ND'
+    target_mask = pd.Series(target_numeric, index=df.index).fillna(0) > 0
+    conflicts = df[nd_mask & target_mask].copy()
+    if conflicts.empty:
+        return conflicts
+
+    conflicts['Target Numeric'] = target_numeric[conflicts.index]
+    return conflicts
 
 
 @st.cache_data(show_spinner=False)
