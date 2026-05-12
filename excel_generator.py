@@ -7,7 +7,6 @@ Excel輸出模組 v2.10.0
 
 import io
 import pandas as pd
-import numpy as np
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import xlsxwriter

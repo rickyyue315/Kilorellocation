@@ -2,8 +2,6 @@
 Mojibake 修復模組 — 修復 Streamlit 文字渲染中的亂碼問題
 """
 
-import unicodedata
-
 try:
     from streamlit.delta_generator import DeltaGenerator
 except Exception:

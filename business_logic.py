@@ -33,14 +33,71 @@ from config import (
     ND_RECEIVE_MULTIPLIER,
 )
 from services.recommendation_factory import build_recommendation, apply_transfer
-from strategies.simplified_sku import SimplifiedSKUStrategy
+from strategies.predicates import is_hd_to_hk_restricted
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-_SIMPLIFIED_SKU_STRATEGY = SimplifiedSKUStrategy()
+def _safe_get_last2m(row) -> int:
+    if 'Last 2 Month Sold Qty' in row.index:
+        return int(row['Last 2 Month Sold Qty'])
+    return int(row['Last Month Sold Qty'])
+
+
+def _make_source(row, transferable_qty: int, priority: int, source_type: str, **extra) -> Dict:
+    source = {
+        'site': row['Site'],
+        'om': row['OM'],
+        'rp_type': row['RP Type'],
+        'transferable_qty': transferable_qty,
+        'priority': priority,
+        'original_stock': int(row['SaSa Net Stock']),
+        'effective_sold_qty': int(row['Effective Sold Qty']),
+        'source_type': source_type,
+        'store_type': '',
+        'last_month_sold_qty': int(row['Last Month Sold Qty']),
+        'mtd_sold_qty': int(row['MTD Sold Qty']),
+        'last_2_month_sold_qty': _safe_get_last2m(row),
+    }
+    source.update(extra)
+    return source
+
+
+def _make_dest(row, needed_qty: int, priority: int, dest_type: str,
+               target_qty: int, max_receive_qty: Optional[int] = None, **extra) -> Dict:
+    dest = {
+        'site': row['Site'],
+        'om': row['OM'],
+        'rp_type': row['RP Type'],
+        'needed_qty': needed_qty,
+        'priority': priority,
+        'current_stock': int(row['SaSa Net Stock']),
+        'pending_received': int(row['Pending Received']),
+        'safety_stock': int(row['Safety Stock']),
+        'moq': int(row['MOQ']),
+        'effective_sold_qty': int(row['Effective Sold Qty']),
+        'dest_type': dest_type,
+        'target_qty': target_qty,
+        'received_qty': 0,
+        'last_month_sold_qty': int(row['Last Month Sold Qty']),
+        'mtd_sold_qty': int(row['MTD Sold Qty']),
+    }
+    if max_receive_qty is not None:
+        dest['max_receive_qty'] = max_receive_qty
+    dest.update(extra)
+    return dest
+
+
+def _compute_max_protected_sold(df) -> float:
+    if df.empty:
+        return 0
+    max_sold = df['Effective Sold Qty'].max()
+    if len(df) == 1 or max_sold == 0 or (df['Effective Sold Qty'] == max_sold).sum() >= len(df):
+        return float('inf')
+    return max_sold
+
 
 class TransferLogic:
     """調貨業務邏輯類 v2.11.0"""
@@ -143,14 +200,6 @@ class TransferLogic:
     def _is_simplified_sku_mode(self, mode: str) -> bool:
         return mode in (self.mode_simplified_sku_same, self.mode_simplified_sku_cross)
 
-    @staticmethod
-    def _is_hd_to_hk_restricted(source_site: str, dest_site: str) -> bool:
-        if not isinstance(source_site, str) or not source_site.upper().startswith('HD'):
-            return False
-        if not isinstance(dest_site, str):
-            return False
-        return dest_site.upper().startswith(('HA', 'HB', 'HC'))
-
     def _get_b_special_sales_total(self, data: Dict) -> int:
         return int(data.get('last_month_sold_qty', 0) or 0) + int(data.get('mtd_sold_qty', 0) or 0)
 
@@ -180,219 +229,136 @@ class TransferLogic:
 
         Args:
             group_df: 按Article和OM分組的DataFrame
-            mode: 轉貨模式（保守轉貨、加強轉貨、附加B(特別模式)、附加B3(跨OM特別模式)、重點補0、清貨轉貨、強制轉出、強制轉出(跨OM)或目標優化）
+            mode: 轉貨模式
 
         Returns:
             轉出候選店鋪列表
         """
-        sources: List[Dict] = []
-
-        # 精簡SKU模式：ND全轉出 + RF超出Cap部分轉出
         if self._is_simplified_sku_mode(mode):
-            nd_stores = group_df[group_df['RP Type'] == 'ND']
-            for _, row in nd_stores.iterrows():
-                net_stock = int(row['SaSa Net Stock'])
-                if net_stock <= 0:
-                    continue
-                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else int(row['Last Month Sold Qty'])
-                sources.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'transferable_qty': net_stock,
-                    'priority': 1,
-                    'original_stock': net_stock,
-                    'effective_sold_qty': int(row['Effective Sold Qty']),
-                    'source_type': '精簡SKU ND轉出',
-                    'store_type': '',
-                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                    'mtd_sold_qty': int(row['MTD Sold Qty']),
-                    'last_2_month_sold_qty': last_two_month_sold,
-                })
-
-            rf_sources = group_df[group_df['RP Type'] == 'RF']
-            max_sold_qty = rf_sources['Effective Sold Qty'].max() if not rf_sources.empty else 0
-            if not rf_sources.empty:
-                if len(rf_sources) == 1 or max_sold_qty == 0 or (rf_sources['Effective Sold Qty'] == max_sold_qty).sum() >= len(rf_sources):
-                    max_sold_qty = float('inf')
-
-            for _, row in rf_sources.iterrows():
-                total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-                safety_stock = int(row['Safety Stock'])
-                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else int(row['Last Month Sold Qty'])
-                cap = max(safety_stock * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER, last_two_month_sold * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER)
-                effective_sold = int(row['Effective Sold Qty'])
-
-                if effective_sold >= max_sold_qty:
-                    continue
-                if total_available <= cap:
-                    continue
-
-                transferable_qty = min(total_available - cap, int(row['SaSa Net Stock']))
-                if transferable_qty <= 0:
-                    continue
-
-                sources.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'transferable_qty': transferable_qty,
-                    'priority': 2,
-                    'original_stock': int(row['SaSa Net Stock']),
-                    'effective_sold_qty': effective_sold,
-                    'source_type': '精簡SKU RF轉出',
-                    'store_type': '',
-                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                    'mtd_sold_qty': int(row['MTD Sold Qty']),
-                    'last_2_month_sold_qty': last_two_month_sold,
-                })
-
-            sources.sort(key=lambda x: x['priority'])
-            return sources
-
-        # ND1/ND2 模式特殊處理：ND 店舖按銷量排序智能轉出
+            return self._sources_simplified_sku(group_df)
         if self._is_nd_transfer_mode(mode):
-            nd_stores = group_df[group_df['RP Type'] == 'ND']
-
-            # 找出最高銷量 ND 店舖（保護，不強制轉出）
-            max_nd_sold = nd_stores['Effective Sold Qty'].max() if not nd_stores.empty else 0
-            # 若所有 ND 銷量相同（含全為0），不保護任何店舖
-            if not nd_stores.empty:
-                if max_nd_sold == 0 or (nd_stores['Effective Sold Qty'] == max_nd_sold).sum() >= len(nd_stores):
-                    max_nd_sold = float('inf')
-
-            for _, row in nd_stores.iterrows():
-                net_stock = int(row['SaSa Net Stock'])
-                if net_stock <= 0:
-                    continue
-                effective_sold = int(row['Effective Sold Qty'])
-                if effective_sold >= max_nd_sold:
-                    continue  # 保護最高銷量 ND 店舖
-
-                last_month_sold = int(row['Last Month Sold Qty'])
-                mtd_sold = int(row['MTD Sold Qty'])
-                total_sales = last_month_sold + mtd_sold  # 兩月銷量合計（排序鍵）
-
-                sources.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'transferable_qty': net_stock,  # 全數可轉出
-                    'priority': 1,
-                    'original_stock': net_stock,
-                    'effective_sold_qty': effective_sold,
-                    'source_type': 'ND智能轉出',
-                    'last_month_sold_qty': last_month_sold,
-                    'mtd_sold_qty': mtd_sold,
-                    'total_sales_sort': total_sales  # 排序用：升序，0銷量最優先轉出
-                })
-
-            # 按 total_sales_sort 升序排序：銷量0最優先，銷量最低次選
-            sources.sort(key=lambda x: x.get('total_sales_sort', 0))
-            return sources
-
-        # F/F2模式特殊處理：Target優先接收，轉出可全數釋放
+            return self._sources_nd_mode(group_df)
         if mode in (self.mode_f, self.mode_f_target_only):
-            target_series = self._parse_target_series(group_df)
-
-            # ND類型：全數轉出
-            nd_sources = group_df[group_df['RP Type'] == 'ND']
-            for _, row in nd_sources.iterrows():
-                target_value = target_series.loc[row.name]
-                if pd.notna(target_value) and target_value > 0:
-                    continue
-                if mode == self.mode_f_target_only and protected_sites:
-                    site_key = str(row['Site']).strip().upper()
-                    if site_key in protected_sites:
-                        continue
-                net_stock = int(row['SaSa Net Stock'])
-                if net_stock > 0:
-                    sources.append({
-                        'site': row['Site'],
-                        'om': row['OM'],
-                        'rp_type': row['RP Type'],
-                        'transferable_qty': net_stock,
-                        'priority': 1,
-                        'original_stock': net_stock,
-                        'effective_sold_qty': int(row['Effective Sold Qty']),
-                        'source_type': 'F模式ND轉出',
-                        'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                        'mtd_sold_qty': int(row['MTD Sold Qty'])
-                    })
-
-            # RF類型：可忽視最小庫存要求，但保護最高銷量店鋪
-            rf_sources = group_df[group_df['RP Type'] == 'RF']
-            max_sold_qty = rf_sources['Effective Sold Qty'].max() if not rf_sources.empty else 0
-            # 如果所有RF店鋪銷量相同（包括全為0）或只有1家RF店，則不保護任何店鋪
-            if not rf_sources.empty:
-                if len(rf_sources) == 1 or max_sold_qty == 0 or (rf_sources['Effective Sold Qty'] == max_sold_qty).sum() >= len(rf_sources):
-                    max_sold_qty = float('inf')
-
-            for _, row in rf_sources.iterrows():
-                target_value = target_series.loc[row.name]
-                if pd.notna(target_value) and target_value > 0:
-                    continue
-                if mode == self.mode_f_target_only and protected_sites:
-                    site_key = str(row['Site']).strip().upper()
-                    if site_key in protected_sites:
-                        continue
-                net_stock = int(row['SaSa Net Stock'])
-                effective_sold = int(row['Effective Sold Qty'])
-
-                if net_stock <= 0:
-                    continue
-                if effective_sold >= max_sold_qty:
-                    continue
-
-                sources.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'transferable_qty': net_stock,
-                    'priority': 2,
-                    'original_stock': net_stock,
-                    'effective_sold_qty': effective_sold,
-                    'source_type': 'F模式RF轉出',
-                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                    'mtd_sold_qty': int(row['MTD Sold Qty'])
-                })
-
-            # 按優先級 + 銷售量升序排序（銷售最多排最後）
-            sources.sort(key=lambda x: (x['priority'], x.get('effective_sold_qty', 0)))
-            return sources
-
-        # E1/E1b/E2模式特殊處理：檢查是否有被標記為*ALL*的行
+            return self._sources_f_mode(group_df, mode, protected_sites)
         if mode in (self.mode_e1, self.mode_e1b, self.mode_e2):
-            # 檢查是否存在'ALL'欄位，以及是否有任何行被標記
-            if 'ALL' in group_df.columns:
-                all_marked = group_df[
-                    (group_df['ALL'].notna()) & 
-                    (group_df['ALL'].astype(str).str.strip() != '')
-                ]
-                
-                # E1/E1b/E2模式：只有被標記為*ALL*的行才會轉出，所有庫存全數轉出
-                for _, row in all_marked.iterrows():
-                    net_stock = int(row['SaSa Net Stock'])
-                    if net_stock > 0:  # 只考慮有庫存的店鋪
-                        sources.append({
-                            'site': row['Site'],
-                            'om': row['OM'],
-                            'rp_type': row['RP Type'],
-                            'transferable_qty': net_stock,  # 全數轉出
-                            'priority': 1,  # E模式：優先級最高
-                            'original_stock': net_stock,
-                            'effective_sold_qty': int(row['Effective Sold Qty']),
-                            'source_type': 'E模式強制轉出',
-                            'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                            'mtd_sold_qty': int(row['MTD Sold Qty']),
-                            'is_e_mode': True  # 標記為E模式
-                        })
-                
-                # 按優先級排序
-                sources.sort(key=lambda x: x['priority'])
-                return sources  # E模式只處理標記的行，不處理其他邏輯
-        
-        # 優先級1：ND類型轉出（所有模式一致，E1/E1b/E2模式除外）
+            return self._sources_e_mode(group_df)
+        return self._sources_general(group_df, mode)
+
+    def _sources_simplified_sku(self, group_df: pd.DataFrame) -> List[Dict]:
+        sources: List[Dict] = []
+        nd_stores = group_df[group_df['RP Type'] == 'ND']
+        for _, row in nd_stores.iterrows():
+            net_stock = int(row['SaSa Net Stock'])
+            if net_stock <= 0:
+                continue
+            sources.append(_make_source(row, net_stock, 1, '精簡SKU ND轉出'))
+
+        rf_sources = group_df[group_df['RP Type'] == 'RF']
+        max_sold_qty = _compute_max_protected_sold(rf_sources)
+
+        for _, row in rf_sources.iterrows():
+            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+            safety_stock = int(row['Safety Stock'])
+            last_two_month_sold = _safe_get_last2m(row)
+            cap = max(safety_stock * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER, last_two_month_sold * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER)
+            effective_sold = int(row['Effective Sold Qty'])
+
+            if effective_sold >= max_sold_qty:
+                continue
+            if total_available <= cap:
+                continue
+
+            transferable_qty = min(total_available - cap, int(row['SaSa Net Stock']))
+            if transferable_qty <= 0:
+                continue
+
+            sources.append(_make_source(row, transferable_qty, 2, '精簡SKU RF轉出'))
+
+        sources.sort(key=lambda x: x['priority'])
+        return sources
+
+    def _sources_nd_mode(self, group_df: pd.DataFrame) -> List[Dict]:
+        sources: List[Dict] = []
+        nd_stores = group_df[group_df['RP Type'] == 'ND']
+        max_nd_sold = _compute_max_protected_sold(nd_stores)
+
+        for _, row in nd_stores.iterrows():
+            net_stock = int(row['SaSa Net Stock'])
+            if net_stock <= 0:
+                continue
+            effective_sold = int(row['Effective Sold Qty'])
+            if effective_sold >= max_nd_sold:
+                continue
+
+            last_month_sold = int(row['Last Month Sold Qty'])
+            mtd_sold = int(row['MTD Sold Qty'])
+            total_sales = last_month_sold + mtd_sold
+
+            sources.append(_make_source(row, net_stock, 1, 'ND智能轉出',
+                                        total_sales_sort=total_sales))
+
+        sources.sort(key=lambda x: x.get('total_sales_sort', 0))
+        return sources
+
+    def _sources_f_mode(self, group_df: pd.DataFrame, mode: str, protected_sites: Optional[Set[str]]) -> List[Dict]:
+        sources: List[Dict] = []
+        target_series = self._parse_target_series(group_df)
+
+        nd_sources = group_df[group_df['RP Type'] == 'ND']
+        for _, row in nd_sources.iterrows():
+            target_value = target_series.loc[row.name]
+            if pd.notna(target_value) and target_value > 0:
+                continue
+            if mode == self.mode_f_target_only and protected_sites:
+                site_key = str(row['Site']).strip().upper()
+                if site_key in protected_sites:
+                    continue
+            net_stock = int(row['SaSa Net Stock'])
+            if net_stock > 0:
+                sources.append(_make_source(row, net_stock, 1, 'F模式ND轉出'))
+
+        rf_sources = group_df[group_df['RP Type'] == 'RF']
+        max_sold_qty = _compute_max_protected_sold(rf_sources)
+
+        for _, row in rf_sources.iterrows():
+            target_value = target_series.loc[row.name]
+            if pd.notna(target_value) and target_value > 0:
+                continue
+            if mode == self.mode_f_target_only and protected_sites:
+                site_key = str(row['Site']).strip().upper()
+                if site_key in protected_sites:
+                    continue
+            net_stock = int(row['SaSa Net Stock'])
+            effective_sold = int(row['Effective Sold Qty'])
+
+            if net_stock <= 0:
+                continue
+            if effective_sold >= max_sold_qty:
+                continue
+
+            sources.append(_make_source(row, net_stock, 2, 'F模式RF轉出'))
+
+        sources.sort(key=lambda x: (x['priority'], x.get('effective_sold_qty', 0)))
+        return sources
+
+    def _sources_e_mode(self, group_df: pd.DataFrame) -> List[Dict]:
+        sources: List[Dict] = []
+        if 'ALL' not in group_df.columns:
+            return sources
+        all_marked = group_df[
+            (group_df['ALL'].notna()) & 
+            (group_df['ALL'].astype(str).str.strip() != '')
+        ]
+        for _, row in all_marked.iterrows():
+            net_stock = int(row['SaSa Net Stock'])
+            if net_stock > 0:
+                sources.append(_make_source(row, net_stock, 1, 'E模式強制轉出',
+                                            is_e_mode=True))
+        sources.sort(key=lambda x: x['priority'])
+        return sources
+
+    def _sources_general(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
+        sources: List[Dict] = []
         if self._is_b_special_mode(mode):
             if 'Type' in group_df.columns:
                 type_series = group_df['Type'].astype(str).str.upper()
@@ -421,23 +387,9 @@ class TransferLogic:
                     source_type = 'ND轉出'
 
                 source_store_type = type_series.loc[row.name] if type_series is not None else ''
-                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else last_month_sold
                 
-                sources.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'transferable_qty': int(row['SaSa Net Stock']),
-                    'priority': 1,
-                    'original_stock': int(row['SaSa Net Stock']),
-                    'effective_sold_qty': int(row['Effective Sold Qty']),
-                    'source_type': source_type,
-                    'store_type': source_store_type,
-                    # 添加銷售數據
-                    'last_2_month_sold_qty': last_two_month_sold,
-                    'last_month_sold_qty': last_month_sold,
-                    'mtd_sold_qty': mtd_sold
-                })
+                sources.append(_make_source(row, int(row['SaSa Net Stock']), 1, source_type,
+                                            store_type=source_store_type))
 
         # B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式特殊處理：Type=L 低銷量特例
         if self._is_b_special_mode(mode):
@@ -449,8 +401,6 @@ class TransferLogic:
                 if max(last_month_sold, mtd_sold) > 2:
                     continue
 
-                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else last_month_sold
-
                 net_stock = int(row['SaSa Net Stock'])
                 if self._is_b_l_retain_mode(mode):
                     transferable_qty = max(net_stock - 2, 0)
@@ -458,20 +408,8 @@ class TransferLogic:
                     transferable_qty = net_stock
 
                 if transferable_qty > 0:
-                    sources.append({
-                        'site': row['Site'],
-                        'om': row['OM'],
-                        'rp_type': row['RP Type'],
-                        'transferable_qty': transferable_qty,
-                        'priority': 2,
-                        'original_stock': net_stock,
-                        'effective_sold_qty': int(row['Effective Sold Qty']),
-                        'source_type': 'Local店舖全轉出',
-                        'store_type': type_series.loc[row.name],
-                        'last_2_month_sold_qty': last_two_month_sold,
-                        'last_month_sold_qty': last_month_sold,
-                        'mtd_sold_qty': mtd_sold
-                    })
+                    sources.append(_make_source(row, transferable_qty, 2, 'Local店舖全轉出',
+                                                store_type=type_series.loc[row.name]))
 
         # D2模式：RF完全不做轉出，僅ND清貨轉出
         if mode == self.mode_d2:
@@ -482,11 +420,7 @@ class TransferLogic:
         rf_sources = group_df[group_df['RP Type'] == 'RF']
 
         # 找出該Article+OM組合中的最高有效銷量（用於避免從最高動銷店轉出）
-        max_sold_qty = rf_sources['Effective Sold Qty'].max() if not rf_sources.empty else 0
-        # 如果所有RF店鋪銷量相同（包括全為0）或只有1家RF店，則不保護任何店鋪
-        if not rf_sources.empty:
-            if len(rf_sources) == 1 or max_sold_qty == 0 or (rf_sources['Effective Sold Qty'] == max_sold_qty).sum() >= len(rf_sources):
-                max_sold_qty = float('inf')
+        max_sold_qty = _compute_max_protected_sold(rf_sources)
 
         rf_source_count_before_filter = 0
         rf_source_count_after_filter = 0
@@ -622,22 +556,8 @@ class TransferLogic:
                     continue
 
                 last_month_sold = int(row['Last Month Sold Qty'])
-                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else last_month_sold
-                sources.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'transferable_qty': int(actual_transferable),
-                    'priority': 2,
-                    'original_stock': int(row['SaSa Net Stock']),
-                    'effective_sold_qty': effective_sold,
-                    'source_type': source_type,
-                    'store_type': type_series.loc[row.name] if type_series is not None else '',
-                    # 添加銷售數據
-                    'last_2_month_sold_qty': last_two_month_sold,
-                    'last_month_sold_qty': last_month_sold,
-                    'mtd_sold_qty': int(row['MTD Sold Qty'])
-                })
+                sources.append(_make_source(row, int(actual_transferable), 2, source_type,
+                                            store_type=type_series.loc[row.name] if type_series is not None else ''))
 
         if rf_source_count_before_filter > 0 and rf_source_count_after_filter == 0:
             logger.warning(
@@ -657,529 +577,264 @@ class TransferLogic:
         
         Args:
             group_df: 按Article和OM分組的DataFrame
-            mode: 轉貨模式（保守轉貨、加強轉貨、附加B(特別模式)、附加B3(跨OM特別模式)、重點補0、清貨轉貨、強制轉出、強制轉出(跨OM)或目標優化）
+            mode: 轉貨模式
 
         Returns:
             接收候選店鋪列表
         """
-        destinations = []
-
-        # 精簡SKU模式：RF店舖接收，上限=Max(Safety*2, Last2Month*2)
         if self._is_simplified_sku_mode(mode):
-            rf_stores = group_df[group_df['RP Type'] == 'RF']
-            for _, row in rf_stores.iterrows():
-                total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-                safety_stock = int(row['Safety Stock'])
-                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else int(row['Last Month Sold Qty'])
-                cap = max(safety_stock * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER, last_two_month_sold * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER)
-                if total_available >= cap:
-                    continue
-
-                needed_qty = cap - total_available
-                if needed_qty <= 0:
-                    continue
-
-                destinations.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'needed_qty': needed_qty,
-                    'priority': 1,
-                    'current_stock': int(row['SaSa Net Stock']),
-                    'pending_received': int(row['Pending Received']),
-                    'safety_stock': safety_stock,
-                    'moq': int(row['MOQ']),
-                    'effective_sold_qty': int(row['Effective Sold Qty']),
-                    'dest_type': '精簡SKU接收',
-                    'target_qty': cap,
-                    'received_qty': 0,
-                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                    'mtd_sold_qty': int(row['MTD Sold Qty']),
-                    'max_receive_qty': needed_qty,
-                })
-
-            destinations.sort(key=lambda x: x['priority'])
-            return destinations
-
-        # ND1/ND2 模式特殊處理：ND 可接收，兩層優先級（RF緊急缺貨 > ND潛在缺貨）
+            return self._dests_simplified_sku(group_df)
         if self._is_nd_transfer_mode(mode):
-            rf_stores = group_df[group_df['RP Type'] == 'RF']
-            nd_stores = group_df[group_df['RP Type'] == 'ND']
-
-            # 優先級1：RF 緊急缺貨 (零庫存但有銷售記錄)
-            for _, row in rf_stores.iterrows():
-                is_no_stock = int(row['SaSa Net Stock']) == 0
-                has_sales = int(row['Effective Sold Qty']) > 0
-                if is_no_stock and has_sales:
-                    needed_qty = int(row['Safety Stock'])
-                    if needed_qty <= 0:
-                        needed_qty = 2  # 最少給2件
-                    destinations.append({
-                        'site': row['Site'],
-                        'om': row['OM'],
-                        'rp_type': row['RP Type'],
-                        'needed_qty': needed_qty,
-                        'priority': 1,
-                        'current_stock': int(row['SaSa Net Stock']),
-                        'pending_received': int(row['Pending Received']),
-                        'safety_stock': int(row['Safety Stock']),
-                        'moq': int(row['MOQ']),
-                        'effective_sold_qty': int(row['Effective Sold Qty']),
-                        'dest_type': 'RF緊急缺貨補貨',
-                        'target_qty': needed_qty,
-                        'received_qty': 0,
-                        'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                        'mtd_sold_qty': int(row['MTD Sold Qty']),
-                        'total_sales': int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty']),
-                        'max_receive_qty': needed_qty
-                    })
-
-            # 優先級2：ND 潛在缺貨 (ND店舖按兩月銷量排序接收，上限=2×兩月銷量)
-            for _, row in nd_stores.iterrows():
-                last_month_sold = int(row['Last Month Sold Qty'])
-                mtd_sold = int(row['MTD Sold Qty'])
-                total_sales = last_month_sold + mtd_sold
-
-                # 兩月銷量為0的 ND 店舖不可接收（無需求依據）
-                if total_sales <= 0:
-                    continue
-
-                max_receive = ND_RECEIVE_MULTIPLIER * total_sales
-                current_stock = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-
-                if current_stock >= max_receive:
-                    continue  # 已達接收上限
-
-                needed_qty = max_receive - current_stock
-                destinations.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'needed_qty': needed_qty,
-                    'priority': 2,
-                    'current_stock': int(row['SaSa Net Stock']),
-                    'pending_received': int(row['Pending Received']),
-                    'safety_stock': int(row['Safety Stock']) if pd.notna(row['Safety Stock']) else 0,
-                    'moq': int(row['MOQ']) if pd.notna(row['MOQ']) else 0,
-                    'effective_sold_qty': int(row['Effective Sold Qty']),
-                    'dest_type': 'ND潛在缺貨接收',
-                    'target_qty': max_receive,
-                    'received_qty': 0,
-                    'last_month_sold_qty': last_month_sold,
-                    'mtd_sold_qty': mtd_sold,
-                    'total_sales': total_sales,
-                    'max_receive_qty': max_receive
-                })
-
-            # 排序：RF緊急缺貨優先(priority=1)，ND潛在缺貨次之(priority=2)並按銷量降序接收
-            destinations.sort(key=lambda x: (x['priority'], -x.get('total_sales', 0)))
-            return destinations
-
-        # 只考慮RF類型店鋪（ND店鋪在所有模式下都只能轉出，不能接收）
-        # 例外：F/F2模式下，有 Target > 0 的 ND 店舖可接收（打破 ND 不可接收規則）
-        rf_destinations = group_df[group_df['RP Type'] == 'RF']
-
-        # F/F2模式特殊處理：Target數字優先接收
-        # - F：其餘店鋪按C模式補0
-        # - F2：僅Target店舖可接收
+            return self._dests_nd_mode(group_df)
         if mode in (self.mode_f, self.mode_f_target_only):
-            target_series = self._parse_target_series(group_df)
-
-            for idx, row in group_df.iterrows():
-                total_available = row['SaSa Net Stock'] + row['Pending Received']
-                target_value = target_series.loc[idx]
-                rp_type = row['RP Type']
-
-                # Target數字：優先接收目標（ND 和 RF 均可接收）
-                if pd.notna(target_value) and target_value > 0:
-                    target_qty = int(target_value)
-                    if mode == self.mode_f_target_only:
-                        dest_type = 'F指定模式目標接收'
-                    else:
-                        dest_type = 'F模式目標接收'
-                    needed_qty = target_qty
-                    destinations.append({
-                        'site': row['Site'],
-                        'om': row['OM'],
-                        'rp_type': rp_type,
-                        'needed_qty': needed_qty,
-                        'priority': 1,
-                        'current_stock': int(row['SaSa Net Stock']),
-                        'pending_received': int(row['Pending Received']),
-                        'safety_stock': int(row['Safety Stock']),
-                        'moq': int(row['MOQ']),
-                        'effective_sold_qty': int(row['Effective Sold Qty']),
-                        'dest_type': dest_type,
-                        'target_qty': target_qty,
-                        'received_qty': 0,
-                        'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                        'mtd_sold_qty': int(row['MTD Sold Qty'])
-                    })
-                    continue
-
-                # ND 店舖無 Target 時不接收（ND 預設只能轉出）
-                if rp_type == 'ND':
-                    continue
-
-                # F2：非Target店舖不接收
-                if mode == self.mode_f_target_only:
-                    continue
-
-                # 未標Target的RF店鋪，按C模式重點補0（Safety Stock=0且無銷量的店舖不補）
-                if total_available <= 1 and (int(row['Safety Stock']) > 0 or int(row['Effective Sold Qty']) > 0):
-                    target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
-                    needed_qty = target_qty - total_available
-                    if needed_qty > 0:
-                        destinations.append({
-                            'site': row['Site'],
-                            'om': row['OM'],
-                            'rp_type': rp_type,
-                            'needed_qty': needed_qty,
-                            'priority': 2,
-                            'current_stock': int(row['SaSa Net Stock']),
-                            'pending_received': int(row['Pending Received']),
-                            'safety_stock': int(row['Safety Stock']),
-                            'moq': int(row['MOQ']),
-                            'effective_sold_qty': int(row['Effective Sold Qty']),
-                            'dest_type': '重點補0',
-                            'target_qty': target_qty,
-                            'received_qty': 0,
-                            'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                            'mtd_sold_qty': int(row['MTD Sold Qty'])
-                        })
-
-            destinations.sort(key=lambda x: x['priority'])
-            return destinations
-        
-        # E1/E1b/E2模式特殊處理：所有RF店鋪都可以接收，上限固定為 Safety Stock * 2
+            return self._dests_f_mode(group_df, mode)
         if mode in (self.mode_e1, self.mode_e1b, self.mode_e2):
-            if 'Type' in rf_destinations.columns:
-                type_series = rf_destinations['Type'].astype(str).str.upper()
-            else:
-                type_series = pd.Series("", index=rf_destinations.index)
-
-            for _, row in rf_destinations.iterrows():
-                total_available = row['SaSa Net Stock'] + row['Pending Received']
-                safety_stock = int(row['Safety Stock'])
-                
-                # E模式：接收上限固定為 Safety Stock * 2，最少為3件
-                max_can_receive = max(int(safety_stock * SAFETY_RECEIVE_MULTIPLIER), MIN_RECEIVE_FLOOR)
-                
-                # 如果目前庫存低於接收上限，則允許接收
-                if total_available < max_can_receive:
-                    needed_qty = max_can_receive - total_available
-                    sales_total = int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])
-
-                    if mode == self.mode_e1b:
-                        store_type = type_series.loc[row.name]
-                        if store_type == 'T':
-                            if sales_total > 0:
-                                priority = 1
-                                dest_type = 'E1b遊客區店舖 高銷量優先'
-                            else:
-                                priority = 3
-                                dest_type = 'E1b遊客區店舖 Safety優先'
-                        elif store_type == 'M':
-                            if sales_total > 0:
-                                priority = 2
-                                dest_type = 'E1b混合型店舖 高銷量優先'
-                            else:
-                                priority = 4
-                                dest_type = 'E1b混合型店舖 Safety優先'
-                        else:
-                            priority = 5
-                            dest_type = 'E1b其他類型店舖'
-                    else:
-                        priority = 1
-                        dest_type = 'E模式接收'
-                    
-                    destinations.append({
-                        'site': row['Site'],
-                        'om': row['OM'],
-                        'rp_type': row['RP Type'],
-                        'needed_qty': int(needed_qty),
-                        'priority': priority,
-                        'current_stock': int(row['SaSa Net Stock']),
-                        'pending_received': int(row['Pending Received']),
-                        'safety_stock': safety_stock,
-                        'moq': int(row['MOQ']),
-                        'effective_sold_qty': int(row['Effective Sold Qty']),
-                        'dest_type': dest_type,
-                        'target_qty': max_can_receive,
-                        'received_qty': 0,
-                        'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                        'mtd_sold_qty': int(row['MTD Sold Qty']),
-                        'max_receive_qty': max_can_receive
-                    })
-            
-            if mode == self.mode_e1b:
-                def e1b_sort_key(item: Dict) -> Tuple[int, int, int]:
-                    if item['priority'] in (1, 2):
-                        return (item['priority'], -int(item.get('effective_sold_qty', 0)), 0)
-                    return (item['priority'], -int(item.get('safety_stock', 0)), 0)
-
-                destinations.sort(key=e1b_sort_key)
-            else:
-                destinations.sort(key=lambda x: x['priority'])
-            return destinations
-
-        # B2/B2a/B3/B3a模式特殊處理：接收上限為Safety Stock的2倍，且累計追蹤
+            return self._dests_e_mode(group_df, mode)
         if self._is_b_special_mode(mode):
-            if 'Type' in rf_destinations.columns:
-                type_series = rf_destinations['Type'].astype(str).str.upper()
-            else:
-                type_series = pd.Series("", index=rf_destinations.index)
+            return self._dests_b_special(group_df)
+        if self._is_d_family_mode(mode):
+            return self._dests_d_mode(group_df)
+        if mode == self.mode_c1:
+            return self._dests_c1_mode(group_df)
+        return self._dests_general(group_df, mode)
 
-            for idx, row in rf_destinations.iterrows():
-                total_available = row['SaSa Net Stock'] + row['Pending Received']
-                safety_stock = int(row['Safety Stock'])
-                max_can_receive = max(safety_stock * SAFETY_RECEIVE_MULTIPLIER, MIN_RECEIVE_FLOOR)
+    def _dests_simplified_sku(self, group_df: pd.DataFrame) -> List[Dict]:
+        destinations: List[Dict] = []
+        rf_stores = group_df[group_df['RP Type'] == 'RF']
+        for _, row in rf_stores.iterrows():
+            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+            safety_stock = int(row['Safety Stock'])
+            last_two_month_sold = _safe_get_last2m(row)
+            cap = max(safety_stock * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER, last_two_month_sold * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER)
+            if total_available >= cap:
+                continue
+            needed_qty = cap - total_available
+            if needed_qty <= 0:
+                continue
+            destinations.append(_make_dest(row, needed_qty, 1, '精簡SKU接收', cap,
+                                            max_receive_qty=needed_qty))
+        destinations.sort(key=lambda x: x['priority'])
+        return destinations
 
-                # 僅接受庫存不足安全庫存的店舖接收，目標補至安全庫存
-                # max_can_receive 作為累計接收硬上限（防止多來源疊加超量）
-                if total_available >= safety_stock:
-                    continue
+    def _dests_nd_mode(self, group_df: pd.DataFrame) -> List[Dict]:
+        destinations: List[Dict] = []
+        rf_stores = group_df[group_df['RP Type'] == 'RF']
+        nd_stores = group_df[group_df['RP Type'] == 'ND']
 
-                sales_total = int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])
-                store_type = type_series.loc[idx]
-
-                if store_type == 'T':
-                    if sales_total > 0:
-                        priority = 1
-                        dest_type = '遊客區店舖 高銷量優先'
-                    else:
-                        priority = 3
-                        dest_type = '遊客區店舖 Safety優先'
-                elif store_type == 'M':
-                    if sales_total > 0:
-                        priority = 2
-                        dest_type = '混合型店舖 高銷量優先'
-                    else:
-                        priority = 4
-                        dest_type = '混合型店舖 Safety優先'
-                else:
-                    priority = 4
-                    dest_type = '其他類型 Safety優先'
-
-                needed_qty = safety_stock - total_available
-                needed_qty = min(needed_qty, max_can_receive - total_available)
+        for _, row in rf_stores.iterrows():
+            is_no_stock = int(row['SaSa Net Stock']) == 0
+            has_sales = int(row['Effective Sold Qty']) > 0
+            if is_no_stock and has_sales:
+                needed_qty = int(row['Safety Stock'])
                 if needed_qty <= 0:
-                    continue
+                    needed_qty = 2
+                destinations.append(_make_dest(row, needed_qty, 1, 'RF緊急缺貨補貨', needed_qty,
+                                                max_receive_qty=needed_qty,
+                                                total_sales=int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])))
 
-                last_month_sold = int(row['Last Month Sold Qty'])
-                last_two_month_sold = int(row['Last 2 Month Sold Qty']) if 'Last 2 Month Sold Qty' in row.index else last_month_sold
+        for _, row in nd_stores.iterrows():
+            last_month_sold = int(row['Last Month Sold Qty'])
+            mtd_sold = int(row['MTD Sold Qty'])
+            total_sales = last_month_sold + mtd_sold
+            if total_sales <= 0:
+                continue
+            max_receive = ND_RECEIVE_MULTIPLIER * total_sales
+            current_stock = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+            if current_stock >= max_receive:
+                continue
+            needed_qty = max_receive - current_stock
+            destinations.append(_make_dest(row, needed_qty, 2, 'ND潛在缺貨接收', max_receive,
+                                            max_receive_qty=max_receive,
+                                            total_sales=total_sales))
 
-                destinations.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'needed_qty': int(needed_qty),
-                    'priority': priority,
-                    'current_stock': int(row['SaSa Net Stock']),
-                    'pending_received': int(row['Pending Received']),
-                    'safety_stock': safety_stock,
-                    'moq': int(row['MOQ']),
-                    'effective_sold_qty': int(row['Effective Sold Qty']),
-                    'dest_type': dest_type,
-                    'target_qty': max_can_receive,
-                    'received_qty': 0,
-                    'store_type': store_type,
-                    'last_2_month_sold_qty': last_two_month_sold,
-                    'last_month_sold_qty': last_month_sold,
-                    'mtd_sold_qty': int(row['MTD Sold Qty']),
-                    'max_receive_qty': max_can_receive
-                })
+        destinations.sort(key=lambda x: (x['priority'], -x.get('total_sales', 0)))
+        return destinations
 
-            def b2_sort_key(item: Dict) -> Tuple[int, int, int]:
+    def _dests_f_mode(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
+        destinations: List[Dict] = []
+        target_series = self._parse_target_series(group_df)
+
+        for idx, row in group_df.iterrows():
+            total_available = row['SaSa Net Stock'] + row['Pending Received']
+            target_value = target_series.loc[idx]
+            rp_type = row['RP Type']
+
+            if pd.notna(target_value) and target_value > 0:
+                target_qty = int(target_value)
+                dest_type = 'F指定模式目標接收' if mode == self.mode_f_target_only else 'F模式目標接收'
+                destinations.append(_make_dest(row, target_qty, 1, dest_type, target_qty))
+                continue
+
+            if rp_type == 'ND':
+                continue
+            if mode == self.mode_f_target_only:
+                continue
+
+            if total_available <= 1 and (int(row['Safety Stock']) > 0 or int(row['Effective Sold Qty']) > 0):
+                target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
+                needed_qty = target_qty - total_available
+                if needed_qty > 0:
+                    destinations.append(_make_dest(row, needed_qty, 2, '重點補0', target_qty))
+
+        destinations.sort(key=lambda x: x['priority'])
+        return destinations
+
+    def _dests_e_mode(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
+        destinations: List[Dict] = []
+        rf_destinations = group_df[group_df['RP Type'] == 'RF']
+        if 'Type' in rf_destinations.columns:
+            type_series = rf_destinations['Type'].astype(str).str.upper()
+        else:
+            type_series = pd.Series("", index=rf_destinations.index)
+
+        for _, row in rf_destinations.iterrows():
+            total_available = row['SaSa Net Stock'] + row['Pending Received']
+            safety_stock = int(row['Safety Stock'])
+            max_can_receive = max(int(safety_stock * SAFETY_RECEIVE_MULTIPLIER), MIN_RECEIVE_FLOOR)
+
+            if total_available < max_can_receive:
+                needed_qty = max_can_receive - total_available
+                sales_total = int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])
+
+                if mode == self.mode_e1b:
+                    store_type = type_series.loc[row.name]
+                    if store_type == 'T':
+                        priority, dest_type = (1, 'E1b遊客區店舖 高銷量優先') if sales_total > 0 else (3, 'E1b遊客區店舖 Safety優先')
+                    elif store_type == 'M':
+                        priority, dest_type = (2, 'E1b混合型店舖 高銷量優先') if sales_total > 0 else (4, 'E1b混合型店舖 Safety優先')
+                    else:
+                        priority, dest_type = 5, 'E1b其他類型店舖'
+                else:
+                    priority, dest_type = 1, 'E模式接收'
+
+                destinations.append(_make_dest(row, int(needed_qty), priority, dest_type, max_can_receive,
+                                                max_receive_qty=max_can_receive))
+
+        if mode == self.mode_e1b:
+            def e1b_sort_key(item: Dict) -> Tuple[int, int, int]:
                 if item['priority'] in (1, 2):
                     return (item['priority'], -int(item.get('effective_sold_qty', 0)), 0)
                 return (item['priority'], -int(item.get('safety_stock', 0)), 0)
-
-            destinations.sort(key=b2_sort_key)
-            return destinations
-        
-        # D/D2模式特殊處理：放寬接收條件，不要求最高銷量限制
-        if self._is_d_family_mode(mode):
-            for _, row in rf_destinations.iterrows():
-                total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-                safety_stock = int(row['Safety Stock'])
-                
-                # 優先級1：緊急缺貨補貨
-                is_no_stock = int(row['SaSa Net Stock']) == 0
-                has_sales_history = int(row['Effective Sold Qty']) > 0
-                
-                if is_no_stock and has_sales_history:
-                    needed_qty = max(safety_stock, 2) - total_available
-                    if needed_qty <= 0:
-                        continue
-                    max_receive = max(safety_stock, 2)
-                    destinations.append({
-                        'site': row['Site'],
-                        'om': row['OM'],
-                        'rp_type': row['RP Type'],
-                        'needed_qty': needed_qty,
-                        'priority': 1,
-                        'current_stock': int(row['SaSa Net Stock']),
-                        'pending_received': int(row['Pending Received']),
-                        'safety_stock': safety_stock,
-                        'moq': int(row['MOQ']),
-                        'effective_sold_qty': int(row['Effective Sold Qty']),
-                        'dest_type': '緊急缺貨補貨',
-                        'target_qty': max_receive,
-                        'received_qty': 0,
-                        'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                        'mtd_sold_qty': int(row['MTD Sold Qty']),
-                        'max_receive_qty': max_receive
-                    })
-                    continue
-                
-                # 優先級2：潛在缺貨補貨（D模式放寬：不要求最高銷量）
-                is_insufficient_stock = total_available < safety_stock
-                
-                if is_insufficient_stock:
-                    needed_qty = safety_stock - total_available
-                    destinations.append({
-                        'site': row['Site'],
-                        'om': row['OM'],
-                        'rp_type': row['RP Type'],
-                        'needed_qty': needed_qty,
-                        'priority': 2,
-                        'current_stock': int(row['SaSa Net Stock']),
-                        'pending_received': int(row['Pending Received']),
-                        'safety_stock': safety_stock,
-                        'moq': int(row['MOQ']),
-                        'effective_sold_qty': int(row['Effective Sold Qty']),
-                        'dest_type': '潛在缺貨補貨',
-                        'target_qty': safety_stock,
-                        'received_qty': 0,
-                        'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                        'mtd_sold_qty': int(row['MTD Sold Qty']),
-                        'max_receive_qty': safety_stock
-                    })
-            
+            destinations.sort(key=e1b_sort_key)
+        else:
             destinations.sort(key=lambda x: x['priority'])
-            return destinations
-        
-        # C1模式特殊處理：只補 total_available <= 1，且不回落到一般缺貨分支
-        if mode == self.mode_c1:
-            for _, row in rf_destinations.iterrows():
-                total_available = row['SaSa Net Stock'] + row['Pending Received']
-                if total_available > 1:
-                    continue
-                # Safety Stock=0且無銷量的店舖不補
-                if int(row['Safety Stock']) <= 0 and int(row['Effective Sold Qty']) <= 0:
-                    continue
+        return destinations
 
-                target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
-                needed_qty = target_qty - total_available
+    def _dests_b_special(self, group_df: pd.DataFrame) -> List[Dict]:
+        destinations: List[Dict] = []
+        rf_destinations = group_df[group_df['RP Type'] == 'RF']
+        if 'Type' in rf_destinations.columns:
+            type_series = rf_destinations['Type'].astype(str).str.upper()
+        else:
+            type_series = pd.Series("", index=rf_destinations.index)
+
+        for idx, row in rf_destinations.iterrows():
+            total_available = row['SaSa Net Stock'] + row['Pending Received']
+            safety_stock = int(row['Safety Stock'])
+            max_can_receive = max(safety_stock * SAFETY_RECEIVE_MULTIPLIER, MIN_RECEIVE_FLOOR)
+
+            if total_available >= safety_stock:
+                continue
+
+            sales_total = int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])
+            store_type = type_series.loc[idx]
+
+            if store_type == 'T':
+                priority, dest_type = (1, '遊客區店舖 高銷量優先') if sales_total > 0 else (3, '遊客區店舖 Safety優先')
+            elif store_type == 'M':
+                priority, dest_type = (2, '混合型店舖 高銷量優先') if sales_total > 0 else (4, '混合型店舖 Safety優先')
+            else:
+                priority, dest_type = 4, '其他類型 Safety優先'
+
+            needed_qty = safety_stock - total_available
+            needed_qty = min(needed_qty, max_can_receive - total_available)
+            if needed_qty <= 0:
+                continue
+
+            destinations.append(_make_dest(row, int(needed_qty), priority, dest_type, max_can_receive,
+                                            max_receive_qty=max_can_receive,
+                                            store_type=store_type))
+
+        def b2_sort_key(item: Dict) -> Tuple[int, int, int]:
+            if item['priority'] in (1, 2):
+                return (item['priority'], -int(item.get('effective_sold_qty', 0)), 0)
+            return (item['priority'], -int(item.get('safety_stock', 0)), 0)
+
+        destinations.sort(key=b2_sort_key)
+        return destinations
+
+    def _dests_d_mode(self, group_df: pd.DataFrame) -> List[Dict]:
+        destinations: List[Dict] = []
+        rf_destinations = group_df[group_df['RP Type'] == 'RF']
+        for _, row in rf_destinations.iterrows():
+            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+            safety_stock = int(row['Safety Stock'])
+            is_no_stock = int(row['SaSa Net Stock']) == 0
+            has_sales_history = int(row['Effective Sold Qty']) > 0
+
+            if is_no_stock and has_sales_history:
+                needed_qty = max(safety_stock, 2) - total_available
                 if needed_qty <= 0:
                     continue
+                max_receive = max(safety_stock, 2)
+                destinations.append(_make_dest(row, needed_qty, 1, '緊急缺貨補貨', max_receive,
+                                                max_receive_qty=max_receive))
+                continue
 
-                destinations.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'needed_qty': int(needed_qty),
-                    'priority': 1,
-                    'current_stock': int(row['SaSa Net Stock']),
-                    'pending_received': int(row['Pending Received']),
-                    'safety_stock': int(row['Safety Stock']),
-                    'moq': int(row['MOQ']),
-                    'effective_sold_qty': int(row['Effective Sold Qty']),
-                    'dest_type': '重點補0',
-                    'target_qty': int(target_qty),
-                    'received_qty': 0,
-                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                    'mtd_sold_qty': int(row['MTD Sold Qty'])
-                })
+            is_insufficient_stock = total_available < safety_stock
+            if is_insufficient_stock:
+                needed_qty = safety_stock - total_available
+                destinations.append(_make_dest(row, needed_qty, 2, '潛在缺貨補貨', safety_stock,
+                                                max_receive_qty=safety_stock))
 
-            destinations.sort(key=lambda x: x['priority'])
-            return destinations
+        destinations.sort(key=lambda x: x['priority'])
+        return destinations
 
-        # 找出該Article+OM組合中的最高有效銷量
+    def _dests_c1_mode(self, group_df: pd.DataFrame) -> List[Dict]:
+        destinations: List[Dict] = []
+        rf_destinations = group_df[group_df['RP Type'] == 'RF']
+        for _, row in rf_destinations.iterrows():
+            total_available = row['SaSa Net Stock'] + row['Pending Received']
+            if total_available > 1:
+                continue
+            if int(row['Safety Stock']) <= 0 and int(row['Effective Sold Qty']) <= 0:
+                continue
+            target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
+            needed_qty = target_qty - total_available
+            if needed_qty <= 0:
+                continue
+            destinations.append(_make_dest(row, int(needed_qty), 1, '重點補0', int(target_qty)))
+        destinations.sort(key=lambda x: x['priority'])
+        return destinations
+
+    def _dests_general(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
+        destinations: List[Dict] = []
+        rf_destinations = group_df[group_df['RP Type'] == 'RF']
         
         for _, row in rf_destinations.iterrows():
             total_available = row['SaSa Net Stock'] + row['Pending Received']
             
-            # C模式/C2模式特殊處理：針對(SaSa Net Stock+Pending Received)<=1的店鋪
-            # Safety Stock=0且無銷量的店舖不補
             if mode in (self.mode_c, self.mode_c2) and total_available <= 1 and (int(row['Safety Stock']) > 0 or int(row['Effective Sold Qty']) > 0):
-                # 計算需要補充的數量：根據Safety Stock的50%和3件的最高值來確定補充數量
                 target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
                 needed_qty = target_qty - total_available
-                
                 if needed_qty > 0:
-                    destinations.append({
-                        'site': row['Site'],
-                        'om': row['OM'],
-                        'rp_type': row['RP Type'],
-                        'needed_qty': int(needed_qty),
-                        'priority': 1,  # C/C2模式中優先級最高
-                        'current_stock': int(row['SaSa Net Stock']),
-                        'pending_received': int(row['Pending Received']),
-                        'safety_stock': int(row['Safety Stock']),
-                        'moq': int(row['MOQ']),
-                        'effective_sold_qty': int(row['Effective Sold Qty']),
-                        'dest_type': '重點補0',
-                        'target_qty': int(target_qty),
-                        'received_qty': 0,
-                        'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                        'mtd_sold_qty': int(row['MTD Sold Qty'])
-                    })
+                    destinations.append(_make_dest(row, int(needed_qty), 1, '重點補0', int(target_qty)))
                 continue
             
-            # A和B模式的常規處理
-            # 優先級1：緊急缺貨補貨
             is_no_stock = row['SaSa Net Stock'] == 0
             has_sales_history = row['Effective Sold Qty'] > 0
             
             if is_no_stock and has_sales_history:
                 needed_qty = row['Safety Stock']
-                destinations.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'needed_qty': int(needed_qty),
-                    'priority': 1,
-                    'current_stock': int(row['SaSa Net Stock']),
-                    'pending_received': int(row['Pending Received']),
-                    'safety_stock': int(row['Safety Stock']),
-                    'moq': int(row['MOQ']),
-                    'effective_sold_qty': int(row['Effective Sold Qty']),
-                    'dest_type': '緊急缺貨補貨',
-                    'target_qty': int(needed_qty),
-                    'received_qty': 0,
-                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                    'mtd_sold_qty': int(row['MTD Sold Qty'])
-                })
+                destinations.append(_make_dest(row, int(needed_qty), 1, '緊急缺貨補貨', int(needed_qty)))
                 continue
             
-            # 優先級2：潛在缺貨補貨
             is_insufficient_stock = total_available < row['Safety Stock']
-            
             if is_insufficient_stock:
                 needed_qty = row['Safety Stock'] - total_available
-                destinations.append({
-                    'site': row['Site'],
-                    'om': row['OM'],
-                    'rp_type': row['RP Type'],
-                    'needed_qty': int(needed_qty),
-                    'priority': 2,
-                    'current_stock': int(row['SaSa Net Stock']),
-                    'pending_received': int(row['Pending Received']),
-                    'safety_stock': int(row['Safety Stock']),
-                    'moq': int(row['MOQ']),
-                    'effective_sold_qty': int(row['Effective Sold Qty']),
-                    'dest_type': '潛在缺貨補貨',
-                    'target_qty': int(row['Safety Stock']),
-                    'received_qty': 0,
-                    'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                    'mtd_sold_qty': int(row['MTD Sold Qty'])
-                })
+                destinations.append(_make_dest(row, int(needed_qty), 2, '潛在缺貨補貨', int(row['Safety Stock'])))
         
-        # 按優先級排序
         destinations.sort(key=lambda x: x['priority'])
-        
         return destinations
     
     def match_transfers(self, article: str, om: str, sources: List[Dict], 
@@ -1217,7 +872,7 @@ class TransferLogic:
 
         # 精簡SKU模式特殊處理
         if self._is_simplified_sku_mode(mode):
-            return _SIMPLIFIED_SKU_STRATEGY.match(sources, destinations, article, product_desc, mode)
+            return self._strategies['simplified_sku'].match(sources, destinations, article, product_desc, mode)
         
         # 複製源和目的地列表，避免修改原始數據
         temp_sources = [s.copy() for s in sources]
@@ -1271,104 +926,6 @@ class TransferLogic:
                                    article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, None, '重點補0',
                                    receive_sites=receive_sites)
         
-        return recommendations
-
-    def _match_transfers_e_mode(self, sources: List[Dict], destinations: List[Dict], 
-                                article: str, om: str, product_desc: str, mode: str) -> List[Dict]:
-        """
-        E1模式匹配邏輯（僅同OM配對）：
-        1. 只做同OM配對，不跨OM
-        2. HD店鋪不能轉去HA/HB/HC的店鋪
-        3. 嚴格避免同一SKU的轉出店舖同時接收
-        
-        Args:
-            sources: 轉出候選店鋪列表（E模式已標記*ALL*）
-            destinations: 接收候選店鋪列表
-            article: 商品編號
-            om: OM編號
-            product_desc: 商品描述
-            
-        Returns:
-            匹配成功的調貨建議列表
-        """
-        recommendations = []
-
-        # 複製源和目的地列表
-        temp_sources = [s.copy() for s in sources]
-        for s in temp_sources:
-            s['total_transferred'] = 0
-        temp_destinations = [d.copy() for d in destinations]
-
-        # 記錄已經作為轉出店鋪的站點
-        transfer_sites = set([s['site'] for s in temp_sources if s['transferable_qty'] > 0])
-        
-        # 記錄已接收的站點，防止接收方再被選為轉出方
-        receive_sites = set()
-
-        # 記錄接收店鋪的累計接收數量
-        received_qty_by_site = {}
-
-        # 轉出限制：source 已配對的 receive 店鋪集合
-        source_to_receive_sites = {}
-        max_receive_sites_per_source = self.b_special_max_receive_sites_per_source
-
-        # 僅同OM配對
-        for source in temp_sources:
-            if source['transferable_qty'] <= 0:
-                continue
-
-            # 找出同OM的接收店鋪
-            same_om_dests = [d for d in temp_destinations
-                           if d['om'] == source['om'] and d['needed_qty'] > 0]
-
-            for dest in same_om_dests:
-                if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
-                    continue
-
-                # 基本檢查
-                if source['site'] == dest['site']:
-                    continue
-                if dest['site'] in transfer_sites:
-                    continue
-                if dest.get('rp_type') == 'ND':
-                    continue
-
-# HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                if self._is_hd_to_hk_restricted(source['site'], dest['site']):
-                    continue
-
-                # 轉出限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
-                if max_receive_sites_per_source is not None:
-                    matched_sites = source_to_receive_sites.get(source['site'], set())
-                    if dest['site'] not in matched_sites and len(matched_sites) >= max_receive_sites_per_source:
-                        continue
-
-                # 執行轉移
-                transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
-
-                # 檢查接收上限
-                receive_site_key = f"{dest['site']}_{article}"
-                current_received = received_qty_by_site.get(receive_site_key, 0)
-                max_receive = dest.get('max_receive_qty', dest.get('target_qty', float('inf')))
-                if current_received >= max_receive:
-                    continue
-                transfer_qty = min(transfer_qty, max_receive - current_received)
-                if transfer_qty <= 0:
-                    continue
-
-                notes = self._create_recommendation_note(source, dest, current_received, transfer_qty, mode)
-                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
-                recommendations.append(recommendation)
-
-                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
-
-                # 記錄接收店鋪（防止同時作為轉出方）
-                receive_sites.add(dest['site'])
-
-                # 記錄此 source 已配對的 receive 店鋪
-                matched = source_to_receive_sites.setdefault(source['site'], set())
-                matched.add(dest['site'])
-
         return recommendations
 
     def _match_transfers_e_mode(self, sources: List[Dict], destinations: List[Dict], 
@@ -1441,7 +998,7 @@ class TransferLogic:
                     continue
                 
                 # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                if self._is_hd_to_hk_restricted(source['site'], dest['site']):
+                if is_hd_to_hk_restricted(source['site'], dest['site']):
                     continue
 
                 # 轉出限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
@@ -1501,7 +1058,7 @@ class TransferLogic:
                     continue
                 
                 # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                if self._is_hd_to_hk_restricted(source['site'], dest['site']):
+                if is_hd_to_hk_restricted(source['site'], dest['site']):
                     continue  # 跳過不允許的目標
 
                 # 轉出限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
@@ -1540,158 +1097,112 @@ class TransferLogic:
                 if source['transferable_qty'] <= 0:
                     break
         
-        # Phase 3: C模式回退邏輯 - 當其他OM未有店舖涉及強制轉出時，可按照C模式照常做重點補0
+        self._e_mode_phase3_c_fallback(
+            group_df, temp_destinations, e_mode_source_oms,
+            transfer_sites, receive_sites, received_qty_by_site,
+            recommendations, article, product_desc)
         
-        # 關鍵：收集所有非E模式OM的**仍有未滿足需求**的接收目標sites
-        # 這些sites不應該再成為C模式的sources，因為它們已經被分配為接收方
+        return recommendations
+
+    def _e_mode_phase3_c_fallback(self, group_df, temp_destinations, e_mode_source_oms,
+                                   transfer_sites, receive_sites, received_qty_by_site,
+                                   recommendations, article, product_desc):
         non_e_mode_receiving_sites = set([d['site'] for d in temp_destinations
                                            if d['om'] not in e_mode_source_oms and d['needed_qty'] > 0])
         
-        # 篩選非E模式OM的未滿足接收需求
         unfulfilled_dests = [d for d in temp_destinations 
                             if d['needed_qty'] > 0 
                             and d['om'] not in e_mode_source_oms
                             and d['site'] not in transfer_sites]
         
-        if unfulfilled_dests:
-            # 識別非E模式OM的RF過剩店舖，用於C模式轉出
-            c_mode_sources = []
-            
-            for _, row in group_df[(group_df['RP Type'] == 'RF')].iterrows():
-                # 跳過E模式OM的店舖
-                if row['OM'] in e_mode_source_oms:
-                    continue
-                
-                # 跳過已經作為轉出店舖的（關鍵：避免轉出店舖同時接收）
-                if row['Site'] in transfer_sites:
-                    continue
-                
-                # 跳過已經作為接收店舖的（P1-2修復：防止接收店同時做轉出）
-                if row['Site'] in receive_sites:
-                    continue
-                
-                # 關鍵：不能同時作為接收目標的sites
-                if row['Site'] in non_e_mode_receiving_sites:
-                    continue
-                
-                total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-                safety_stock = int(row['Safety Stock'])
-                effective_sold = int(row['Effective Sold Qty'])
-                
-                # 找出該OM的最高銷量（保護最高動銷店）
-                om_rf_stores = group_df[(group_df['RP Type'] == 'RF') & (group_df['OM'] == row['OM'])]
-                max_sold_qty = om_rf_stores['Effective Sold Qty'].max() if not om_rf_stores.empty else 0
-                # 如果所有同OM的RF店鋪銷量相同（包括全為0）或只有1家RF店，則不保護任何店鋪
-                if not om_rf_stores.empty:
-                    if len(om_rf_stores) == 1 or max_sold_qty == 0 or (om_rf_stores['Effective Sold Qty'] == max_sold_qty).sum() >= len(om_rf_stores):
-                        max_sold_qty = float('inf')
-                
-                # C模式條件：庫存高於安全庫存，且不是最高銷量店
-                is_stock_above_safety = total_available > safety_stock
-                is_not_highest_sold = effective_sold < max_sold_qty
-                
-                if is_stock_above_safety and is_not_highest_sold:
-                    base_transferable = total_available - safety_stock
-                    if base_transferable <= 0:
-                        continue
-                    
-                    # C模式上限：30% total_available，最多3件，至少1件
-                    ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
-                    abs_cap = C_MODE_ABS_CAP
-                    capped_ratio = max(ratio_cap, 0)
-                    raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
-                    upper_limit = max(1, raw_upper)
-                    
-                    actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
-                    
-                    if actual_transferable > 0:
-                        remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
-                        
-                        # 判斷類型
-                        if remaining_stock >= safety_stock:
-                            source_type = 'RF過剩轉出(C模式回退)'
-                        else:
-                            source_type = 'RF加強轉出(C模式回退)'
-                        
-                        c_mode_sources.append({
-                            'site': row['Site'],
-                            'om': row['OM'],
-                            'rp_type': row['RP Type'],
-                            'transferable_qty': actual_transferable,
-                            'priority': 2,
-                            'original_stock': int(row['SaSa Net Stock']),
-                            'total_transferred': 0,
-                            'effective_sold_qty': effective_sold,
-                            'source_type': source_type,
-                            'last_month_sold_qty': int(row['Last Month Sold Qty']),
-                            'mtd_sold_qty': int(row['MTD Sold Qty'])
-                        })
-            
-            # 執行C模式匹配
-            for source in c_mode_sources:
-                if source['transferable_qty'] <= 0:
-                    continue
-                
-                # 標記為轉出店舖
-                transfer_sites.add(source['site'])
-                
-                for dest in unfulfilled_dests:
-                    if dest['needed_qty'] <= 0:
-                        continue
-                    
-                    # 避免同一店舖自我調貨
-                    if source['site'] == dest['site']:
-                        continue
-                    
-                    # 關鍵：嚴格避免轉出店舖同時作為接收店舖
-                    if dest['site'] in transfer_sites:
-                        continue
-                    
-                    # 避免接收店同時作為轉出方
-                    if dest['site'] in receive_sites:
-                        continue
-                    
-                    # 確保接收店舖不是ND類型
-                    if dest.get('rp_type') == 'ND':
-                        continue
-                    
-                    # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                    if self._is_hd_to_hk_restricted(source['site'], dest['site']):
-                        continue  # 跳過不允許的目標
-                    
-                    # 檢查累計接收數量，避免過量接收
-                    receive_site_key = f"{dest['site']}_{article}"
-                    current_received = received_qty_by_site.get(receive_site_key, 0)
-                    
-                    # 對於E模式接收店舖，檢查是否已達到上限（2倍安全庫存）
-                    if dest.get('dest_type') == 'E模式接收':
-                        max_receive = dest.get('max_receive_qty', dest.get('target_qty', float('inf')))
-                        if current_received >= max_receive:
-                            continue  # 已達上限，跳過
-                        # 計算剩餘可接收量
-                        remaining_capacity = max_receive - current_received
-                        transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_capacity)
-                    else:
-                        transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
-                    
-                    if transfer_qty <= 0:
-                        continue
-                    
-                    # 創建建議
-                    notes = f'E模式Phase3 - C模式回退（非E模式OM的重點補0）'
-                    recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
-                    recommendations.append(recommendation)
+        if not unfulfilled_dests:
+            return
 
-                    apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
-
-                    # 記錄接收店鋪（防止同時作為轉出方）
-                    receive_sites.add(dest['site'])
-                    
-                    if source['transferable_qty'] <= 0:
-                        break
+        c_mode_sources = []
         
-        return recommendations
-    
+        for _, row in group_df[(group_df['RP Type'] == 'RF')].iterrows():
+            if row['OM'] in e_mode_source_oms:
+                continue
+            if row['Site'] in transfer_sites:
+                continue
+            if row['Site'] in receive_sites:
+                continue
+            if row['Site'] in non_e_mode_receiving_sites:
+                continue
+            
+            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+            safety_stock = int(row['Safety Stock'])
+            effective_sold = int(row['Effective Sold Qty'])
+            
+            om_rf_stores = group_df[(group_df['RP Type'] == 'RF') & (group_df['OM'] == row['OM'])]
+            max_sold_qty = _compute_max_protected_sold(om_rf_stores)
+            
+            is_stock_above_safety = total_available > safety_stock
+            is_not_highest_sold = effective_sold < max_sold_qty
+            
+            if is_stock_above_safety and is_not_highest_sold:
+                base_transferable = total_available - safety_stock
+                if base_transferable <= 0:
+                    continue
+                
+                ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
+                abs_cap = C_MODE_ABS_CAP
+                capped_ratio = max(ratio_cap, 0)
+                raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
+                upper_limit = max(1, raw_upper)
+                
+                actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
+                
+                if actual_transferable > 0:
+                    remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+                    source_type = 'RF過剩轉出(C模式回退)' if remaining_stock >= safety_stock else 'RF加強轉出(C模式回退)'
+                    
+                    c_mode_sources.append(_make_source(row, actual_transferable, 2, source_type,
+                                                        total_transferred=0))
+        
+        for source in c_mode_sources:
+            if source['transferable_qty'] <= 0:
+                continue
+            transfer_sites.add(source['site'])
+            
+            for dest in unfulfilled_dests:
+                if dest['needed_qty'] <= 0:
+                    continue
+                if source['site'] == dest['site']:
+                    continue
+                if dest['site'] in transfer_sites:
+                    continue
+                if dest['site'] in receive_sites:
+                    continue
+                if dest.get('rp_type') == 'ND':
+                    continue
+                if is_hd_to_hk_restricted(source['site'], dest['site']):
+                    continue
+                
+                receive_site_key = f"{dest['site']}_{article}"
+                current_received = received_qty_by_site.get(receive_site_key, 0)
+                
+                if dest.get('dest_type') == 'E模式接收':
+                    max_receive = dest.get('max_receive_qty', dest.get('target_qty', float('inf')))
+                    if current_received >= max_receive:
+                        continue
+                    remaining_capacity = max_receive - current_received
+                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_capacity)
+                else:
+                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
+                
+                if transfer_qty <= 0:
+                    continue
+                
+                notes = 'E模式Phase3 - C模式回退（非E模式OM的重點補0）'
+                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
+                recommendations.append(recommendation)
+                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
+                receive_sites.add(dest['site'])
+                
+                if source['transferable_qty'] <= 0:
+                    break
+
     def _match_by_priority(self, sources: List[Dict], destinations: List[Dict], 
                           recommendations: List[Dict], article: str, group_id: str, 
                           product_desc: str, source_priority: int, dest_priority: int,
@@ -1783,12 +1294,12 @@ class TransferLogic:
                 if self._is_b3_family_mode(mode):
                     if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
                         continue
-                    if self._is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
+                    if is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
                         continue
                 
                 # 全域安全網：跨OM配對時一律執行HD/Windy限制（P1-3防禦性加固）
                 if source.get('om') and dest.get('om') and source.get('om') != dest.get('om'):
-                    if self._is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
+                    if is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
                         continue
                     if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
                         continue
@@ -2202,7 +1713,7 @@ class TransferLogic:
                 recommendations = self._strategies['nd_mode'].match(sources, destinations, article, product_desc, mode, om=om)
             # 精簡SKU模式
             elif self._is_simplified_sku_mode(mode):
-                recommendations = _SIMPLIFIED_SKU_STRATEGY.match(sources, destinations, article, product_desc, mode)
+                recommendations = self._strategies['simplified_sku'].match(sources, destinations, article, product_desc, mode)
             else:
                 recommendations = self.match_transfers(article, om, sources, destinations, product_desc, mode)
             
