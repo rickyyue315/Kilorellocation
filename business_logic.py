@@ -89,6 +89,7 @@ class TransferLogic:
         from strategies.f_mode import FModeStrategy
         from strategies.e1_mode import E1ModeStrategy
         from strategies.nd_mode import NDModeStrategy
+        from strategies.b_special import BSpecialStrategy
         return {
             'simplified_sku': SimplifiedSKUStrategy(),
             'c2_mode': C2ModeStrategy(),
@@ -102,6 +103,10 @@ class TransferLogic:
             ),
             'nd_mode': NDModeStrategy(
                 create_note=self._create_recommendation_note,
+                max_receive_sites_per_source=self.b_special_max_receive_sites_per_source,
+            ),
+            'b_special': BSpecialStrategy(
+                match_by_priority=self._match_by_priority,
                 max_receive_sites_per_source=self.b_special_max_receive_sites_per_source,
             ),
         }
@@ -1197,7 +1202,7 @@ class TransferLogic:
 
         # B2/B2a/B3/B3a模式特殊處理：Type L優先轉出
         if self._is_b_special_mode(mode):
-            return self._match_transfers_b_special(sources, destinations, article, om, product_desc, mode)
+            return self._strategies['b_special'].match(sources, destinations, article, product_desc, mode)
         
         # E1/E2模式由generate_transfer_recommendations直接調用對應的匹配函數處理
         # 此處不需要處理E1/E2模式
