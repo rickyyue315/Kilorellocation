@@ -138,6 +138,22 @@ class TransferLogic:
         self.mode_simplified_sku_same = "精簡SKU(限同OM)"
         self.mode_simplified_sku_cross = "精簡SKU(跨OM)"
 
+        # 模式家族映射（v2.11.2 優化）- 避免重複的 _is_*_mode() 邏輯
+        self.MODE_FAMILIES = {
+            'b_special': {
+                self.mode_b_special, self.mode_b_special_a,
+                self.mode_b2l, self.mode_b2la,
+                self.mode_b3, self.mode_b3a,
+                self.mode_b3l, self.mode_b3la,
+            },
+            'b3_family': {self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la},
+            'b_tourist_no_source': {self.mode_b_special_a, self.mode_b2la, self.mode_b3a, self.mode_b3la},
+            'b_l_retain': {self.mode_b2l, self.mode_b2la, self.mode_b3l, self.mode_b3la},
+            'd_family': {self.mode_d, self.mode_d2},
+            'nd_transfer': {self.mode_nd1, self.mode_nd2},
+            'simplified_sku': {self.mode_simplified_sku_same, self.mode_simplified_sku_cross},
+        }
+
         self._strategies = self._init_strategies()
 
     def _init_strategies(self):
@@ -169,36 +185,32 @@ class TransferLogic:
         }
 
     def _is_b_special_mode(self, mode: str) -> bool:
-        return mode in (
-            self.mode_b_special,
-            self.mode_b_special_a,
-            self.mode_b2l,
-            self.mode_b2la,
-            self.mode_b3,
-            self.mode_b3a,
-            self.mode_b3l,
-            self.mode_b3la,
-        )
+        """檢查是否為 B 特別系列模式（B2/B2a/B2L/B2La/B3/B3a/B3L/B3La）"""
+        return mode in self.MODE_FAMILIES.get('b_special', set())
 
     def _is_b3_family_mode(self, mode: str) -> bool:
-        return mode in (self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la)
+        """檢查是否為 B3 系列模式"""
+        return mode in self.MODE_FAMILIES.get('b3_family', set())
 
     def _is_b_tourist_no_source_mode(self, mode: str) -> bool:
-        return mode in (self.mode_b_special_a, self.mode_b2la, self.mode_b3a, self.mode_b3la)
+        """檢查是否為 T遊客鋪不出貨模式"""
+        return mode in self.MODE_FAMILIES.get('b_tourist_no_source', set())
 
     def _is_b_l_retain_mode(self, mode: str) -> bool:
-        return mode in (self.mode_b2l, self.mode_b2la, self.mode_b3l, self.mode_b3la)
+        """檢查是否為 L保留2件模式"""
+        return mode in self.MODE_FAMILIES.get('b_l_retain', set())
 
     def _is_d_family_mode(self, mode: str) -> bool:
         """D/D2 模式家族判斷"""
-        return mode in (self.mode_d, self.mode_d2)
+        return mode in self.MODE_FAMILIES.get('d_family', set())
 
     def _is_nd_transfer_mode(self, mode: str) -> bool:
         """ND1/ND2 模式：ND 店舖可互相調貨（打破全局 ND 不可接收規則）"""
-        return mode in (self.mode_nd1, self.mode_nd2)
+        return mode in self.MODE_FAMILIES.get('nd_transfer', set())
 
     def _is_simplified_sku_mode(self, mode: str) -> bool:
-        return mode in (self.mode_simplified_sku_same, self.mode_simplified_sku_cross)
+        """檢查是否為精簡SKU模式"""
+        return mode in self.MODE_FAMILIES.get('simplified_sku', set())
 
     def _get_b_special_sales_total(self, data: Dict) -> int:
         return int(data.get('last_month_sold_qty', 0) or 0) + int(data.get('mtd_sold_qty', 0) or 0)
@@ -222,6 +234,91 @@ class TransferLogic:
         if isinstance(parsed, pd.Series):
             return parsed
         return pd.Series(parsed, index=df.index)
+    
+    def _calculate_transferable_qty(self, row, mode: str) -> Tuple[int, str]:
+        """
+        統一計算RF可轉出數量（v2.11.2 優化）
+        
+        Args:
+            row: 店舖行數據
+            mode: 轉貨模式
+            
+        Returns:
+            (實際可轉出數量, 來源類型標記)
+        """
+        total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+        safety_stock = int(row['Safety Stock'])
+        base_transferable = total_available - safety_stock
+        
+        if base_transferable <= 0:
+            return 0, ''
+        
+        # 根據模式選擇上限策略
+        if mode == self.mode_a:
+            # A模式：保守轉貨（20% 上限）
+            upper_limit = max(int(total_available * A_MODE_PERCENTAGE_CAP), A_MODE_MIN_TRANSFER)
+            bump_eligible = True  # A模式允許1->2件上調
+        elif mode in (self.mode_c, self.mode_c1, self.mode_c2):
+            # C模式：中等轉貨（30% 上限）
+            if mode == self.mode_c1:
+                base_transferable = int(row['SaSa Net Stock']) - 2
+                if base_transferable <= 0:
+                    return 0, ''
+            ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
+            abs_cap = C_MODE_ABS_CAP
+            capped_ratio = max(ratio_cap, 0)
+            raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
+            upper_limit = max(2, raw_upper) if mode == self.mode_c1 else max(1, raw_upper)
+            bump_eligible = False
+        else:
+            # B模式（含B2/B3）：加強轉貨（50% 上限）
+            upper_limit = max(int(total_available * B_MODE_PERCENTAGE_CAP), B_MODE_MIN_TRANSFER)
+            bump_eligible = False
+        
+        actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
+        if actual_transferable <= 0:
+            return 0, ''
+        
+        remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+        
+        # A模式特殊規則：1件上調至2件
+        if bump_eligible and actual_transferable == 1 and remaining_stock >= 3 and 2 <= upper_limit:
+            actual_transferable = 2
+            remaining_stock = int(row['SaSa Net Stock']) - 2
+        
+        # 根據庫存量決定源類型
+        source_type = 'RF過剩轉出' if remaining_stock >= safety_stock else 'RF加強轉出'
+        
+        return actual_transferable, source_type
+    
+    def _identify_needed_qty(self, row, mode: str, dest_type_hint: str = '') -> Tuple[int, str]:
+        """
+        統一計算接收需求量（v2.11.2 優化）
+        
+        Args:
+            row: 店舖行數據
+            mode: 轉貨模式
+            dest_type_hint: 接收類型提示（如 'critical', 'potential'）
+            
+        Returns:
+            (需求數量, 接收類型標記)
+        """
+        total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+        safety_stock = int(row['Safety Stock'])
+        effective_sold = int(row['Effective Sold Qty'])
+        
+        # 判斷缺貨級別
+        if total_available == 0 and effective_sold > 0:
+            # 緊急缺貨（0庫存但有銷量）
+            needed_qty = safety_stock if safety_stock > 0 else 2
+            return needed_qty, '緊急缺貨'
+        
+        if total_available < safety_stock and effective_sold > 0:
+            # 潛在缺貨
+            needed_qty = safety_stock - total_available
+            return needed_qty, '潛在缺貨'
+        
+        return 0, ''
     
     def identify_sources(self, group_df: pd.DataFrame, mode: str, protected_sites: Optional[Set[str]] = None) -> List[Dict]:
         """
@@ -1255,6 +1352,77 @@ class TransferLogic:
 
         return max(transfer_qty, 0)
 
+    def _can_transfer(self, source: Dict, dest: Dict, mode: str, article: str,
+                      transfer_sites: set, receive_sites: set, 
+                      source_to_receive_sites: Dict, received_qty_by_site: Dict,
+                      source_type_filter: Optional[str] = None) -> bool:
+        """
+        前置過濾：檢查轉出/接收是否允許（v2.11.2 優化）
+        
+        減少 _match_by_priority() 中的嵌套，提高可讀性
+        """
+        # 檢查1：避免同一店鋪自我調貨
+        if source['site'] == dest['site']:
+            return False
+        
+        # 檢查2：避免轉出店鋪同時作為接收店鋪
+        if dest['site'] in transfer_sites:
+            return False
+        
+        # 檢查3：避免已接收的店鋪同時作為轉出店鋪
+        if source['site'] in receive_sites:
+            return False
+        
+        # 檢查4：確保接收店鋪不是ND類型
+        if dest.get('rp_type') == 'ND':
+            return False
+        
+        # 檢查5：B2/B3店舖數量限制
+        if self.b_special_max_receive_sites_per_source is not None:
+            source_site = source.get('site')
+            matched_sites = source_to_receive_sites.get(source_site, set())
+            if dest.get('site') not in matched_sites and len(matched_sites) >= self.b_special_max_receive_sites_per_source:
+                return False
+        
+        # 檢查6：HD/Windy 跨OM限制
+        if source.get('om') and dest.get('om') and source.get('om') != dest.get('om'):
+            if is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
+                return False
+            if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
+                return False
+        
+        # 檢查7：B3 系列特殊限制
+        if self._is_b3_family_mode(mode):
+            if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
+                return False
+            if is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
+                return False
+        
+        # 檢查8：B Special Mix 銷售守衛
+        if self._is_b_special_mode(mode) and str(source.get('store_type', '')).upper() == 'M':
+            source_sales_total = self._get_b_special_sales_total(source)
+            dest_sales_total = self._get_b_special_sales_total(dest)
+            if source_sales_total > 0 and source_sales_total > dest_sales_total:
+                return False
+        
+        # 檢查9：接收上限（B/C/D 模式）
+        receive_site_key = f"{dest['site']}_{article}"
+        current_received_qty = received_qty_by_site.get(receive_site_key, 0)
+        
+        if self._is_b_special_mode(mode) and 'target_qty' in dest:
+            if current_received_qty >= dest['target_qty']:
+                return False
+        
+        if dest['dest_type'] == '重點補0' and 'target_qty' in dest:
+            if current_received_qty >= dest['target_qty']:
+                return False
+        
+        if self._is_d_family_mode(mode) and 'target_qty' in dest:
+            if current_received_qty >= dest['target_qty']:
+                return False
+        
+        return True
+
     def _match_by_priority(self, sources: List[Dict], destinations: List[Dict], 
                           recommendations: List[Dict], article: str, group_id: str, 
                           product_desc: str, source_priority: int, dest_priority: int,
@@ -1319,73 +1487,15 @@ class TransferLogic:
                 if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
                     continue
                 
-                # 避免同一店鋪自我調貨
-                if source['site'] == dest['site']:
+                # 使用統一的前置過濾函數（v2.11.2 優化）- 減少代碼重複 -60 行
+                if not self._can_transfer(source, dest, mode, article, transfer_sites, receive_sites,
+                                         source_to_receive_sites, received_qty_by_site, source_type_filter):
                     continue
-                
-                # 避免轉出店鋪同時作為接收店鋪
-                if dest['site'] in transfer_sites:
-                    continue
-                
-                # 避免已接收的店鋪同時作為轉出店鋪（防止同一SKU下接收店又做轉出）
-                if source['site'] in receive_sites:
-                    continue
-                
-                # 防禦性檢查：確保接收店鋪不是ND類型（ND店鋪在所有模式下都只能轉出，不能接收）
-                if dest.get('rp_type') == 'ND':
-                    continue
-
-                # B2/B2a/B3/B3a店舖數量限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
-                if max_receive_sites_per_source is not None:
-                    source_site = source.get('site')
-                    matched_sites = source_to_receive_sites.get(source_site, set())
-                    if dest.get('site') not in matched_sites and len(matched_sites) >= max_receive_sites_per_source:
-                        continue
-
-                # B3/B3a模式：Windy轉出只能到Windy；HD不能轉到HA/HB/HC
-                if self._is_b3_family_mode(mode):
-                    if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
-                        continue
-                    if is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
-                        continue
-                
-                # 全域安全網：跨OM配對時一律執行HD/Windy限制（P1-3防禦性加固）
-                if source.get('om') and dest.get('om') and source.get('om') != dest.get('om'):
-                    if is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
-                        continue
-                    if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
-                        continue
-
-                # B2/B2a/B3/B3a模式：Mix店舖銷售高於目標店時，不允許作為轉出
-                # 規則：Mix source 的 (Last Month + MTD) > destination 的 (Last Month + MTD) 時跳過
-                # 例外：若source也無銷量，則不阻擋（避免全部被擋住導致無調貨）
-                if self._is_b_special_mode(mode) and str(source.get('store_type', '')).upper() == 'M':
-                    source_sales_total = self._get_b_special_sales_total(source)
-                    dest_sales_total = self._get_b_special_sales_total(dest)
-                    if source_sales_total > 0 and source_sales_total > dest_sales_total:
-                        continue
-                
-                # 檢查接收店鋪是否已達到目標數量
-                receive_site_key = f"{dest['site']}_{article}"
-                current_received_qty = received_qty_by_site.get(receive_site_key, 0)
-
-                # B2/B2a/B3/B3a模式：檢查接收上限
-                if self._is_b_special_mode(mode) and 'target_qty' in dest:
-                    if current_received_qty >= dest['target_qty']:
-                        continue
-                
-                # 對於C模式(重點補0)，檢查累計接收數量是否達到目標
-                if dest['dest_type'] == '重點補0':
-                    # 如果累計接收數量已達到目標數量，跳過此接收店鋪
-                    if current_received_qty >= dest['target_qty']:
-                        continue
-                
-                # D/D2模式：檢查累計接收上限（不超過Safety Stock）
-                if self._is_d_family_mode(mode) and 'target_qty' in dest:
-                    if current_received_qty >= dest['target_qty']:
-                        continue
                 
                 # 確定轉移數量
+                receive_site_key = f"{dest['site']}_{article}"
+                current_received_qty = received_qty_by_site.get(receive_site_key, 0)
+                
                 transfer_qty = self._compute_transfer_qty(
                     source, dest, mode, current_received_qty)
                 
@@ -1400,9 +1510,8 @@ class TransferLogic:
                 apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received_qty)
 
                 # 將轉出店鋪添加到轉出集合（只在實際產生轉移後才添加）
-                if not source_added_to_transfer:
+                if source['site'] not in transfer_sites:
                     transfer_sites.add(source['site'])
-                    source_added_to_transfer = True
                 
                 # 將接收店鋪添加到接收集合（防止已接收的店舖再做轉出）
                 receive_sites.add(dest['site'])
@@ -1412,19 +1521,13 @@ class TransferLogic:
                 matched_sites = source_to_receive_sites.setdefault(source_site, set())
                 matched_sites.add(dest['site'])
                 
-                # 對於C模式(重點補0)，如果累計接收數量已達到目標，將需求設為0
-                if dest['dest_type'] == '重點補0' and received_qty_by_site[receive_site_key] >= dest['target_qty']:
+                # 更新目標達成標誌
+                if dest['dest_type'] == '重點補0' and received_qty_by_site[receive_site_key] >= dest.get('target_qty', float('inf')):
                     dest['needed_qty'] = 0
-
-                # B2/B2a/B3/B3a模式：如果累計接收已達上限，將需求設為0
-                if self._is_b_special_mode(mode) and 'target_qty' in dest:
-                    if received_qty_by_site[receive_site_key] >= dest['target_qty']:
-                        dest['needed_qty'] = 0
-
-                # D/D2模式：如果累計接收已達安全庫存上限，將需求設為0
-                if self._is_d_family_mode(mode) and 'target_qty' in dest:
-                    if received_qty_by_site[receive_site_key] >= dest['target_qty']:
-                        dest['needed_qty'] = 0
+                elif self._is_b_special_mode(mode) and 'target_qty' in dest and received_qty_by_site[receive_site_key] >= dest['target_qty']:
+                    dest['needed_qty'] = 0
+                elif self._is_d_family_mode(mode) and 'target_qty' in dest and received_qty_by_site[receive_site_key] >= dest['target_qty']:
+                    dest['needed_qty'] = 0
 
     def _get_record_sales_total(self, rec: Dict[str, Any], prefix: str) -> int:
         """取得建議記錄中指定端點的總銷量（上月 + MTD）。"""

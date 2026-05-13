@@ -181,6 +181,8 @@ if uploaded_file is not None:
         if st.session_state.get('_run_key') != current_run_key:
             for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key']:
                 st.session_state.pop(k, None)
+            for k in [k for k in st.session_state if k.startswith('_display_df_')]:
+                st.session_state.pop(k)
             st.session_state['_run_key'] = current_run_key
 
         if st.button("🎯 生成調貨建議", type="primary", use_container_width=True):

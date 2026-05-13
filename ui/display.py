@@ -138,9 +138,7 @@ def render_kpi_cards(statistics: dict):
     st.markdown("")
 
 
-def render_results_table(recommendations: list, df: pd.DataFrame, current_run_key: str):
-    st.markdown("### 📋 調貨建議清單")
-
+def _build_display_data(recommendations: list, df: pd.DataFrame) -> list:
     _stock_lookup = (
         df[['Article', 'Site', 'SaSa Net Stock', 'Safety Stock', 'MOQ']]
         .set_index(['Article', 'Site'])
@@ -164,15 +162,10 @@ def render_results_table(recommendations: list, df: pd.DataFrame, current_run_ke
         dest_safety = dst_info.get('safety', 0)
         dest_moq = dst_info.get('moq', 0)
 
-        dest_total_after = dest_stock + rec['Transfer Qty']
-
         source_key = f"{rec['Article']}_{rec['Transfer Site']}"
-
         if source_key not in cumulative_transfers:
             cumulative_transfers[source_key] = 0
-
         cumulative_transfers[source_key] += rec['Transfer Qty']
-
         source_after_transfer_stock = source_stock - cumulative_transfers[source_key]
 
         display_data.append({
@@ -188,24 +181,37 @@ def render_results_table(recommendations: list, df: pd.DataFrame, current_run_ke
             'Receive OM': rec['Receive OM'],
             'Receive Site': rec['Receive Site'],
             'Receive Original Stock': dest_stock,
-            'Receive Total After': dest_total_after,
+            'Receive Total After': dest_stock + rec['Transfer Qty'],
             'Receive Safety Stock': dest_safety,
             'Receive MOQ': dest_moq,
             'Source Type': rec.get('Source Type', ''),
             'Destination Type': rec.get('Destination Type', ''),
         })
 
-    rec_df = pd.DataFrame(display_data)
-    if (
+    return display_data
+
+
+def render_results_table(recommendations: list, df: pd.DataFrame, current_run_key: str):
+    st.markdown("### 📋 調貨建議清單")
+
+    cache_key = f"_display_df_{current_run_key}"
+    if cache_key not in st.session_state:
+        st.session_state[cache_key] = pd.DataFrame(_build_display_data(recommendations, df))
+    rec_df = st.session_state[cache_key]
+
+    total_recs = len(rec_df)
+    use_preview_limit = (
         IS_ZEABUR_RUNTIME
         and ZEABUR_RESULT_PREVIEW_LIMIT > 0
-        and len(rec_df) > ZEABUR_RESULT_PREVIEW_LIMIT
-    ):
+        and total_recs > ZEABUR_RESULT_PREVIEW_LIMIT
+    )
+
+    if use_preview_limit:
         st.info(
             f"Zeabur 效能模式：目前先顯示前 {ZEABUR_RESULT_PREVIEW_LIMIT:,} 行，"
             "避免大型結果表拖慢頁面。完整結果仍可下載，亦可按需展開。"
         )
-        show_full_result_table = st.toggle(
+        show_full_result_table = st.checkbox(
             "載入完整調貨建議表",
             value=False,
             key=f"show_full_result_table_{current_run_key}",
