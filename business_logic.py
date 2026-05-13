@@ -154,6 +154,41 @@ class TransferLogic:
             'simplified_sku': {self.mode_simplified_sku_same, self.mode_simplified_sku_cross},
         }
 
+        b_special = self.MODE_FAMILIES['b_special']
+        b3_family = self.MODE_FAMILIES['b3_family']
+        simplified = self.MODE_FAMILIES['simplified_sku']
+
+        self._ALL_MODES = (
+            {self.mode_a, self.mode_b}
+            | b_special
+            | {self.mode_c, self.mode_c1, self.mode_c2}
+            | self.MODE_FAMILIES['d_family']
+            | {self.mode_e1, self.mode_e1b, self.mode_e2}
+            | {self.mode_f, self.mode_f_target_only}
+            | self.MODE_FAMILIES['nd_transfer']
+            | simplified
+        )
+
+        self._CROSS_OM_GROUPING_MODES = (
+            {self.mode_e2, self.mode_f, self.mode_f_target_only,
+             self.mode_c2, self.mode_nd2}
+            | b3_family
+        )
+
+        self._SOURCE_FILTER_MODES = (
+            {self.mode_e1, self.mode_e1b, self.mode_e2,
+             self.mode_f, self.mode_f_target_only, self.mode_c2,
+             self.mode_nd1, self.mode_nd2}
+            | b_special | simplified
+        )
+
+        self._CROSS_OM_MATCHING_MODES = (
+            {self.mode_e2, self.mode_f, self.mode_f_target_only,
+             self.mode_c2, self.mode_nd2}
+            | b3_family
+            | {self.mode_simplified_sku_cross}
+        )
+
         self._strategies = self._init_strategies()
 
     def _init_strategies(self):
@@ -161,6 +196,7 @@ class TransferLogic:
         from strategies.c2_mode import C2ModeStrategy
         from strategies.f_mode import FModeStrategy
         from strategies.e1_mode import E1ModeStrategy
+        from strategies.e2_mode import E2ModeStrategy
         from strategies.nd_mode import NDModeStrategy
         from strategies.b_special import BSpecialStrategy
         return {
@@ -171,6 +207,10 @@ class TransferLogic:
                 f2_allow_hd_transfer=self.f2_allow_hd_transfer,
             ),
             'e1_mode': E1ModeStrategy(
+                create_note=self._create_recommendation_note,
+                max_receive_sites_per_source=self.b_special_max_receive_sites_per_source,
+            ),
+            'e2_mode': E2ModeStrategy(
                 create_note=self._create_recommendation_note,
                 max_receive_sites_per_source=self.b_special_max_receive_sites_per_source,
             ),
@@ -234,91 +274,6 @@ class TransferLogic:
         if isinstance(parsed, pd.Series):
             return parsed
         return pd.Series(parsed, index=df.index)
-    
-    def _calculate_transferable_qty(self, row, mode: str) -> Tuple[int, str]:
-        """
-        統一計算RF可轉出數量（v2.11.2 優化）
-        
-        Args:
-            row: 店舖行數據
-            mode: 轉貨模式
-            
-        Returns:
-            (實際可轉出數量, 來源類型標記)
-        """
-        total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-        safety_stock = int(row['Safety Stock'])
-        base_transferable = total_available - safety_stock
-        
-        if base_transferable <= 0:
-            return 0, ''
-        
-        # 根據模式選擇上限策略
-        if mode == self.mode_a:
-            # A模式：保守轉貨（20% 上限）
-            upper_limit = max(int(total_available * A_MODE_PERCENTAGE_CAP), A_MODE_MIN_TRANSFER)
-            bump_eligible = True  # A模式允許1->2件上調
-        elif mode in (self.mode_c, self.mode_c1, self.mode_c2):
-            # C模式：中等轉貨（30% 上限）
-            if mode == self.mode_c1:
-                base_transferable = int(row['SaSa Net Stock']) - 2
-                if base_transferable <= 0:
-                    return 0, ''
-            ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
-            abs_cap = C_MODE_ABS_CAP
-            capped_ratio = max(ratio_cap, 0)
-            raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
-            upper_limit = max(2, raw_upper) if mode == self.mode_c1 else max(1, raw_upper)
-            bump_eligible = False
-        else:
-            # B模式（含B2/B3）：加強轉貨（50% 上限）
-            upper_limit = max(int(total_available * B_MODE_PERCENTAGE_CAP), B_MODE_MIN_TRANSFER)
-            bump_eligible = False
-        
-        actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
-        if actual_transferable <= 0:
-            return 0, ''
-        
-        remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
-        
-        # A模式特殊規則：1件上調至2件
-        if bump_eligible and actual_transferable == 1 and remaining_stock >= 3 and 2 <= upper_limit:
-            actual_transferable = 2
-            remaining_stock = int(row['SaSa Net Stock']) - 2
-        
-        # 根據庫存量決定源類型
-        source_type = 'RF過剩轉出' if remaining_stock >= safety_stock else 'RF加強轉出'
-        
-        return actual_transferable, source_type
-    
-    def _identify_needed_qty(self, row, mode: str, dest_type_hint: str = '') -> Tuple[int, str]:
-        """
-        統一計算接收需求量（v2.11.2 優化）
-        
-        Args:
-            row: 店舖行數據
-            mode: 轉貨模式
-            dest_type_hint: 接收類型提示（如 'critical', 'potential'）
-            
-        Returns:
-            (需求數量, 接收類型標記)
-        """
-        total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-        safety_stock = int(row['Safety Stock'])
-        effective_sold = int(row['Effective Sold Qty'])
-        
-        # 判斷缺貨級別
-        if total_available == 0 and effective_sold > 0:
-            # 緊急缺貨（0庫存但有銷量）
-            needed_qty = safety_stock if safety_stock > 0 else 2
-            return needed_qty, '緊急缺貨'
-        
-        if total_available < safety_stock and effective_sold > 0:
-            # 潛在缺貨
-            needed_qty = safety_stock - total_available
-            return needed_qty, '潛在缺貨'
-        
-        return 0, ''
     
     def identify_sources(self, group_df: pd.DataFrame, mode: str, protected_sites: Optional[Set[str]] = None) -> List[Dict]:
         """
@@ -1025,281 +980,6 @@ class TransferLogic:
         
         return recommendations
 
-    def _match_transfers_e_mode(self, sources: List[Dict], destinations: List[Dict], 
-                               article: str, om: str, product_desc: str, 
-                               group_df: pd.DataFrame) -> List[Dict]:
-        """
-        E模式特殊匹配邏輯：
-        1. 優先同OM配對
-        2. 當該OM所有接收店鋪都無能力接收時，放寬跨OM店鋪接收
-        3. 但HD店鋪絕對不能轉去HA/HB/HC的店鋪
-        4. 當其他OM未有店舖涉及強制轉出時，可按照C模式照常做重點補0
-        5. 嚴格避免同一SKU的轉出店舖同時接收
-        
-        Args:
-            sources: 轉出候選店鋪列表（E模式已標記*ALL*）
-            destinations: 接收候選店鋪列表
-            article: 商品編號
-            om: OM編號
-            product_desc: 商品描述
-            group_df: 該Article的完整數據DataFrame（用於Phase 3邏輯）
-            
-        Returns:
-            匹配成功的調貨建議列表
-        """
-        recommendations = []
-        
-        # 複製源和目的地列表
-        temp_sources = [s.copy() for s in sources]
-        for s in temp_sources:
-            s['total_transferred'] = 0
-        temp_destinations = [d.copy() for d in destinations]
-        
-        # 記錄已經作為轉出店鋪的站點
-        # 關鍵：先將所有E模式source sites添加到transfer_sites，防止它們同時作為接收方
-        transfer_sites = set([s['site'] for s in temp_sources if s['transferable_qty'] > 0])
-        
-        # 記錄已經作為接收店鋪的站點，防止它們同時作為轉出方（P1-2修復）
-        receive_sites = set()
-        
-        # 記錄接收店鋪的累計接收數量
-        received_qty_by_site = {}
-
-        # 轉出限制：source 已配對的 receive 店鋪集合
-        source_to_receive_sites = {}
-        max_receive_sites_per_source = self.b_special_max_receive_sites_per_source
-        
-        # 記錄E模式強制轉出的來源OM（用於判斷是否切換到C模式）
-        e_mode_source_oms = set([s['om'] for s in temp_sources])
-        
-        # Phase 1: 優先同OM配對
-        for source in temp_sources:
-            if source['transferable_qty'] <= 0:
-                continue
-            
-            # 找出同OM的接收店鋪
-            same_om_dests = [d for d in temp_destinations
-                           if d['om'] == source['om'] and d['needed_qty'] > 0]
-            
-            # 優先匹配同OM的目標
-            for dest in same_om_dests:
-                if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
-                    continue
-                
-                # 基本檢查
-                if source['site'] == dest['site']:
-                    continue
-                if dest['site'] in transfer_sites:
-                    continue
-                if dest.get('rp_type') == 'ND':
-                    continue
-                
-                # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                if is_hd_to_hk_restricted(source['site'], dest['site']):
-                    continue
-
-                # 轉出限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
-                if max_receive_sites_per_source is not None:
-                    matched_sites = source_to_receive_sites.get(source['site'], set())
-                    if dest['site'] not in matched_sites and len(matched_sites) >= max_receive_sites_per_source:
-                        continue
-                
-                # 執行轉移
-                transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
-                
-                # 檢查接收上限
-                receive_site_key = f"{dest['site']}_{article}"
-                current_received = received_qty_by_site.get(receive_site_key, 0)
-                max_receive = dest.get('max_receive_qty', dest.get('target_qty', float('inf')))
-                if current_received >= max_receive:
-                    continue
-                transfer_qty = min(transfer_qty, max_receive - current_received)
-                if transfer_qty <= 0:
-                    continue
-                
-                notes = self._create_recommendation_note(source, dest, current_received, transfer_qty, self.mode_e2)
-                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
-                recommendations.append(recommendation)
-
-                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
-
-                # 記錄接收店鋪（防止同時作為轉出方）
-                receive_sites.add(dest['site'])
-
-                # 記錄此 source 已配對的 receive 店鋪
-                matched = source_to_receive_sites.setdefault(source['site'], set())
-                matched.add(dest['site'])
-        
-        # Phase 2: 當同OM無法完全接收時，跨OM配對（但HD店鋪不能轉去HA/HB/HC）
-        for source in temp_sources:
-            if source['transferable_qty'] <= 0:
-                continue
-            
-            # 找出可用的跨OM接收店鋪
-            source_om = source['om']
-            
-            for dest in temp_destinations:
-                if dest['needed_qty'] <= 0:
-                    continue
-                
-                # 跳過同OM的目標（已在Phase 1處理）
-                if dest['om'] == source_om:
-                    continue
-                
-                # 基本檢查
-                if source['site'] == dest['site']:
-                    continue
-                if dest['site'] in transfer_sites:
-                    continue
-                if dest.get('rp_type') == 'ND':
-                    continue
-                
-                # HD限制檢查：HD店鋪不能轉去HA/HB/HC店鋪
-                if is_hd_to_hk_restricted(source['site'], dest['site']):
-                    continue  # 跳過不允許的目標
-
-                # 轉出限制：同一SKU下每個轉出店最多配對N個接收店（可配置）
-                if max_receive_sites_per_source is not None:
-                    matched_sites = source_to_receive_sites.get(source['site'], set())
-                    if dest['site'] not in matched_sites and len(matched_sites) >= max_receive_sites_per_source:
-                        continue
-                
-                # 執行轉移
-                transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
-                
-                # 檢查接收上限
-                receive_site_key = f"{dest['site']}_{article}"
-                current_received = received_qty_by_site.get(receive_site_key, 0)
-                max_receive = dest.get('max_receive_qty', dest.get('target_qty', float('inf')))
-                if current_received >= max_receive:
-                    continue
-                transfer_qty = min(transfer_qty, max_receive - current_received)
-                if transfer_qty <= 0:
-                    continue
-                
-                notes = self._create_recommendation_note(source, dest, current_received, transfer_qty, self.mode_e2)
-                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
-                recommendations.append(recommendation)
-
-                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
-
-                # 記錄接收店鋪（防止同時作為轉出方）
-                receive_sites.add(dest['site'])
-
-                # 記錄此 source 已配對的 receive 店鋪
-                matched = source_to_receive_sites.setdefault(source['site'], set())
-                matched.add(dest['site'])
-                
-                # 如果源已耗盡，跳出
-                if source['transferable_qty'] <= 0:
-                    break
-        
-        self._e_mode_phase3_c_fallback(
-            group_df, temp_destinations, e_mode_source_oms,
-            transfer_sites, receive_sites, received_qty_by_site,
-            recommendations, article, product_desc)
-        
-        return recommendations
-
-    def _e_mode_phase3_c_fallback(self, group_df, temp_destinations, e_mode_source_oms,
-                                   transfer_sites, receive_sites, received_qty_by_site,
-                                   recommendations, article, product_desc):
-        non_e_mode_receiving_sites = set([d['site'] for d in temp_destinations
-                                           if d['om'] not in e_mode_source_oms and d['needed_qty'] > 0])
-        
-        unfulfilled_dests = [d for d in temp_destinations 
-                            if d['needed_qty'] > 0 
-                            and d['om'] not in e_mode_source_oms
-                            and d['site'] not in transfer_sites]
-        
-        if not unfulfilled_dests:
-            return
-
-        c_mode_sources = []
-        
-        for _, row in group_df[(group_df['RP Type'] == 'RF')].iterrows():
-            if row['OM'] in e_mode_source_oms:
-                continue
-            if row['Site'] in transfer_sites:
-                continue
-            if row['Site'] in receive_sites:
-                continue
-            if row['Site'] in non_e_mode_receiving_sites:
-                continue
-            
-            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-            safety_stock = int(row['Safety Stock'])
-            effective_sold = int(row['Effective Sold Qty'])
-            
-            om_rf_stores = group_df[(group_df['RP Type'] == 'RF') & (group_df['OM'] == row['OM'])]
-            max_sold_qty = _compute_max_protected_sold(om_rf_stores)
-            
-            is_stock_above_safety = total_available > safety_stock
-            is_not_highest_sold = effective_sold < max_sold_qty
-            
-            if is_stock_above_safety and is_not_highest_sold:
-                base_transferable = total_available - safety_stock
-                if base_transferable <= 0:
-                    continue
-                
-                ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
-                abs_cap = C_MODE_ABS_CAP
-                capped_ratio = max(ratio_cap, 0)
-                raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
-                upper_limit = max(1, raw_upper)
-                
-                actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
-                
-                if actual_transferable > 0:
-                    remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
-                    source_type = 'RF過剩轉出(C模式回退)' if remaining_stock >= safety_stock else 'RF加強轉出(C模式回退)'
-                    
-                    c_mode_sources.append(_make_source(row, actual_transferable, 2, source_type,
-                                                        total_transferred=0))
-        
-        for source in c_mode_sources:
-            if source['transferable_qty'] <= 0:
-                continue
-            transfer_sites.add(source['site'])
-            
-            for dest in unfulfilled_dests:
-                if dest['needed_qty'] <= 0:
-                    continue
-                if source['site'] == dest['site']:
-                    continue
-                if dest['site'] in transfer_sites:
-                    continue
-                if dest['site'] in receive_sites:
-                    continue
-                if dest.get('rp_type') == 'ND':
-                    continue
-                if is_hd_to_hk_restricted(source['site'], dest['site']):
-                    continue
-                
-                receive_site_key = f"{dest['site']}_{article}"
-                current_received = received_qty_by_site.get(receive_site_key, 0)
-                
-                if dest.get('dest_type') == 'E模式接收':
-                    max_receive = dest.get('max_receive_qty', dest.get('target_qty', float('inf')))
-                    if current_received >= max_receive:
-                        continue
-                    remaining_capacity = max_receive - current_received
-                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_capacity)
-                else:
-                    transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
-                
-                if transfer_qty <= 0:
-                    continue
-                
-                notes = 'E模式Phase3 - C模式回退（非E模式OM的重點補0）'
-                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
-                recommendations.append(recommendation)
-                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
-                receive_sites.add(dest['site'])
-                
-                if source['transferable_qty'] <= 0:
-                    break
-
     def _compute_transfer_qty(self, source: Dict, dest: Dict, mode: str, current_received_qty: int) -> int:
         transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
 
@@ -1707,7 +1387,7 @@ class TransferLogic:
         logger.info(f"開始生成調貨建議 - {mode}")
         
         # 驗證模式
-        if mode not in [self.mode_a, self.mode_b, self.mode_b_special, self.mode_b_special_a, self.mode_b2l, self.mode_b2la, self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la, self.mode_c, self.mode_c1, self.mode_c2, self.mode_d, self.mode_d2, self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_nd1, self.mode_nd2, self.mode_simplified_sku_same, self.mode_simplified_sku_cross]:
+        if mode not in self._ALL_MODES:
             raise ValueError(f"無效的轉貨模式: {mode}")
 
         # E模式必須存在ALL欄位；若不存在則直接拋出明確錯誤
@@ -1715,11 +1395,9 @@ class TransferLogic:
             raise ValueError("E模式需要ALL欄位")
         
         # 根據模式選擇分組方式
-        if mode in [self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la, self.mode_c2, self.mode_nd2]:
-            # E2/F/F2/B3/B3L/C2/ND2模式支持跨OM配對，因此僅按Article分組
+        if mode in self._CROSS_OM_GROUPING_MODES:
             grouped = df.groupby(['Article'])
         else:
-            # 其他模式（含E1/E1b/ND1）按Article和OM分組
             grouped = df.groupby(['Article', 'OM'])
         
         all_recommendations = []
@@ -1765,13 +1443,13 @@ class TransferLogic:
             # 識別接收候選店鋪
             destinations = self.identify_destinations(group_df, mode)
             
-            # E1/E1b/E2/F/F2/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C2/ND1/ND2/精簡SKU模式特殊處理：從destinations中過濾掉同時作為轉出源的店鋪
-            if mode in [self.mode_e1, self.mode_e1b, self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b_special, self.mode_b_special_a, self.mode_b2l, self.mode_b2la, self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la, self.mode_c2, self.mode_nd1, self.mode_nd2, self.mode_simplified_sku_same, self.mode_simplified_sku_cross]:
+            # 特殊模式處理：從destinations中過濾掉同時作為轉出源的店鋪
+            if mode in self._SOURCE_FILTER_MODES:
                 source_sites = set([s['site'] for s in sources])
                 destinations = [d for d in destinations if d['site'] not in source_sites]
             
             # 執行匹配
-            if mode in [self.mode_e2, self.mode_f, self.mode_f_target_only, self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la, self.mode_c2, self.mode_nd2, self.mode_simplified_sku_cross]:
+            if mode in self._CROSS_OM_MATCHING_MODES:
                 article = group_keys[0] if isinstance(group_keys, (list, tuple)) else group_keys
                 om = "Multiple"  # 跨OM模式下OM由source/dest決定
             else:
@@ -1780,9 +1458,10 @@ class TransferLogic:
             # E1/E1b模式：僅同OM配對
             if mode in (self.mode_e1, self.mode_e1b):
                 recommendations = self._strategies['e1_mode'].match(sources, destinations, article, product_desc, mode, om=om)
-            # E2模式需要傳入group_df以支持Phase 3邏輯
+            # E2模式：跨OM強制轉出
             elif mode == self.mode_e2:
-                recommendations = self._match_transfers_e_mode(sources, destinations, article, om, product_desc, group_df)
+                recommendations = self._strategies['e2_mode'].match(
+                    sources, destinations, article, product_desc, mode, om=om, group_df=group_df)
             elif mode in (self.mode_f, self.mode_f_target_only):
                 recommendations = self._strategies['f_mode'].match(sources, destinations, article, product_desc, mode)
             elif mode == self.mode_c2:
@@ -1824,424 +1503,35 @@ class TransferLogic:
         return all_recommendations
     
     def perform_quality_checks(self, df: pd.DataFrame, mode: str = '') -> bool:
-        """
-        執行質量檢查
-        
-        Args:
-            df: 原始數據DataFrame
-            mode: 調貨模式（ND1/ND2 模式下 ND 允許接收，其他模式保持原有限制）
-            
-        Returns:
-            質量檢查是否通過
-        """
+        from services.quality_checks import run_quality_checks
         logger.info("開始執行質量檢查")
-        
-        self.quality_errors = []
-        self.quality_check_passed = True
-        
-        # 預先建立 (Article, Site) → row 的索引，避免後續多次全表掃描
-        df_indexed = df.set_index(['Article', 'Site'])
-        
-        # 檢查1：轉出與接收的Article必須完全一致
-        for rec in self.transfer_recommendations:
-            if 'Article' not in rec:
-                self.quality_errors.append(f"調貨建議中缺少Article欄位: {rec}")
-                self.quality_check_passed = False
-        
-        # 檢查2：Transfer Qty必須為正整數
-        for rec in self.transfer_recommendations:
-            if not isinstance(rec['Transfer Qty'], int) or rec['Transfer Qty'] <= 0:
-                self.quality_errors.append(f"轉移數量必須為正整數: {rec}")
-                self.quality_check_passed = False
-        
-        # 檢查3：同一來源的累計Transfer Qty不得超過轉出店鋪的原始SaSa Net Stock
-        cumulative_transfers_by_source = {}
-        for rec in self.transfer_recommendations:
-            source_key = (rec['Article'], rec['Transfer Site'])
-            cumulative_transfers_by_source[source_key] = cumulative_transfers_by_source.get(source_key, 0) + rec['Transfer Qty']
-        
-        for (article, transfer_site), total_qty in cumulative_transfers_by_source.items():
-            key = (article, transfer_site)
-            if key in df_indexed.index:
-                original_stock = df_indexed.at[key, 'SaSa Net Stock']
-                if total_qty > original_stock:
-                    self.quality_errors.append(f"累計轉移數量({total_qty})超過原始庫存({original_stock}) - Article: {article}, Site: {transfer_site}")
-                    self.quality_check_passed = False
-        
-        # 檢查4：Transfer Site和Receive Site不能相同
-        for rec in self.transfer_recommendations:
-            if rec['Transfer Site'] == rec['Receive Site']:
-                self.quality_errors.append(f"轉出店鋪和接收店鋪不能相同: {rec}")
-                self.quality_check_passed = False
-        
-        # 檢查5：最終輸出的Article欄位必須是12位文本格式
-        for rec in self.transfer_recommendations:
-            if not isinstance(rec['Article'], str) or len(rec['Article']) != 12:
-                self.quality_errors.append(f"Article欄位必須是12位文本格式: {rec}")
-                self.quality_check_passed = False
-        
-        # 檢查6：同一SKU的轉出店鋪不能同時作為接收店鋪
-        transfer_sites_by_article = {}
-        receive_sites_by_article = {}
-        
-        for rec in self.transfer_recommendations:
-            article = rec['Article']
-            
-            # 記錄轉出店鋪
-            if article not in transfer_sites_by_article:
-                transfer_sites_by_article[article] = set()
-            transfer_sites_by_article[article].add(rec['Transfer Site'])
-            
-            # 記錄接收店鋪
-            if article not in receive_sites_by_article:
-                receive_sites_by_article[article] = set()
-            receive_sites_by_article[article].add(rec['Receive Site'])
-        
-        # 檢查是否有重疊
-        for article in transfer_sites_by_article:
-            if article in receive_sites_by_article:
-                overlap = transfer_sites_by_article[article] & receive_sites_by_article[article]
-                if overlap:
-                    self.quality_errors.append(f"同一SKU {article} 的轉出店鋪同時作為接收店鋪: {overlap}")
-                    self.quality_check_passed = False
-        
-        # 檢查7：接收店鋪不能是ND類型（ND店鋪在所有模式下都只能轉出，不能接收）
-        # 例外：ND1/ND2 模式下允許 ND 互轉（ND 可作為接收方）
-        # 使用已建好的索引查詢，避免每條建議全表掃描
-        if not self._is_nd_transfer_mode(mode) and mode not in (self.mode_f, self.mode_f_target_only):
-            for rec in self.transfer_recommendations:
-                receive_site = rec['Receive Site']
-                article = rec['Article']
-                key = (article, receive_site)
-                if key in df_indexed.index:
-                    rp_type = df_indexed.at[key, 'RP Type']
-                    if rp_type == 'ND':
-                        self.quality_errors.append(f"ND店鋪不能作為接收店鋪 - Site: {receive_site}, Article: {article}")
-                        self.quality_check_passed = False
-        
-        # 檢查8：對於C模式(重點補0)，檢查接收店鋪的累計接收數量是否超過目標數量
-        receive_site_stats = {}
-        for rec in self.transfer_recommendations:
-            if rec.get('Destination Type') == '重點補0':
-                key = (rec['Article'], rec['Receive Site'])
-                if key not in receive_site_stats:
-                    receive_site_stats[key] = {
-                        'target_qty': rec.get('Target Qty', 0),
-                        'total_received': 0
-                    }
-                receive_site_stats[key]['total_received'] += rec['Transfer Qty']
-        
-        # 檢查是否有超過目標數量的情況
-        for key, stats in receive_site_stats.items():
-            article, site = key
-            if stats['total_received'] > stats['target_qty']:
-                self.quality_errors.append(f"同一SKU {article} 的接收店鋪 {site} 累計接收數量超過目標數量: {stats['total_received']} > {stats['target_qty']}")
-                self.quality_check_passed = False
-        
-        if self.quality_check_passed:
+        skip_nd_check = self._is_nd_transfer_mode(mode) or mode in (self.mode_f, self.mode_f_target_only)
+        passed, errors = run_quality_checks(self.transfer_recommendations, df, skip_nd_check)
+        self.quality_check_passed = passed
+        self.quality_errors = errors
+        if passed:
             logger.info("質量檢查通過")
         else:
-            logger.error(f"質量檢查失敗，發現 {len(self.quality_errors)} 個錯誤")
-            for error in self.quality_errors:
+            logger.error(f"質量檢查失敗，發現 {len(errors)} 個錯誤")
+            for error in errors:
                 logger.error(error)
-        
-        return self.quality_check_passed
-    
+        return passed
+
     def get_transfer_statistics(self) -> Dict:
-        """
-        獲取調貨統計信息
-        
-        Returns:
-            統計信息字典
-        """
-        if not self.transfer_recommendations:
-            return {}
-        
-        # 總調貨建議數量
-        total_recommendations = len(self.transfer_recommendations)
-        
-        # 總調貨件數
-        total_transfer_qty = sum(rec['Transfer Qty'] for rec in self.transfer_recommendations)
-        
-        # 涉及產品數量
-        unique_articles = len(set(rec['Article'] for rec in self.transfer_recommendations))
-        
-        # 涉及OM數量
-        unique_oms = len(set(rec['Transfer OM'] for rec in self.transfer_recommendations))
-        
-        # 按Article統計
-        article_stats = {}
-        for rec in self.transfer_recommendations:
-            article = rec['Article']
-            if article not in article_stats:
-                article_stats[article] = {
-                    'total_qty': 0,
-                    'count': 0,
-                    'oms': set()
-                }
-            article_stats[article]['total_qty'] += rec['Transfer Qty']
-            article_stats[article]['count'] += 1
-            article_stats[article]['oms'].add(rec['Transfer OM'])
-        
-        # 轉換set為count
-        for article in article_stats:
-            article_stats[article]['om_count'] = len(article_stats[article]['oms'])
-        
-        # 按OM統計
-        om_stats = {}
-        for rec in self.transfer_recommendations:
-            transfer_om = rec['Transfer OM']
-            if transfer_om not in om_stats:
-                om_stats[transfer_om] = {
-                    'total_qty': 0,
-                    'transfer_qty': 0,
-                    'receive_qty': 0,
-                    'count': 0,
-                    'articles': set()
-                }
-            om_stats[transfer_om]['total_qty'] += rec['Transfer Qty']
-            om_stats[transfer_om]['transfer_qty'] += rec['Transfer Qty']
-            om_stats[transfer_om]['count'] += 1
-            om_stats[transfer_om]['articles'].add(rec['Article'])
-
-            receive_om = rec['Receive OM']
-            if receive_om not in om_stats:
-                om_stats[receive_om] = {
-                    'total_qty': 0,
-                    'transfer_qty': 0,
-                    'receive_qty': 0,
-                    'count': 0,
-                    'articles': set()
-                }
-            om_stats[receive_om]['receive_qty'] += rec['Transfer Qty']
-        
-        # 轉換set為count
-        for om in om_stats:
-            om_stats[om]['article_count'] = len(om_stats[om]['articles'])
-        
-        # 轉出類型分析
-        source_type_stats = {}
-        for rec in self.transfer_recommendations:
-            source_type = rec.get('Source Type', 'Unknown')
-            if source_type not in source_type_stats:
-                source_type_stats[source_type] = {'count': 0, 'qty': 0}
-            source_type_stats[source_type]['count'] += 1
-            source_type_stats[source_type]['qty'] += rec['Transfer Qty']
-        
-        # 接收類型分析
-        dest_type_stats = {}
-        for rec in self.transfer_recommendations:
-            dest_type = rec.get('Destination Type', 'Unknown')
-            if dest_type not in dest_type_stats:
-                dest_type_stats[dest_type] = {'count': 0, 'qty': 0}
-            dest_type_stats[dest_type]['count'] += 1
-            dest_type_stats[dest_type]['qty'] += rec['Transfer Qty']
-        
-        return {
-            'total_recommendations': total_recommendations,
-            'total_transfer_qty': total_transfer_qty,
-            'unique_articles': unique_articles,
-            'unique_oms': unique_oms,
-            'article_stats': article_stats,
-            'om_stats': om_stats,
-            'source_type_stats': source_type_stats,
-            'dest_type_stats': dest_type_stats
-        }
-
-    def _note_source_analysis(self, source: Dict, dest: Dict, mode: str, transfer_qty: int) -> str:
-        src_type = source['source_type']
-        remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-
-        if src_type == 'ND智能轉出':
-            total_sales = source.get('last_month_sold_qty', 0) + source.get('mtd_sold_qty', 0)
-            if total_sales == 0:
-                return f"【轉出分析: ND智能轉出，0銷量店舖優先轉出，轉出後剩餘{remaining}件】"
-            return f"【轉出分析: ND智能轉出，兩月銷量{total_sales}件(按銷量升序排序)，轉出後剩餘{remaining}件】"
-        if src_type == 'ND轉出' and not self._is_d_family_mode(mode):
-            return "【轉出分析: ND類型店鋪，無庫存限制，可全數轉出】"
-        if src_type == 'F模式ND轉出':
-            return "【轉出分析: F模式ND類型店鋪，無庫存限制，全數轉出】"
-        if source['rp_type'] == 'ND' and self._is_d_family_mode(mode):
-            mode_label = 'D2' if mode == self.mode_d2 else 'D'
-            return f"【轉出分析: ND店鋪清貨(模式{mode_label})，轉出後剩餘庫存({remaining})件，已優化避免1件餘貨】"
-        if src_type == 'F模式RF轉出':
-            return f"【轉出分析: F模式RF轉出，可忽視最小庫存要求，轉出後剩餘庫存({remaining})件】"
-        if src_type == 'E模式強制轉出':
-            rp_type = source.get('rp_type', '')
-            is_cross_om = mode == self.mode_e2 and source['om'] != dest['om']
-            cross_om_desc = "跨OM" if is_cross_om else "同OM"
-            return f"【轉出分析: E模式強制轉出({cross_om_desc}配對)，{rp_type}店鋪被標記為*ALL*全數轉出，原始庫存{source['original_stock']}件，轉出後剩餘{remaining}件】"
-        if src_type == 'Local店舖全轉出':
-            if self._is_b_l_retain_mode(mode):
-                return "【轉出分析: Local店舖低銷量特例（附加B-L系列模式），保留2件後轉出】"
-            return "【轉出分析: Local店舖全轉出（附加B系列模式），可全數轉出】"
-        if src_type == 'RF過剩轉出':
-            return f"【轉出分析: RF過剩轉出，轉出後剩餘庫存({remaining})仍高於安全庫存({source.get('safety_stock', 'N/A')})】"
-        if src_type == 'RF加強轉出':
-            return f"【轉出分析: RF加強轉出，轉出後剩餘庫存({remaining})可能低於安全庫存({source.get('safety_stock', 'N/A')})】"
-        if src_type == '精簡SKU ND轉出':
-            return f"【轉出分析: 精簡SKU模式ND轉出，全數可轉出，轉出後剩餘{remaining}件】"
-        if src_type == '精簡SKU RF轉出':
-            last_2m = source.get('last_2_month_sold_qty', 0)
-            return f"【轉出分析: 精簡SKU模式RF轉出，超出Cap(Safety×2與2月銷量×2取高者)部分轉出，2月銷量{last_2m}件，轉出後剩餘{remaining}件】"
-        return ""
-
-    def _note_dest_analysis(self, dest: Dict, current_received_qty: int, transfer_qty: int) -> str:
-        dest_type = dest['dest_type']
-        cumulative = current_received_qty + transfer_qty
-
-        if dest_type in ('F模式目標接收', 'F指定模式目標接收'):
-            target_qty = dest.get('target_qty', 0)
-            prefix = "F指定模式目標接收，僅Target店舖可接收" if dest_type == 'F指定模式目標接收' else "F模式目標接收"
-            return f"【接收分析: {prefix}，目標數量{target_qty}件，累計已接收{cumulative}件】"
-        if dest_type == 'E模式接收' or str(dest_type).startswith('E1b'):
-            target_qty = dest.get('target_qty', 0)
-            safety_stock = dest.get('safety_stock', 0)
-            current_stock = dest.get('current_stock', 0)
-            pending = dest.get('pending_received', 0)
-            total_available = current_stock + pending
-            return f"【接收分析: E模式接收，RF店鋪當前總庫存{total_available}件(現有{current_stock}件+待收{pending}件)，安全庫存{safety_stock}件，接收上限為安全庫存2倍({target_qty}件)，累計已接收{cumulative}件】"
-        if dest_type == '重點補0':
-            if 'target_qty' in dest:
-                return f"【接收分析: 重點補0，目標數量{dest['target_qty']}件，累計已接收{cumulative}件，缺口{abs(cumulative - dest['target_qty'])}件】"
-            return "【接收分析: 重點補0，針對低庫存店鋪補貨】"
-        if dest_type == 'ND潛在缺貨接收':
-            total_sales = dest.get('total_sales', 0)
-            max_receive = dest.get('max_receive_qty', total_sales * 2)
-            return f"【接收分析: ND潛在缺貨接收，兩月銷量{total_sales}件，接收上限{max_receive}件(2×兩月銷量)，累計已接收{cumulative}件】"
-        if dest_type == 'RF緊急缺貨補貨':
-            return "【接收分析: RF緊急缺貨補貨，RF店鋪零庫存但有銷售記錄（ND模式優先滿足）】"
-        if dest_type == '緊急缺貨補貨':
-            return "【接收分析: 緊急缺貨補貨，該店鋪零庫存但有銷售記錄】"
-        if dest_type == '潛在缺貨補貨':
-            current_stock = dest.get('current_stock', 0)
-            pending = dest.get('pending_received', 0)
-            safety_stock = dest.get('safety_stock', 0)
-            total_available = current_stock + pending
-            shortage = safety_stock - total_available
-            return f"【接收分析: 潛在缺貨補貨，庫存不足{shortage}件，補充至安全庫存{safety_stock}件】"
-        if dest_type == '精簡SKU接收':
-            target_qty = dest.get('target_qty', 0)
-            return f"【接收分析: 精簡SKU接收，接收上限Cap=Max(Safety×2, 2月銷量×2)={target_qty}件，累計已接收{cumulative}件】"
-        return ""
+        from services.statistics import compute_transfer_statistics
+        return compute_transfer_statistics(self.transfer_recommendations)
 
     def _create_recommendation_note(self, source: Dict, dest: Dict, current_received_qty: int, transfer_qty: int, mode: str) -> str:
-        """
-        創建調貨建議的Notes欄位內容
-        
-        Args:
-            source: 轉出店鋪信息
-            dest: 接收店鋪信息
-            current_received_qty: 當前累計接收數量
-            transfer_qty: 本次轉移數量
-            mode: 轉貨模式
-            
-        Returns:
-            詳細的Notes欄位內容
-        """
-        notes_parts = []
-        
-        # 1. 轉出店鋪分類
-        notes_parts.append(f"【轉出分類: {source['source_type']}】")
-        
-        # 2. 接收店鋪分類
-        notes_parts.append(f"【接收分類: {dest['dest_type']}】")
-        
-        # 3. 優先級信息
-        if source['source_type'] == 'ND智能轉出':
-            priority_desc = "ND智能轉出(按銷量排序優先級)"
-        elif source['priority'] == 1:
-            priority_desc = "ND轉出(最高優先級)"
-        else:
-            priority_desc = "RF轉出"
-        notes_parts.append(f"【轉出優先級: {priority_desc}】")
-        
-        if dest['priority'] == 1:
-            priority_desc = "接收(最高優先級)"
-        else:
-            priority_desc = "接收(一般優先級)"
-        notes_parts.append(f"【接收優先級: {priority_desc}】")
-        
-        # 4. 庫存狀況分析
-        notes_parts.append(self._note_source_analysis(source, dest, mode, transfer_qty))
-        
-        # 5. 接收需求分析
-        notes_parts.append(self._note_dest_analysis(dest, current_received_qty, transfer_qty))
-
-        # 附加B系列模式接收上限說明
-        if self._is_b_special_mode(mode) and 'target_qty' in dest:
-            notes_parts.append(f"【接收上限: 附加B系列模式接收上限為安全庫存2倍({dest['target_qty']}件)，累計已接收{current_received_qty + transfer_qty}件】")
-        
-        # E1/E2模式接收上限說明
-        if mode in (self.mode_e1, self.mode_e1b, self.mode_e2) and 'target_qty' in dest:
-            notes_parts.append(f"【接收上限: E模式接收上限為安全庫存2倍(最少3件)，目標{dest['target_qty']}件，累計已接收{current_received_qty + transfer_qty}件】")
-        
-        # 6. 轉移數量說明
-        if transfer_qty == 2 and source.get('original_stock', 0) == 1:
-            notes_parts.append("【數量說明: 已優化至2件，最小轉移單位】")
-        elif transfer_qty == 1:
-            notes_parts.append("【數量說明: 最小轉移單位1件】")
-        else:
-            notes_parts.append(f"【數量說明: 轉移{transfer_qty}件】")
-        
-        # 7. 轉移後狀況
-        if source['source_type'] == 'E模式強制轉出':
-            remaining_stock = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-        else:
-            remaining_stock = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-        notes_parts.append(f"【轉移後狀況: 轉出店鋪剩餘庫存{remaining_stock}件，接收店鋪累計接收{current_received_qty + transfer_qty}件】")
-        
-        # 8. 特殊標記
-        if source['source_type'] in ['RF加強轉出']:
-            notes_parts.append("【特殊標記: 加強轉出類型，需注意轉出後庫存狀況】")
-        if source['source_type'] == 'E模式強制轉出':
-            if mode == self.mode_e1:
-                notes_parts.append("【特殊標記: E1模式強制轉出，僅同OM配對，店鋪被標記為*ALL*必須全數轉出】")
-            elif mode == self.mode_e1b:
-                notes_parts.append("【特殊標記: E1b模式強制轉出，僅同OM配對，接收端優先Type=T(遊客區)與Type=M(混合型)店舖】")
-            elif mode == self.mode_e2:
-                if source['om'] == dest['om']:
-                    notes_parts.append("【特殊標記: E2模式強制轉出，優先同OM配對，店鋪被標記為*ALL*必須全數轉出】")
-                else:
-                    notes_parts.append("【特殊標記: E2模式強制轉出，跨OM配對(同OM無法接收)，店鋪被標記為*ALL*必須全數轉出】")
-        if dest['dest_type'] == '重點補0':
-            notes_parts.append("【特殊標記: 重點補0類型，確保最低保障標準】")
-        if dest['dest_type'] == 'E模式接收' or str(dest.get('dest_type', '')).startswith('E1b'):
-            notes_parts.append("【特殊標記: E模式接收，RF店鋪可接受來自標記為*ALL*的強制轉出】")
-        if self._is_simplified_sku_mode(mode):
-            if dest.get('dest_type') == '退回D001':
-                notes_parts.append("【特殊標記: 精簡SKU模式，剩餘庫存退回D001】")
-            elif dest.get('dest_type') == '精簡SKU接收':
-                mode_variant = "限同OM" if mode == self.mode_simplified_sku_same else "跨OM"
-                notes_parts.append(f"【特殊標記: 精簡SKU模式({mode_variant})，RF存貨上限=Max(Safety×2, 2月銷量×2)，參考C1模式最少2件起轉】")
-        
-        return " | ".join(notes_parts)
-
-
-def _parse_target_for_ui(value):
-    """將 Target 欄位轉為可比較數值，支援全形數字與千分位逗號"""
-    if pd.isna(value):
-        return float('nan')
-
-    text = str(value).strip()
-    if text == "":
-        return float('nan')
-
-    text = unicodedata.normalize('NFKC', text).replace(',', '')
-    return pd.to_numeric(text, errors='coerce')
-
-
-def _find_f_mode_nd_target_conflicts(df: pd.DataFrame) -> pd.DataFrame:
-    """找出 F/F2 模式下 ND 且 Target>0 的店舖資料"""
-    if 'RP Type' not in df.columns or 'Target' not in df.columns:
-        return pd.DataFrame()
-
-    target_numeric = df['Target'].map(_parse_target_for_ui)
-    nd_mask = df['RP Type'].astype(str).str.strip().str.upper() == 'ND'
-    target_mask = pd.Series(target_numeric, index=df.index).fillna(0) > 0
-    conflicts = df[nd_mask & target_mask].copy()
-    if conflicts.empty:
-        return conflicts
-
-    conflicts['Target Numeric'] = target_numeric[conflicts.index]
-    return conflicts
+        from services.notes import create_recommendation_note
+        mode_info = {
+            'is_d_family': self._is_d_family_mode(mode),
+            'is_b_special': self._is_b_special_mode(mode),
+            'is_b_l_retain': self._is_b_l_retain_mode(mode),
+            'is_simplified_sku': self._is_simplified_sku_mode(mode),
+            'mode_e1': self.mode_e1,
+            'mode_e1b': self.mode_e1b,
+            'mode_e2': self.mode_e2,
+            'mode_d2': self.mode_d2,
+            'mode_simplified_sku_same': self.mode_simplified_sku_same,
+        }
+        return create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode, mode_info)
