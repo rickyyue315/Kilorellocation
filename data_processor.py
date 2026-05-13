@@ -62,7 +62,7 @@ class DataProcessor:
         Returns:
             填充後的 DataFrame
         """
-        df_filled = df.copy()
+        df_filled = df
         
         # 重置填充統計
         self.fill_stats = {
@@ -117,20 +117,23 @@ class DataProcessor:
         
         return df_filled
     
-    def read_excel_file(self, file_path: str) -> pd.DataFrame:
+    def read_excel_file(self, file_path_or_buffer) -> pd.DataFrame:
         """
         讀取Excel文件，確保Article欄位為12位文本格式，並標記*ALL*欄位（不分大小寫）
         
         Args:
-            file_path: Excel文件路徑
+            file_path_or_buffer: Excel文件路徑或 BytesIO 緩衝區
             
         Returns:
             處理後的DataFrame
         """
         try:
-            # 讀取Excel文件，指定Article欄位為字符串類型
             dtype_dict = {'Article': str}
-            df = pd.read_excel(file_path, dtype=dtype_dict)
+            # calamine 引擎（Rust 實作）比 openpyxl 快 5-10 倍；若未安裝則 fallback
+            try:
+                df = pd.read_excel(file_path_or_buffer, dtype=dtype_dict, engine='calamine')
+            except Exception:
+                df = pd.read_excel(file_path_or_buffer, dtype=dtype_dict)
             
             # 確保Article欄位為12位文本格式（補零不足12位；截斷超過12位）
             if 'Article' in df.columns:
@@ -249,7 +252,7 @@ class DataProcessor:
         Returns:
             處理後的DataFrame
         """
-        df_processed = df.copy()
+        df_processed = df
         
         # 處理整數欄位
         for col in self.integer_columns:
@@ -297,7 +300,7 @@ class DataProcessor:
         Returns:
             處理後的DataFrame
         """
-        df_processed = df.copy()
+        df_processed = df
         
         # Safety Stock缺失值填充為0
         if 'Safety Stock' in df_processed.columns:
@@ -327,7 +330,7 @@ class DataProcessor:
         Returns:
             處理後的DataFrame
         """
-        df_processed = df.copy()
+        df_processed = df
         
         # 添加Notes欄位（如果不存在）
         if 'Notes' not in df_processed.columns:
@@ -370,7 +373,7 @@ class DataProcessor:
         Returns:
             添加有效銷量欄位的DataFrame
         """
-        df_processed = df.copy()
+        df_processed = df
         
         # 計算有效銷量：上月銷量 + 本月MTD銷量
         if 'Last Month Sold Qty' in df_processed.columns and 'MTD Sold Qty' in df_processed.columns:
@@ -383,12 +386,12 @@ class DataProcessor:
         logger.info("有效銷量計算完成")
         return df_processed
     
-    def preprocess_data(self, file_path: str) -> Tuple[pd.DataFrame, Dict]:
+    def preprocess_data(self, file_path_or_buffer) -> Tuple[pd.DataFrame, Dict]:
         """
         完整的數據預處理流程
         
         Args:
-            file_path: Excel文件路徑
+            file_path_or_buffer: Excel文件路徑或 BytesIO 緩衝區
             
         Returns:
             處理後的DataFrame和處理統計信息
@@ -396,7 +399,7 @@ class DataProcessor:
         logger.info("開始數據預處理")
         
         # 讀取Excel文件
-        df = self.read_excel_file(file_path)
+        df = self.read_excel_file(file_path_or_buffer)
         
         # 驗證欄位
         if not self.validate_columns(df):

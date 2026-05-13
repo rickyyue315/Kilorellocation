@@ -57,18 +57,9 @@ def _find_f_mode_nd_target_conflicts(df: pd.DataFrame) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def _cached_preprocess(file_bytes: bytes) -> tuple:
-    import tempfile
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
-        tmp.write(file_bytes)
-        tmp_path = tmp.name
-    try:
-        processor = DataProcessor()
-        df, stats = processor.preprocess_data(tmp_path)
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+    import io
+    processor = DataProcessor()
+    df, stats = processor.preprocess_data(io.BytesIO(file_bytes))
     return df, stats
 
 
