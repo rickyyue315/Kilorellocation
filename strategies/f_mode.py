@@ -50,7 +50,10 @@ class FModeStrategy(BaseMatchStrategy):
                     and str(src.get('site', '')).upper().startswith('HD')
                     and dest_site.upper().startswith(('HA', 'HB', 'HC'))):
                 hd_penalty = 10
-            return (tier + hd_penalty, src.get('effective_sold_qty', 0))
+            windy_penalty = 0
+            if is_f2 and dest_om == 'Windy' and src.get('om') != 'Windy':
+                windy_penalty = 5
+            return (tier + hd_penalty + windy_penalty, src.get('effective_sold_qty', 0))
 
         for priority_level in [1, 2]:
             priority_dests = [d for d in temp_destinations if d['priority'] == priority_level]
