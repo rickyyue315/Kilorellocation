@@ -1,4 +1,4 @@
-# KiLo 庫存調貨建議系統 v2.11.1
+# KiLo 庫存調貨建議系統 v2.11.3
 
 ## 系統概述
 
@@ -220,5 +220,5 @@ python -m pytest tests/test_b2_b3_source_receive_site_limit.py tests/test_b2_pri
 
 ## 版本
 
-- 目前版本：`v2.11.1`
+- 目前版本：`v2.11.3`
 - 詳細異動請見 `VERSION.md`

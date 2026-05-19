@@ -23,16 +23,26 @@ Draw one logic image that lets users compare all current transfer modes and unde
 4. Same site cannot transfer to itself.
 5. For B2/B2a/B3/B3a only: if a Type=M (Mix) source store has higher total sales than destination store, the match is blocked.
   - Total sales = Last Month Sold Qty + MTD Sold Qty
-6. Matching priority order (core flow):
+6. Matching priority order (core flow, v2.11.3 optimized):
+   - **C mode**: ND source -> Priority Zero Replenishment (highest priority for zero-stock stores)
    - ND source -> Emergency Replenishment
    - ND source -> Potential Replenishment
+   - **C1 mode**: RF Surplus source -> Priority Zero Replenishment (sorted by transferable_qty desc)
    - RF Surplus source -> Emergency Replenishment
    - RF Surplus source -> Potential Replenishment
+   - **B Special (B2/B2a/B3/B3a)**: RF Surplus > Local Full Transfer > RF Enhanced
+   - **C mode**: RF Surplus source -> Priority Zero Replenishment
+   - **C1 mode**: RF Enhanced source -> Priority Zero Replenishment
    - RF Enhanced source -> Emergency Replenishment
    - RF Enhanced source -> Potential Replenishment
-   - (Mode C/C2) RF source -> Priority Zero Replenishment
+   - **C mode**: RF Enhanced source -> Priority Zero Replenishment
+   - (Mode C/C2) RF source -> Priority Zero Replenishment (legacy fallback)
    - (Mode F/F2) Target priority matching (ND/RF can receive)
    - (Mode 精簡SKU) RF-to-RF matching (min 2 pieces) -> D001 fallback
+   - **Key changes v2.11.3**: 
+     - C mode: Priority Zero Replenishment now served at EACH source priority level (before Emergency/Potential)
+     - B Special: RF Surplus matched BEFORE Local Full Transfer (was reversed)
+     - C1 mode: explicit Priority Zero rounds for RF Surplus then RF Enhanced
 7. **Post-processing (all modes)**: after all matching, single-piece transfer lines (Transfer Qty = 1) are eliminated:
    - Strategy A (Rebalance): take 1 piece from another destination with qty ≥3 in same source group, making the 1-piece line become 2.
    - Strategy B (Merge): if no donor ≥3, merge the 1-piece into the highest-sales destination in the group (measured by Last Month Sold Qty + MTD Sold Qty), then remove the 1-piece record.

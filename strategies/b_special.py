@@ -42,8 +42,8 @@ class BSpecialStrategy(BaseMatchStrategy):
 
         rounds = [
             (1, 1, None), (1, 2, None),
-            (2, 1, 'Local店舖全轉出'), (2, 2, 'Local店舖全轉出'),
             (2, 1, 'RF過剩轉出'), (2, 2, 'RF過剩轉出'),
+            (2, 1, 'Local店舖全轉出'), (2, 2, 'Local店舖全轉出'),
             (2, 1, 'RF加強轉出'), (2, 2, 'RF加強轉出'),
         ]
 
