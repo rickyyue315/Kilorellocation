@@ -980,6 +980,7 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
   - 可切換為「HD 可轉出（最後優先）」：允許 HD 轉到 HA/HB/HC，但排在最低優先級，僅在其他來源不足時才使用
 - **Target 店舖不論 ND 或 RF 均可接收**（打破 ND 不可接收限制）
 - **Target 數量直接作為接收量**（不考慮現有庫存與在途數量）
+- **Windy 目標店優先從同 OM 無 Target 店提取**：若目標店為 Windy（有 Target），優先從其他無 Target 的 Windy 店舖提取；僅在 Windy 來源不足時，才回落至非 Windy 來源
 
 **接收規則：**
 1. Target 有數字：直接按 Target Qty 安排接收（不論 ND/RF，不考慮 Pending Received）
@@ -988,7 +989,8 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 **轉出規則：**
 - ND店鋪可全數轉出（若有 Target 則不轉出，改為接收方）
 - RF店鋪可轉出（保護最高銷量店鋪）
-- 轉出優先級：ND > 同OM RF > 跨OM RF > HD（僅在啟用HD可轉出時，且為最低優先）
+- 轉出優先級：Windy同OM > ND > 同OM RF > 跨OM RF > HD（僅在啟用HD可轉出時，且為最低優先）
+  - 若接收方為 Windy：Windy 來源（ND/RF）優先於非 Windy 來源
 
 **轉出類型：** F模式ND轉出、F模式RF轉出
 **接收類型：** F指定模式目標接收

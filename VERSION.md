@@ -1,5 +1,29 @@
 # 版本更新記錄
 
+## v2.11.2 (2026-05-19)
+
+### F2 模式 — Windy 目標店優先從同 OM 無 Target 店提取
+
+#### 功能說明
+- F2 模式下，當 Windy 目標店（有 Target > 0）需要接收時，優先從其他無 Target 的 Windy 店舖提取
+- 僅在 Windy 來源不足時，才回落至非 Windy 來源（Ivy/Eva 等 OM）
+
+#### 程式碼更新
+- [`strategies/f_mode.py`](strategies/f_mode.py)
+  - `_sort_key` 新增 `windy_penalty=5`：當目的地為 Windy 且來源非 Windy 時加 5，確保 Windy 來源排序於非 Windy 來源之前
+- [`tests/test_f2_windy_priority.py`](tests/test_f2_windy_priority.py) (新增)
+  - `test_f2_windy_source_prioritized_over_non_windy`：Windy 來源足夠時不使用非 Windy 來源
+  - `test_f2_windy_falls_back_to_non_windy_when_insufficient`：Windy 來源不足時回落非 Windy 來源
+  - `test_f2_windy_nd_source_prioritized_over_non_windy_nd`：Windy ND 來源優先於非 Windy ND 來源
+
+#### 文件同步
+- [`README.md`](README.md) — 模式列表、跨 OM 規則、模式對照表更新
+- [`調貨模式詳解.txt`](調貨模式詳解.txt) — F2 核心特徵與轉出規則更新
+- [`ui/sidebar.py`](ui/sidebar.py) — 特殊功能列表與 F2 模式說明更新
+- [`models/mode.py`](models/mode.py) — F2 模式描述更新
+- [`transfer_logic_ai_brief.md`](transfer_logic_ai_brief.md) — F2 Extra constraints 新增 Windy source priority
+- [`VERSION.md`](VERSION.md) — 本版本記錄
+
 ## v2.11.1-hotfix (2026-05-12)
 
 ### 系統架構重構（Phase 1-5）

@@ -53,7 +53,7 @@ def render_sidebar() -> Dict:
             - ✅ ND/RF類型智慧識別
             - ✅ 優先順序調貨匹配
             - ✅ RF轉出限制控制
-            - ✅ 跨OM配對支援(B3/C2/E/F/F2模式）
+            - ✅ 跨OM配對支援(B3/C2/E/F/F2模式，F2 Windy目標店優先同OM提取）
             
             **特殊功能:**
             - ✅ D模式：避免1件餘貨
@@ -61,7 +61,7 @@ def render_sidebar() -> Dict:
             - ✅ E1b模式：標記商品強制轉出(僅同OM，優先Type=T/M接收)
             - ✅ E2模式：標記商品強制轉出(跨OM)
             - ✅ F模式：Target目標接收優先
-            - ✅ F2模式：僅Target店舖可接收，集中優先補貨
+            - ✅ F2模式：僅Target店舖可接收，集中優先補貨；Windy目標店優先從同OM無Target店提取
             - ✅ B2/B2a模式：接收端依遊客區/混合型店舖優先排序
             - ✅ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式：Mix店舖若總銷量高於目標店，禁止出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
             - ✅ B2a/B2La/B3a/B3La模式：T遊客鋪不作為出貨來源
@@ -263,6 +263,7 @@ def render_sidebar() -> Dict:
             - 僅Target店舖可接收，非Target RF店舖不參與接收
             - 允許跨OM配對
             - HD轉出選項：預設HD不能轉到HA/HB/HC；可切換為「HD可轉出（最後優先）」，此時HD來源排在最低優先級，僅在其他來源不足時才使用
+            - **Windy目標店優先**：若目標店為Windy（有Target），優先從其他無Target的Windy店舖提取；僅在Windy來源不足時才使用非Windy來源
 
             **ND1模式(ND同OM轉貨)**
             - 打破「ND不可接收」全局限制，ND店舖可互相調貨

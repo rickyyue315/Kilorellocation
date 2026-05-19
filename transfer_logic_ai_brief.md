@@ -220,6 +220,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - HD source cannot transfer to HA/HB/HC destinations (default behavior)
   - **HD transfer option (configurable)**: when `f2_allow_hd_transfer=True`, HD sources CAN transfer to HA/HB/HC destinations, but are sorted at the lowest priority tier (hd_penalty=10 added to sort key), only used when all other sources are insufficient
   - Windy source can only transfer to Windy destinations
+  - **Windy source priority**: when a Windy store has Target (is a destination group), Windy sources without Target are prioritized over non-Windy sources (windy_penalty=5 added to sort key); non-Windy sources are only used when Windy sources are insufficient
 - Key change: Target Qty is used directly as needed_qty (no subtraction of current stock or pending); ND stores with Target can receive
 - Goal: Target-only allocation, concentrate transfer to designated stores
 

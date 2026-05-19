@@ -52,7 +52,7 @@ MODE_DESCRIPTIONS: Dict[str, str] = {
     "E1b: 強制轉出(優先類型接收)": "標記商品強制轉出(僅同OM，接收端優先Type=T/M)",
     "E2: 強制轉出(跨OM)": "標記商品強制轉出(可跨OM)",
     "F: 目標優化": "依Target目標分配",
-    "F2: F指定模式": "僅Target店舖可接收，集中調貨，可設定HD轉出選項",
+    "F2: F指定模式": "僅Target店舖可接收，集中調貨，可設定HD轉出選項；Windy目標店優先從同OM無Target店提取",
     "ND1: ND同OM轉貨": "ND店舖互轉(同OM)，按銷量智能排序",
     "ND2: ND混合OM轉貨": "ND店舖互轉(跨OM)，Windy只轉Windy",
     "精簡SKU(限同OM): 精簡SKU限同OM": "精簡SKU模式：同OM轉貨，RF上限=Max(Safety×2,2月銷量×2)，剩餘退回D001",
