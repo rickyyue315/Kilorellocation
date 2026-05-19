@@ -22,6 +22,7 @@ from ui.display import (
     render_statistics,
     render_download_button,
 )
+from ui.tutorial import render_tutorial_page
 from data_processor import DataProcessor
 from business_logic import TransferLogic
 from excel_generator import ExcelGenerator
@@ -89,171 +90,178 @@ f2_allow_hd_transfer = sidebar_result['f2_allow_hd_transfer']
 
 st.title("📦 庫存調貨建議系統")
 st.caption(f"{VERSION} | Intelligent Inventory Reallocation System")
-st.markdown("---")
 
-st.markdown("### 📂 資料上傳")
+tab_system, tab_tutorial = st.tabs(["🏠 調貨系統", "📖 模式教學"])
 
-render_upload_requirements(mode_code)
+with tab_tutorial:
+    render_tutorial_page()
 
-uploaded_file = st.file_uploader(
-    "拖放或點擊上傳 Excel 文件",
-    type=["xlsx", "xls"],
-    help="支援 .xlsx 和 .xls 格式",
-)
+with tab_system:
+    st.markdown("---")
 
-if uploaded_file is not None:
-    progress_bar = st.progress(0, text="準備開始處理文件...")
-    try:
-        progress_bar.progress(10, text="正在驗證文件格式...")
+    st.markdown("### 📂 資料上傳")
 
-        progress_bar.progress(25, text="文件讀取成功!正在進行數據預處理...")
-        processor = DataProcessor()
+    render_upload_requirements(mode_code)
 
-        file_valid, error_msg = processor.validate_file_format(uploaded_file)
-        if not file_valid:
-            st.error(f"文件格式驗證失敗: {error_msg}")
-            st.stop()
+    uploaded_file = st.file_uploader(
+        "拖放或點擊上傳 Excel 文件",
+        type=["xlsx", "xls"],
+        help="支援 .xlsx 和 .xls 格式",
+    )
 
+    if uploaded_file is not None:
+        progress_bar = st.progress(0, text="準備開始處理文件...")
         try:
-            df, processing_stats = _cached_preprocess(uploaded_file.getvalue())
-            progress_bar.progress(60, text="數據預處理完成!")
-        except ValueError as e:
-            st.error(f"❌ {str(e)}")
-            st.stop()
+            progress_bar.progress(10, text="正在驗證文件格式...")
 
-        if mode_code in ["B2", "B2a", "B2L", "B2La", "B3", "B3a", "B3L", "B3La"]:
-            original_columns = processing_stats['original_stats'].get('columns', [])
-            has_type_column = any(col.upper() == 'TYPE' for col in original_columns)
-            if not has_type_column:
-                st.error("❌ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
+            progress_bar.progress(25, text="文件讀取成功!正在進行數據預處理...")
+            processor = DataProcessor()
+
+            file_valid, error_msg = processor.validate_file_format(uploaded_file)
+            if not file_valid:
+                st.error(f"文件格式驗證失敗: {error_msg}")
                 st.stop()
 
-        st.success("檔案上傳與數據預處理成功!")
+            try:
+                df, processing_stats = _cached_preprocess(uploaded_file.getvalue())
+                progress_bar.progress(60, text="數據預處理完成!")
+            except ValueError as e:
+                st.error(f"❌ {str(e)}")
+                st.stop()
 
-        invalid_rp_count = processing_stats['processed_stats'].get('invalid_rp_type_count', 0)
-        if invalid_rp_count > 0:
-            invalid_rp_vals = processing_stats['processed_stats'].get('invalid_rp_types', [])
-            st.warning(
-                f"⚠️ 資料品質提示：發現 {invalid_rp_count} 行 RP Type 欄位值不是 ND 或 RF "
-                f"（{', '.join(str(v) for v in invalid_rp_vals)}），已自動修正為 RF。請確認原始數據是否正確。"
-            )
+            if mode_code in ["B2", "B2a", "B2L", "B2La", "B3", "B3a", "B3L", "B3La"]:
+                original_columns = processing_stats['original_stats'].get('columns', [])
+                has_type_column = any(col.upper() == 'TYPE' for col in original_columns)
+                if not has_type_column:
+                    st.error("❌ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
+                    st.stop()
 
-        if mode_code in ["F", "F2"]:
-            f_mode_conflicts = _find_f_mode_nd_target_conflicts(df)
-            if not f_mode_conflicts.empty:
-                affected_sites = sorted(
-                    set(f_mode_conflicts['Site'].astype(str).str.strip().str.upper())
-                )
-                site_text = "、".join(affected_sites[:8])
-                if len(affected_sites) > 8:
-                    site_text += f" 等{len(affected_sites)}間店"
+            st.success("檔案上傳與數據預處理成功!")
 
+            invalid_rp_count = processing_stats['processed_stats'].get('invalid_rp_type_count', 0)
+            if invalid_rp_count > 0:
+                invalid_rp_vals = processing_stats['processed_stats'].get('invalid_rp_types', [])
                 st.warning(
-                    f"⚠️ {mode_code}模式提示：偵測到 {len(f_mode_conflicts)} 行資料為 ND 且 Target>0。"
-                    f"此店因 ND 規則不會接收。"
-                    f"受影響店舖：{site_text}"
+                    f"⚠️ 資料品質提示：發現 {invalid_rp_count} 行 RP Type 欄位值不是 ND 或 RF "
+                    f"（{', '.join(str(v) for v in invalid_rp_vals)}），已自動修正為 RF。請確認原始數據是否正確。"
                 )
 
-                preview_cols = [c for c in ['Article', 'OM', 'Site', 'RP Type', 'Target', 'SaSa Net Stock', 'Pending Received'] if c in f_mode_conflicts.columns]
-                with st.expander("檢視 ND + Target>0 明細", expanded=False):
-                    st.dataframe(
-                        f_mode_conflicts[preview_cols].head(50),
-                        use_container_width=True,
+            if mode_code in ["F", "F2"]:
+                f_mode_conflicts = _find_f_mode_nd_target_conflicts(df)
+                if not f_mode_conflicts.empty:
+                    affected_sites = sorted(
+                        set(f_mode_conflicts['Site'].astype(str).str.strip().str.upper())
+                    )
+                    site_text = "、".join(affected_sites[:8])
+                    if len(affected_sites) > 8:
+                        site_text += f" 等{len(affected_sites)}間店"
+
+                    st.warning(
+                        f"⚠️ {mode_code}模式提示：偵測到 {len(f_mode_conflicts)} 行資料為 ND 且 Target>0。"
+                        f"此店因 ND 規則不會接收。"
+                        f"受影響店舖：{site_text}"
                     )
 
-        render_data_preview(df, processing_stats)
+                    preview_cols = [c for c in ['Article', 'OM', 'Site', 'RP Type', 'Target', 'SaSa Net Stock', 'Pending Received'] if c in f_mode_conflicts.columns]
+                    with st.expander("檢視 ND + Target>0 明細", expanded=False):
+                        st.dataframe(
+                            f_mode_conflicts[preview_cols].head(50),
+                            use_container_width=True,
+                        )
 
-        st.markdown("---")
-        st.markdown("### 🚀 分析與建議")
+            render_data_preview(df, processing_stats)
 
-        st.info(f"當前模式:**{transfer_mode}**")
+            st.markdown("---")
+            st.markdown("### 🚀 分析與建議")
 
-        current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{uploaded_file.name}_{uploaded_file.size}"
-        if st.session_state.get('_run_key') != current_run_key:
-            for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key']:
-                st.session_state.pop(k, None)
-            for k in [k for k in st.session_state if k.startswith('_display_df_')]:
-                st.session_state.pop(k)
-            st.session_state['_run_key'] = current_run_key
+            st.info(f"當前模式:**{transfer_mode}**")
 
-        if st.button("🎯 生成調貨建議", type="primary", use_container_width=True):
-            progress_bar.progress(70, text="正在分析數據並生成建議...")
-            with st.spinner("演算法運行中,請稍候..."):
-                mode_name = MODE_NAME_MAP.get(mode_code, "目標優化")
+            current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{uploaded_file.name}_{uploaded_file.size}"
+            if st.session_state.get('_run_key') != current_run_key:
+                for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key']:
+                    st.session_state.pop(k, None)
+                for k in [k for k in st.session_state if k.startswith('_display_df_')]:
+                    st.session_state.pop(k)
+                st.session_state['_run_key'] = current_run_key
 
-                transfer_logic = TransferLogic(
-                    b_special_max_receive_sites_per_source=b_special_max_receive_sites_per_source,
-                    f2_allow_hd_transfer=f2_allow_hd_transfer,
-                )
+            if st.button("🎯 生成調貨建議", type="primary", use_container_width=True):
+                progress_bar.progress(70, text="正在分析數據並生成建議...")
+                with st.spinner("演算法運行中,請稍候..."):
+                    mode_name = MODE_NAME_MAP.get(mode_code, "目標優化")
 
-                recommendations = transfer_logic.generate_transfer_recommendations(df, mode_name)
+                    transfer_logic = TransferLogic(
+                        b_special_max_receive_sites_per_source=b_special_max_receive_sites_per_source,
+                        f2_allow_hd_transfer=f2_allow_hd_transfer,
+                    )
 
-                quality_passed = transfer_logic.perform_quality_checks(df, mode_name)
+                    recommendations = transfer_logic.generate_transfer_recommendations(df, mode_name)
 
-                statistics = transfer_logic.get_transfer_statistics()
+                    quality_passed = transfer_logic.perform_quality_checks(df, mode_name)
 
-                st.session_state['recommendations'] = recommendations
-                st.session_state['statistics'] = statistics
-                st.session_state['quality_passed'] = quality_passed
-                st.session_state['quality_errors'] = transfer_logic.quality_errors
+                    statistics = transfer_logic.get_transfer_statistics()
 
-            progress_bar.progress(90, text="分析完成!正在準備結果展示...")
+                    st.session_state['recommendations'] = recommendations
+                    st.session_state['statistics'] = statistics
+                    st.session_state['quality_passed'] = quality_passed
+                    st.session_state['quality_errors'] = transfer_logic.quality_errors
 
-        recommendations = st.session_state.get('recommendations')
-        statistics = st.session_state.get('statistics', {})
-        quality_passed = st.session_state.get('quality_passed')
+                progress_bar.progress(90, text="分析完成!正在準備結果展示...")
 
-        if quality_passed is not None:
-            if quality_passed:
-                st.success("質量檢查通過!")
+            recommendations = st.session_state.get('recommendations')
+            statistics = st.session_state.get('statistics', {})
+            quality_passed = st.session_state.get('quality_passed')
+
+            if quality_passed is not None:
+                if quality_passed:
+                    st.success("質量檢查通過!")
+                else:
+                    st.error("質量檢查失敗,請查看錯誤信息")
+
+                    with st.expander("質量檢查錯誤詳情"):
+                        for error in st.session_state.get('quality_errors', []):
+                            st.error(error)
+
+            if recommendations:
+                st.markdown("---")
+                st.markdown("### 📈 分析結果")
+
+                render_kpi_cards(statistics)
+
+                render_results_table(recommendations, df, current_run_key)
+
+                render_statistics(statistics)
+
+                st.markdown("---")
+                st.success("✅ 分析完成!")
+
+                if st.session_state.get('excel_run_key') != current_run_key or 'excel_data' not in st.session_state:
+                    with st.spinner("生成 Excel 文件..."):
+                        excel_generator = ExcelGenerator()
+                        st.session_state['excel_data'] = excel_generator.generate_excel_file(recommendations, statistics)
+                        st.session_state['excel_filename'] = excel_generator.output_filename
+                        st.session_state['excel_run_key'] = current_run_key
+
+                _excel_bytes = st.session_state.get('excel_data', b'')
+                _excel_filename = st.session_state.get('excel_filename', '調貨建議.xlsx')
+
+                render_download_button(_excel_bytes, _excel_filename, current_run_key)
+
+                progress_bar.progress(100, text="處理完畢!")
             else:
-                st.error("質量檢查失敗,請查看錯誤信息")
+                st.info("根據當前規則，沒有生成任何調貨建議。")
+                progress_bar.progress(100, text="處理完畢!")
 
-                with st.expander("質量檢查錯誤詳情"):
-                    for error in st.session_state.get('quality_errors', []):
-                        st.error(error)
+        except Exception as e:
+            st.error(f"處理文件時發生錯誤: {e}")
+            if st.checkbox("顯示詳細錯誤追蹤"):
+                st.exception(e)
+            if 'progress_bar' in locals():
+                progress_bar.progress(100, text="處理失敗!")
 
-        if recommendations:
-            st.markdown("---")
-            st.markdown("### 📈 分析結果")
-
-            render_kpi_cards(statistics)
-
-            render_results_table(recommendations, df, current_run_key)
-
-            render_statistics(statistics)
-
-            st.markdown("---")
-            st.success("✅ 分析完成!")
-
-            if st.session_state.get('excel_run_key') != current_run_key or 'excel_data' not in st.session_state:
-                with st.spinner("生成 Excel 文件..."):
-                    excel_generator = ExcelGenerator()
-                    st.session_state['excel_data'] = excel_generator.generate_excel_file(recommendations, statistics)
-                    st.session_state['excel_filename'] = excel_generator.output_filename
-                    st.session_state['excel_run_key'] = current_run_key
-
-            _excel_bytes = st.session_state.get('excel_data', b'')
-            _excel_filename = st.session_state.get('excel_filename', '調貨建議.xlsx')
-
-            render_download_button(_excel_bytes, _excel_filename, current_run_key)
-
-            progress_bar.progress(100, text="處理完畢!")
-        else:
-            st.info("根據當前規則，沒有生成任何調貨建議。")
-            progress_bar.progress(100, text="處理完畢!")
-
-    except Exception as e:
-        st.error(f"處理文件時發生錯誤: {e}")
-        if st.checkbox("顯示詳細錯誤追蹤"):
-            st.exception(e)
-        if 'progress_bar' in locals():
-            progress_bar.progress(100, text="處理失敗!")
-
-st.markdown("---")
-st.markdown(f"""
-<div style="text-align: center; color: #6C757D; padding: 30px 0;">
-    <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 {VERSION}</p>
-    <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown(f"""
+    <div style="text-align: center; color: #6C757D; padding: 30px 0;">
+        <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 {VERSION}</p>
+        <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
+    </div>
+    """, unsafe_allow_html=True)

@@ -139,4 +139,150 @@
         font-weight: 600;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     }
+
+    /* ===== Tutorial Page Styles ===== */
+    .flow-container {
+        padding: 16px;
+        background: #FAFBFC;
+        border: 1px solid #E1E4E8;
+        border-radius: 10px;
+        margin: 8px 0;
+        overflow-x: auto;
+    }
+
+    .flow-section {
+        margin: 12px 0;
+    }
+
+    .flow-label {
+        font-weight: 600;
+        font-size: 14px;
+        color: #24292F;
+        margin: 8px 0 4px 0;
+        border-left: 3px solid #4A90E2;
+        padding-left: 8px;
+    }
+
+    .mode-section {
+        margin: 12px 0;
+        padding: 16px;
+        background: #FFFFFF;
+        border: 1px solid #E1E4E8;
+        border-radius: 10px;
+    }
+
+    .mode-title {
+        color: #1A1A2E;
+        font-size: 16px;
+        margin: 0 0 8px 0;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #E1E4E8;
+    }
+
+    .mode-scenario {
+        font-size: 14px;
+        color: #4B5563;
+        margin: 4px 0 12px 0;
+        line-height: 1.6;
+    }
+
+    .mode-notes {
+        font-size: 13px;
+        color: #6B7280;
+        background: #FFF8E1;
+        border: 1px solid #FFE082;
+        border-radius: 6px;
+        padding: 8px 12px;
+        margin: 8px 0;
+        line-height: 1.6;
+    }
+
+    .mode-divider {
+        border: none;
+        border-top: 2px dashed #E1E4E8;
+        margin: 20px 0;
+    }
+
+    /* Match priority rows */
+    .match-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px;
+        background: #F6F8FA;
+        border-radius: 8px;
+    }
+
+    .match-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #FFFFFF;
+        border: 1px solid #D0D7DE;
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+
+    .match-num {
+        background: #4A90E2;
+        color: #FFFFFF;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+
+    .match-src {
+        color: #065F46;
+        font-weight: 600;
+    }
+
+    .match-arrow {
+        color: #9CA3AF;
+        font-size: 14px;
+    }
+
+    .match-dst {
+        color: #1E40AF;
+        font-weight: 600;
+    }
+
+    /* Scenario tables */
+    .scenario-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin: 4px 0;
+    }
+
+    .scenario-table th {
+        background: #4A90E2;
+        color: #FFFFFF;
+        padding: 6px 10px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .scenario-table td {
+        padding: 5px 10px;
+        text-align: center;
+        border-bottom: 1px solid #E5E7EB;
+        font-size: 12px;
+    }
+
+    .scenario-table tr:nth-child(even) td {
+        background: #F8FAFC;
+    }
+
+    .scenario-table tr:hover td {
+        background: #EFF6FF;
+    }
 </style>
