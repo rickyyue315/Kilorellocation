@@ -1,5 +1,5 @@
 """
-業務邏輯模組 v2.13.0
+業務邏輯模組 v2.14.0
 實現調貨規則、源/目的地識別和匹配算法
 支持二十四模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B2L(附加B特別模式-Type=L保留2件)/B2La(附加B特別模式-Type=L保留2件-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/B3L(附加B跨OM特別模式-Type=L保留2件)/B3La(附加B跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
 """
@@ -34,6 +34,16 @@ from services.post_processing import (
     optimize_single_piece_transfers as _optimize_single_piece_transfers_impl,
 )
 from strategies.predicates import is_hd_to_hk_restricted
+from models.mode_registry import (
+    MODE_DEFS,
+    get_mode_families,
+    get_all_mode_names,
+    get_cross_om_grouping_names,
+    get_cross_om_matching_names,
+    get_source_filter_names,
+    get_codes_needing_column,
+)
+from services.perf_timer import perf_timer
 
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
@@ -100,7 +110,7 @@ def _compute_max_protected_sold(df) -> float:
 
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.13.0"""
+    """調貨業務邏輯類 v2.14.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False):
@@ -113,81 +123,17 @@ class TransferLogic:
             else None
         )
         self.f2_allow_hd_transfer = f2_allow_hd_transfer
-        self.mode_a = "保守轉貨"  # A模式
-        self.mode_b = "加強轉貨"  # B模式
-        self.mode_b_special = "附加B(特別模式)"  # B2模式
-        self.mode_b_special_a = "附加B2a(特別模式-T遊客鋪不出貨)"  # B2a模式
-        self.mode_b2l = "附加B2L(特別模式-Type=L保留2件)"  # B2L模式
-        self.mode_b2la = "附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨)"  # B2La模式
-        self.mode_b3 = "附加B3(跨OM特別模式)"  # B3模式
-        self.mode_b3a = "附加B3a(跨OM特別模式-T遊客鋪不出貨)"  # B3a模式
-        self.mode_b3l = "附加B3L(跨OM特別模式-Type=L保留2件)"  # B3L模式
-        self.mode_b3la = "附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)"  # B3La模式
-        self.mode_c = "重點補0"  # C模式
-        self.mode_c1 = "重點補0-只補0/1"  # C1模式
-        self.mode_c2 = "附加C2(跨OM重點補0)"  # C2模式
-        self.mode_d = "清貨轉貨"  # D模式
-        self.mode_d2 = "清貨轉貨(ND限定)"  # D2模式：僅ND清貨轉出，RF不做轉出
-        self.mode_e1 = "強制轉出"  # E1模式（僅同OM）
-        self.mode_e1b = "強制轉出(優先類型接收)"  # E1b模式（僅同OM，接收優先Type=T/M）
-        self.mode_e2 = "強制轉出(跨OM)"  # E2模式（跨OM）
-        self.mode_f = "目標優化"  # F模式
-        self.mode_f_target_only = "F指定模式"  # F2模式（僅Target店舖接收）
-        self.mode_nd1 = "ND同OM轉貨"   # ND1模式（ND同OM互轉，智能銷量排序）
-        self.mode_nd2 = "ND混合OM轉貨"  # ND2模式（ND跨OM互轉，Windy只轉Windy）
-        self.mode_simplified_sku_same = "精簡SKU(限同OM)"
-        self.mode_simplified_sku_cross = "精簡SKU(跨OM)"
+        self._mode_by_name = {d.name: d for d in MODE_DEFS}
+        self._mode_by_code = {d.code: d for d in MODE_DEFS}
+        for d in MODE_DEFS:
+            setattr(self, d.attr_name, d.name)
 
-        # 模式家族映射（v2.11.2 優化）- 避免重複的 _is_*_mode() 邏輯
-        self.MODE_FAMILIES = {
-            'b_special': {
-                self.mode_b_special, self.mode_b_special_a,
-                self.mode_b2l, self.mode_b2la,
-                self.mode_b3, self.mode_b3a,
-                self.mode_b3l, self.mode_b3la,
-            },
-            'b3_family': {self.mode_b3, self.mode_b3a, self.mode_b3l, self.mode_b3la},
-            'b_tourist_no_source': {self.mode_b_special_a, self.mode_b2la, self.mode_b3a, self.mode_b3la},
-            'b_l_retain': {self.mode_b2l, self.mode_b2la, self.mode_b3l, self.mode_b3la},
-            'd_family': {self.mode_d, self.mode_d2},
-            'nd_transfer': {self.mode_nd1, self.mode_nd2},
-            'simplified_sku': {self.mode_simplified_sku_same, self.mode_simplified_sku_cross},
-        }
+        self.MODE_FAMILIES = get_mode_families()
 
-        b_special = self.MODE_FAMILIES['b_special']
-        b3_family = self.MODE_FAMILIES['b3_family']
-        simplified = self.MODE_FAMILIES['simplified_sku']
-
-        self._ALL_MODES = (
-            {self.mode_a, self.mode_b}
-            | b_special
-            | {self.mode_c, self.mode_c1, self.mode_c2}
-            | self.MODE_FAMILIES['d_family']
-            | {self.mode_e1, self.mode_e1b, self.mode_e2}
-            | {self.mode_f, self.mode_f_target_only}
-            | self.MODE_FAMILIES['nd_transfer']
-            | simplified
-        )
-
-        self._CROSS_OM_GROUPING_MODES = (
-            {self.mode_e2, self.mode_f, self.mode_f_target_only,
-             self.mode_c2, self.mode_nd2}
-            | b3_family
-        )
-
-        self._SOURCE_FILTER_MODES = (
-            {self.mode_e1, self.mode_e1b, self.mode_e2,
-             self.mode_f, self.mode_f_target_only, self.mode_c2,
-             self.mode_nd1, self.mode_nd2}
-            | b_special | simplified
-        )
-
-        self._CROSS_OM_MATCHING_MODES = (
-            {self.mode_e2, self.mode_f, self.mode_f_target_only,
-             self.mode_c2, self.mode_nd2}
-            | b3_family
-            | {self.mode_simplified_sku_cross}
-        )
+        self._ALL_MODES = get_all_mode_names()
+        self._CROSS_OM_GROUPING_MODES = get_cross_om_grouping_names()
+        self._SOURCE_FILTER_MODES = get_source_filter_names()
+        self._CROSS_OM_MATCHING_MODES = get_cross_om_matching_names()
 
         self._strategies = self._init_strategies()
 
@@ -259,24 +205,12 @@ class TransferLogic:
         return parse_target_series(df)
     
     def identify_sources(self, group_df: pd.DataFrame, mode: str, protected_sites: Optional[Set[str]] = None) -> List[Dict]:
-        """
-        識別轉出候選店鋪
-
-        Args:
-            group_df: 按Article和OM分組的DataFrame
-            mode: 轉貨模式
-
-        Returns:
-            轉出候選店鋪列表
-        """
-        if self._is_simplified_sku_mode(mode):
-            return self._sources_simplified_sku(group_df)
-        if self._is_nd_transfer_mode(mode):
-            return self._sources_nd_mode(group_df)
-        if mode in (self.mode_f, self.mode_f_target_only):
-            return self._sources_f_mode(group_df, mode, protected_sites)
-        if mode in (self.mode_e1, self.mode_e1b, self.mode_e2):
-            return self._sources_e_mode(group_df)
+        mode_def = self._mode_by_name.get(mode)
+        if mode_def and mode_def.source_method:
+            method = getattr(self, mode_def.source_method)
+            if mode_def.source_method == '_sources_f_mode':
+                return method(group_df, mode, protected_sites)
+            return method(group_df)
         return self._sources_general(group_df, mode)
 
     def _sources_simplified_sku(self, group_df: pd.DataFrame) -> List[Dict]:
@@ -607,30 +541,12 @@ class TransferLogic:
         return sources
     
     def identify_destinations(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
-        """
-        識別接收候選店鋪
-        
-        Args:
-            group_df: 按Article和OM分組的DataFrame
-            mode: 轉貨模式
-
-        Returns:
-            接收候選店鋪列表
-        """
-        if self._is_simplified_sku_mode(mode):
-            return self._dests_simplified_sku(group_df)
-        if self._is_nd_transfer_mode(mode):
-            return self._dests_nd_mode(group_df)
-        if mode in (self.mode_f, self.mode_f_target_only):
-            return self._dests_f_mode(group_df, mode)
-        if mode in (self.mode_e1, self.mode_e1b, self.mode_e2):
-            return self._dests_e_mode(group_df, mode)
-        if self._is_b_special_mode(mode):
-            return self._dests_b_special(group_df)
-        if self._is_d_family_mode(mode):
-            return self._dests_d_mode(group_df)
-        if mode == self.mode_c1:
-            return self._dests_c1_mode(group_df)
+        mode_def = self._mode_by_name.get(mode)
+        if mode_def and mode_def.dest_method:
+            method = getattr(self, mode_def.dest_method)
+            if mode_def.dest_method in ('_dests_f_mode', '_dests_e_mode'):
+                return method(group_df, mode)
+            return method(group_df)
         return self._dests_general(group_df, mode)
 
     def _dests_simplified_sku(self, group_df: pd.DataFrame) -> List[Dict]:
@@ -939,6 +855,7 @@ class TransferLogic:
     def _optimize_single_piece_transfers(self, recommendations: List[Dict], mode: str) -> List[Dict]:
         return _optimize_single_piece_transfers_impl(recommendations, mode, self._create_recommendation_note)
     
+    @perf_timer("generate_transfer_recommendations")
     def generate_transfer_recommendations(self, df: pd.DataFrame, mode: str) -> List[Dict]:
         """
         生成所有調貨建議
@@ -957,8 +874,10 @@ class TransferLogic:
             raise ValueError(f"無效的轉貨模式: {mode}")
 
         # E模式必須存在ALL欄位；若不存在則直接拋出明確錯誤
-        if mode in (self.mode_e1, self.mode_e1b, self.mode_e2) and 'ALL' not in df.columns:
-            raise ValueError("E模式需要ALL欄位")
+        mode_def = self._mode_by_name[mode]
+        for col in mode_def.required_columns:
+            if col not in df.columns:
+                raise ValueError(f"{mode_def.code}模式需要{col}欄位")
         
         # 根據模式選擇分組方式
         if mode in self._CROSS_OM_GROUPING_MODES:
@@ -1021,26 +940,15 @@ class TransferLogic:
             else:
                 article, om = group_keys
             
-            # E1/E1b模式：僅同OM配對
-            if mode in (self.mode_e1, self.mode_e1b):
-                recommendations = self._strategies['e1_mode'].match(sources, destinations, article, product_desc, mode, om=om)
-            # E2模式：跨OM強制轉出
-            elif mode == self.mode_e2:
-                recommendations = self._strategies['e2_mode'].match(
-                    sources, destinations, article, product_desc, mode, om=om, group_df=group_df)
-            elif mode in (self.mode_f, self.mode_f_target_only):
-                recommendations = self._strategies['f_mode'].match(sources, destinations, article, product_desc, mode)
-            elif mode == self.mode_c2:
-                recommendations = self._strategies['c2_mode'].match(sources, destinations, article, product_desc, mode)
-            # ND1 模式：同 OM 配對
-            elif mode == self.mode_nd1:
-                recommendations = self._strategies['nd_mode'].match(sources, destinations, article, product_desc, mode, om=om)
-            # ND2 模式：跨 OM 配對 + Windy 限制
-            elif mode == self.mode_nd2:
-                recommendations = self._strategies['nd_mode'].match(sources, destinations, article, product_desc, mode, om=om)
-            # 精簡SKU模式
-            elif self._is_simplified_sku_mode(mode):
-                recommendations = self._strategies['simplified_sku'].match(sources, destinations, article, product_desc, mode)
+            strategy_key = mode_def.strategy_key
+            if strategy_key:
+                strategy = self._strategies[strategy_key]
+                kwargs = {}
+                if strategy_key in ('e1_mode', 'e2_mode', 'nd_mode'):
+                    kwargs['om'] = om
+                if strategy_key == 'e2_mode':
+                    kwargs['group_df'] = group_df
+                recommendations = strategy.match(sources, destinations, article, product_desc, mode, **kwargs)
             else:
                 recommendations = self.match_transfers(article, om, sources, destinations, product_desc, mode)
             

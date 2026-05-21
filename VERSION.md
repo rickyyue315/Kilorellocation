@@ -1,5 +1,30 @@
 # 版本更新記錄
 
+## v2.14.0 (2026-05-21)
+
+### 模式參數化表 + 效能架構準備
+
+#### 模式註冊表（Mode Registry）
+- `models/mode_registry.py`：新增 `ModeDef` dataclass + 24 筆 `MODE_DEFS` + 衍生查詢函式（`get_mode_def`、`get_mode_families`、`get_ui_options`、`get_receive_limit_codes` 等）
+- `models/mode.py`：改為從 `mode_registry.py` 衍生（`MODE_NAME_MAP`、`MODE_DESCRIPTIONS`、`RECEIVE_SITE_LIMIT_MODE_CODES`），保持向後兼容匯出
+- `ui/sidebar.py`：`_MODE_OPTIONS` 改為 `get_ui_options()` 自動生成，`RECEIVE_SITE_LIMIT_MODE_CODES` 改為 `get_receive_limit_codes()`
+- `business_logic.py`：`__init__` 中 24 個 `self.mode_*` 常數改為從 registry 自動 `setattr`；`MODE_FAMILIES`、`_ALL_MODES`、`_CROSS_OM_*`、`_SOURCE_FILTER_MODES` 改為從 registry 衍生
+- `business_logic.py`：`identify_sources/destinations` 路由改為 registry 查表；`generate_transfer_recommendations` 策略路由改為 `strategy_key` 查表
+
+#### 效能架構準備
+- `services/perf_timer.py`：新增可選計時 decorator，預設關閉（`KILO_PERF_TIMING=1` 才啟用）
+- `services/matching_engine.py`：新增架構文檔 docstring（平行化準備說明）
+- `business_logic.py`：`generate_transfer_recommendations` 加上 `@perf_timer` 裝飾
+
+#### 測試新增
+- `tests/test_mode_registry.py`：25 項測試涵蓋 registry 資料完整性、衍生查詢函式、向後兼容匯出
+
+#### 影響範圍
+- 純內部重構，無外部 API 變更
+- 所有 268 項測試全部通過（243 既有 + 25 新增）
+- 不影響 Zeabur 或 Streamlit Community Cloud 部署
+- 新增第 25 種模式時，只需在 `MODE_DEFS` 加 1 筆記錄（+ 新策略類別如需要）
+
 ## v2.13.0 (2026-05-21)
 
 ### 程式碼重構與測試強化

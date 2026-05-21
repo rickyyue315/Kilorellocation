@@ -7,22 +7,12 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from config import VERSION
-from models.mode import MODE_DESCRIPTIONS, RECEIVE_SITE_LIMIT_MODE_CODES
+from models.mode import MODE_DESCRIPTIONS
+from models.mode_registry import get_ui_options, get_receive_limit_codes
 from ui.mojibake import fix_mojibake_text
 
 
-_MODE_OPTIONS = [
-    "A: 保守轉貨", "B: 加強轉貨", "B2: 附加B(特別模式)", "B2a: 附加B2a(特別模式-T遊客鋪不出貨)",
-    "B2L: 附加B2L(特別模式-Type=L保留2件)", "B2La: 附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨)",
-    "B3: 附加B(跨OM特別模式)", "B3a: 附加B3a(跨OM特別模式-T遊客鋪不出貨)",
-    "B3L: 附加B3L(跨OM特別模式-Type=L保留2件)", "B3La: 附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)",
-    "C: 重點補0", "C1: 重點補0(只補0/1)", "C2: 附加C(跨OM重點補0)",
-    "D: 清貨轉貨", "D2: 清貨轉貨(ND限定)",
-    "E1: 強制轉出", "E1b: 強制轉出(優先類型接收)", "E2: 強制轉出(跨OM)",
-    "F: 目標優化", "F2: F指定模式",
-    "ND1: ND同OM轉貨", "ND2: ND混合OM轉貨",
-    "精簡SKU(限同OM): 精簡SKU限同OM", "精簡SKU(跨OM): 精簡SKU跨OM",
-]
+_MODE_OPTIONS = get_ui_options()
 
 
 def render_sidebar() -> Dict:
@@ -116,7 +106,7 @@ def render_sidebar() -> Dict:
         b_special_max_receive_sites_per_source: Optional[int] = None
         b_special_receive_site_limit_option = "最多 2 間"
 
-        if mode_code in RECEIVE_SITE_LIMIT_MODE_CODES:
+        if mode_code in get_receive_limit_codes():
             b_special_receive_site_limit_option = st.radio(
                 "出貨店舖配對接收店數限制",
                 ["優先 1 間", "最多 2 間", "不限制"],

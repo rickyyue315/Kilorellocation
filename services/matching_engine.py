@@ -1,5 +1,17 @@
 """
 匹配引擎模組 — 核心配對邏輯、前置過濾、轉移量計算、通用模式多回合匹配
+
+架構說明（效能擴展準備）：
+- can_transfer / compute_transfer_qty 接近純函式，僅依賴 logic 的：
+  - MODE_FAMILIES（可用 frozen dict 替代）
+  - b_special_max_receive_sites_per_source（數值）
+  - _is_*_mode() 方法（可用 frozenset membership 替代）
+  - _get_b_special_sales_total()（純計算）
+- match_by_priority / match_general_mode 透過 can_transfer/compute_transfer_qty 間接純函式化
+- 若需平行化：
+  1. 將 logic 依賴提取為 frozen dataclass ModeContext
+  2. 各函式改為 (ctx: ModeContext, ...) 簽名
+  3. 使用 multiprocessing.Pool 或 concurrent.futures 按 Article 分組平行執行
 """
 
 from typing import Any, Dict, List, Optional, Set, Tuple
