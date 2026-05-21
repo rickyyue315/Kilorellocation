@@ -1,5 +1,24 @@
 # 版本更新記錄
 
+## v2.13.0 (2026-05-21)
+
+### 程式碼重構與測試強化
+
+#### 模組拆分
+- `services/target_utils.py`：Target 解析、正規化、ND 衝突偵測等共用函式（從 `app.py` 及 `business_logic.py` 抽出）
+- `services/matching_engine.py`：核心配對邏輯（`match_by_priority`、`can_transfer`、`compute_transfer_qty`、`match_general_mode`）從 `business_logic.py` 抽出
+- `services/post_processing.py`：後處理邏輯（`optimize_single_piece_transfers`、`refresh_recommendation_fields`、銷量計算）從 `business_logic.py` 抽出
+- `business_logic.py` 保留 `TransferLogic` 類別作為 facade，以薄委派（thin delegation）方式呼叫新模組，所有公開 API 不變
+
+#### 測試新增
+- `tests/test_data_processor.py`：31 項測試涵蓋 `read_excel_file`、`validate_columns`、`validate_file_format`、`convert_data_types`、`fill_default_store_data`、`handle_missing_values`、`correct_outliers`、`calculate_effective_sold_qty`、`preprocess_data`
+- `tests/test_excel_generator.py`：10 項測試涵蓋 `generate_filename`、`_generate_remark`、`generate_excel_file`（回傳格式、雙工作表、空建議、欄位驗證等）
+
+#### 影響範圍
+- 純內部重構，無外部 API 變更
+- 243 項既有 + 新增測試全部通過
+- 不影響 Zeabur 或 Streamlit Community Cloud 部署
+
 ## v2.12.0 (2026-05-19)
 
 ### 新增模式教學分頁

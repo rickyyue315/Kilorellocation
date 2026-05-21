@@ -1,26 +1,13 @@
 """
-業務邏輯模組 v2.11.3
+業務邏輯模組 v2.13.0
 實現調貨規則、源/目的地識別和匹配算法
 支持二十四模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B2L(附加B特別模式-Type=L保留2件)/B2La(附加B特別模式-Type=L保留2件-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/B3L(附加B跨OM特別模式-Type=L保留2件)/B3La(附加B跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
-A模式：當actual_transferable=1且remaining_stock>=3時，上調至2件（放寬Safety Stock -1）
-優化接收條件和避免同一SKU的轉出店鋪同時接收
-基於累計接收數量判斷是否達到最低保障標準的機制
-強化ND店鋪限制：所有模式下ND店鋪只能轉出，不能接收（ND1/ND2模式除外）
-D模式特殊規則：ND清貨轉出避免1件餘貨
-C2模式特殊規則：參照C模式邏輯但允許跨OM配對，HD不能轉到HA/HB/HC，Windy轉出只能到Windy
-E1模式：強制轉出（僅同OM配對）
-E1b模式：強制轉出（僅同OM配對，接收優先Type=T/M）
-E2模式：強制轉出（允許跨OM配對）
-ND1模式：ND店舖同OM互轉，基於銷量排序智能調配，RF緊急缺貨優先，ND潛在缺貨次之
-ND2模式：ND店舖跨OM互轉，Windy只能轉Windy，其餘邏輯同ND1
-後處理：所有模式輸出後統一套用_optimize_single_piece_transfers，消除單筆Transfer Qty=1的調貨記錄
 """
 
 import pandas as pd
 import numpy as np
 from typing import Any, Dict, List, Tuple, Optional, Set  # noqa: F401 — Set used in signature defaults
 import logging
-import unicodedata
 
 from config import (
     A_MODE_PERCENTAGE_CAP, A_MODE_MIN_TRANSFER,
@@ -33,6 +20,19 @@ from config import (
     ND_RECEIVE_MULTIPLIER,
 )
 from services.recommendation_factory import build_recommendation, apply_transfer
+from services.target_utils import parse_target_series
+from services.matching_engine import (
+    compute_transfer_qty as _compute_transfer_qty_impl,
+    can_transfer as _can_transfer_impl,
+    match_by_priority as _match_by_priority_impl,
+    match_general_mode as _match_general_mode_impl,
+)
+from services.post_processing import (
+    get_record_sales_total as _get_record_sales_total_impl,
+    infer_source_rp_type as _infer_source_rp_type_impl,
+    refresh_recommendation_fields as _refresh_recommendation_fields_impl,
+    optimize_single_piece_transfers as _optimize_single_piece_transfers_impl,
+)
 from strategies.predicates import is_hd_to_hk_restricted
 
 # 設置日誌
@@ -100,7 +100,7 @@ def _compute_max_protected_sold(df) -> float:
 
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.11.3"""
+    """調貨業務邏輯類 v2.13.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False):
@@ -256,24 +256,7 @@ class TransferLogic:
         return int(data.get('last_month_sold_qty', 0) or 0) + int(data.get('mtd_sold_qty', 0) or 0)
 
     def _parse_target_series(self, df: pd.DataFrame) -> pd.Series:
-        """將 Target 欄位安全轉為數值，支援全形數字與千分位逗號。"""
-        if 'Target' not in df.columns:
-            return pd.Series(np.nan, index=df.index)
-
-        def _normalize_target(value: Any) -> Any:
-            if pd.isna(value):
-                return np.nan
-            text = str(value).strip()
-            if text == "":
-                return np.nan
-            text = unicodedata.normalize('NFKC', text).replace(',', '')
-            return text
-
-        normalized = df['Target'].map(_normalize_target)
-        parsed = pd.to_numeric(normalized, errors='coerce')
-        if isinstance(parsed, pd.Series):
-            return parsed
-        return pd.Series(parsed, index=df.index)
+        return parse_target_series(df)
     
     def identify_sources(self, group_df: pd.DataFrame, mode: str, protected_sites: Optional[Set[str]] = None) -> List[Dict]:
         """
@@ -905,227 +888,29 @@ class TransferLogic:
         Returns:
             匹配成功的調貨建議列表
         """
-        recommendations = []
-
-        # B2/B2a/B3/B3a模式特殊處理：Type L優先轉出
         if self._is_b_special_mode(mode):
             return self._strategies['b_special'].match(sources, destinations, article, product_desc, mode)
-        
-        # E1/E2模式由generate_transfer_recommendations直接調用對應的匹配函數處理
-        # 此處不需要處理E1/E2模式
 
-        # F/F2模式特殊處理：Target優先接收 + 跨OM匹配
         if mode in (self.mode_f, self.mode_f_target_only):
             return self._strategies['f_mode'].match(sources, destinations, article, product_desc, mode)
         
-        # C2模式特殊處理：C模式邏輯 + 跨OM匹配
         if mode == self.mode_c2:
             return self._strategies['c2_mode'].match(sources, destinations, article, product_desc, mode)
 
-        # 精簡SKU模式特殊處理
         if self._is_simplified_sku_mode(mode):
             return self._strategies['simplified_sku'].match(sources, destinations, article, product_desc, mode)
-        
-        # 複製源和目的地列表，避免修改原始數據
-        temp_sources = [s.copy() for s in sources]
-        for s in temp_sources:
-            s['total_transferred'] = 0
-        temp_destinations = [d.copy() for d in destinations]
-        
-        # 記錄已經作為轉出店鋪的站點，避免它們同時作為接收店鋪
-        transfer_sites = set()
-        
-        # 記錄已經作為接收店鋪的站點，避免它們同時作為轉出店鋪
-        receive_sites = set()
-        
-        # 記錄接收店鋪的累計接收數量
-        received_qty_by_site = {}
-        
-        # 按優先級順序進行匹配
-        # 0a. C模式特殊處理：ND轉出 -> 重點補0（優先補充零庫存店）
-        if mode == self.mode_c:
-            self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                   article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site, mode, None, '重點補0',
-                                   receive_sites=receive_sites)
-        
-        # 1. ND轉出 -> 緊急缺貨
-        self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site, mode,
-                               receive_sites=receive_sites)
-        
-        # 2. ND轉出 -> 潛在缺貨
-        self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 1, 2, transfer_sites, received_qty_by_site, mode,
-                               receive_sites=receive_sites)
-        
-        # 2a. C1模式特殊處理：RF過剩轉出 -> 重點補0（明確分離回合，可轉量較大優先）
-        if mode == self.mode_c1:
-            self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                   article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出', '重點補0',
-                                   receive_sites=receive_sites)
-        
-        # 3. RF過剩轉出 -> 緊急缺貨
-        self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出',
-                               receive_sites=receive_sites)
-        
-        # 4. RF過剩轉出 -> 潛在缺貨
-        self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出',
-                               receive_sites=receive_sites)
-        
-        # 4a. C模式特殊處理：RF過剩轉出 -> 重點補0
-        if mode == self.mode_c:
-            self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                   article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出', '重點補0',
-                                   receive_sites=receive_sites)
-        
-        # 4b. C1模式特殊處理：RF加強轉出 -> 重點補0（明確分離回合）
-        if mode == self.mode_c1:
-            self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                   article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出', '重點補0',
-                                   receive_sites=receive_sites)
-        
-        # 5. RF加強轉出 -> 緊急缺貨
-        self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出',
-                               receive_sites=receive_sites)
-        
-        # 6. RF加強轉出 -> 潛在缺貨
-        self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                               article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF加強轉出',
-                               receive_sites=receive_sites)
-        
-        # 6a. C模式特殊處理：RF加強轉出 -> 重點補0
-        if mode == self.mode_c:
-            self._match_by_priority(temp_sources, temp_destinations, recommendations, 
-                                   article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出', '重點補0',
-                                   receive_sites=receive_sites)
-        
-        return recommendations
+
+        return _match_general_mode_impl(self, sources, destinations, article, om, product_desc, mode)
 
     def _compute_transfer_qty(self, source: Dict, dest: Dict, mode: str, current_received_qty: int) -> int:
-        transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
-
-        if self._is_b_special_mode(mode) and 'target_qty' in dest:
-            remaining_capacity = dest['target_qty'] - current_received_qty
-            transfer_qty = min(transfer_qty, remaining_capacity)
-        elif dest['dest_type'] == '重點補0':
-            remaining_needed = dest['target_qty'] - current_received_qty
-            transfer_qty = min(transfer_qty, remaining_needed)
-        elif self._is_d_family_mode(mode) and 'target_qty' in dest:
-            remaining_capacity = dest['target_qty'] - current_received_qty
-            transfer_qty = min(transfer_qty, remaining_capacity)
-
-        if self._is_d_family_mode(mode) and source['rp_type'] == 'ND':
-            already_out = source.get('total_transferred', 0)
-            remaining_after = source['original_stock'] - already_out - transfer_qty
-            if remaining_after == 1:
-                if source['transferable_qty'] >= transfer_qty + 1:
-                    transfer_qty += 1
-                elif transfer_qty > 1:
-                    transfer_qty -= 1
-
-        if transfer_qty == 1 and source['transferable_qty'] >= 2:
-            if source['source_type'] in ['ND轉出', 'ND清貨轉出', 'RF加強轉出', 'RF過剩轉出']:
-                already_out_opt = source.get('total_transferred', 0)
-                remaining_after_opt = source['original_stock'] - already_out_opt - 2
-                if self._is_d_family_mode(mode) and source['rp_type'] == 'ND' and remaining_after_opt == 1:
-                    if source['transferable_qty'] >= 3:
-                        transfer_qty = 3
-                else:
-                    if dest['needed_qty'] >= 2 or (mode == self.mode_a and source['source_type'] == 'RF過剩轉出'):
-                        transfer_qty = 2
-
-        transfer_qty = min(transfer_qty, source['transferable_qty'])
-
-        if self._is_b_special_mode(mode) and 'target_qty' in dest:
-            transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
-        elif dest['dest_type'] == '重點補0' and 'target_qty' in dest:
-            transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
-        elif self._is_d_family_mode(mode) and 'target_qty' in dest:
-            transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
-
-        if self._is_d_family_mode(mode) and source['rp_type'] == 'ND':
-            final_remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-            if final_remaining == 1:
-                if source['transferable_qty'] >= transfer_qty + 1:
-                    transfer_qty += 1
-                elif transfer_qty > 1:
-                    transfer_qty -= 1
-
-        return max(transfer_qty, 0)
+        return _compute_transfer_qty_impl(self, source, dest, mode, current_received_qty)
 
     def _can_transfer(self, source: Dict, dest: Dict, mode: str, article: str,
                       transfer_sites: set, receive_sites: set, 
                       source_to_receive_sites: Dict, received_qty_by_site: Dict,
                       source_type_filter: Optional[str] = None) -> bool:
-        """
-        前置過濾：檢查轉出/接收是否允許（v2.11.2 優化）
-        
-        減少 _match_by_priority() 中的嵌套，提高可讀性
-        """
-        # 檢查1：避免同一店鋪自我調貨
-        if source['site'] == dest['site']:
-            return False
-        
-        # 檢查2：避免轉出店鋪同時作為接收店鋪
-        if dest['site'] in transfer_sites:
-            return False
-        
-        # 檢查3：避免已接收的店鋪同時作為轉出店鋪
-        if source['site'] in receive_sites:
-            return False
-        
-        # 檢查4：確保接收店鋪不是ND類型
-        if dest.get('rp_type') == 'ND':
-            return False
-        
-        # 檢查5：B2/B3店舖數量限制
-        if self.b_special_max_receive_sites_per_source is not None:
-            source_site = source.get('site')
-            matched_sites = source_to_receive_sites.get(source_site, set())
-            if dest.get('site') not in matched_sites and len(matched_sites) >= self.b_special_max_receive_sites_per_source:
-                return False
-        
-        # 檢查6：HD/Windy 跨OM限制
-        if source.get('om') and dest.get('om') and source.get('om') != dest.get('om'):
-            if is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
-                return False
-            if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
-                return False
-        
-        # 檢查7：B3 系列特殊限制
-        if self._is_b3_family_mode(mode):
-            if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
-                return False
-            if is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
-                return False
-        
-        # 檢查8：B Special Mix 銷售守衛
-        if self._is_b_special_mode(mode) and str(source.get('store_type', '')).upper() == 'M':
-            source_sales_total = self._get_b_special_sales_total(source)
-            dest_sales_total = self._get_b_special_sales_total(dest)
-            if source_sales_total > 0 and source_sales_total > dest_sales_total:
-                return False
-        
-        # 檢查9：接收上限（B/C/D 模式）
-        receive_site_key = f"{dest['site']}_{article}"
-        current_received_qty = received_qty_by_site.get(receive_site_key, 0)
-        
-        if self._is_b_special_mode(mode) and 'target_qty' in dest:
-            if current_received_qty >= dest['target_qty']:
-                return False
-        
-        if dest['dest_type'] == '重點補0' and 'target_qty' in dest:
-            if current_received_qty >= dest['target_qty']:
-                return False
-        
-        if self._is_d_family_mode(mode) and 'target_qty' in dest:
-            if current_received_qty >= dest['target_qty']:
-                return False
-        
-        return True
+        return _can_transfer_impl(self, source, dest, mode, article, transfer_sites, receive_sites,
+                                  source_to_receive_sites, received_qty_by_site, source_type_filter)
 
     def _match_by_priority(self, sources: List[Dict], destinations: List[Dict], 
                           recommendations: List[Dict], article: str, group_id: str, 
@@ -1137,265 +922,22 @@ class TransferLogic:
                           receive_sites: set = None,
                           source_to_receive_sites: Optional[Dict[str, set]] = None,
                           max_receive_sites_per_source: Optional[int] = None):
-        """
-        按指定優先級進行匹配
-        
-        Args:
-            sources: 轉出候選店鋪列表
-            destinations: 接收候選店鋪列表
-            recommendations: 調貨建議列表
-            article: 商品編號
-            group_id: 分組ID（OM）
-            product_desc: 商品描述
-            source_priority: 轉出優先級
-            dest_priority: 接收優先級
-            transfer_sites: 已經作為轉出店鋪的站點集合
-            received_qty_by_site: 接收店鋪的累計接收數量字典
-            source_type_filter: 轉出類型過濾器（可選）
-            dest_type_filter: 接收類型過濾器（可選）
-            receive_sites: 已經作為接收店鋪的站點集合（可選，防止接收店同時做轉出）
-            source_to_receive_sites: source店鋪已配對的receive店鋪集合（可選）
-            max_receive_sites_per_source: 每個source在同一SKU最多可配對的receive店鋪數（可選）
-        """
-        if receive_sites is None:
-            receive_sites = set()
-        if source_to_receive_sites is None:
-            source_to_receive_sites = {}
-        # 篩選指定優先級的源和目的地
-        filtered_sources = [s for s in sources if s['priority'] == source_priority and s['transferable_qty'] > 0]
-
-        # C1模式優先使用可轉量較大的來源，減少拆單與單件來源先被耗用
-        if mode == self.mode_c1:
-            filtered_sources.sort(
-                key=lambda x: (
-                    -int(x.get('transferable_qty', 0)),
-                    int(x.get('effective_sold_qty', 0))
-                )
-            )
-        
-        # 如果指定了轉出類型過濾器，則按類型篩選
-        if source_type_filter:
-            filtered_sources = [s for s in filtered_sources if s['source_type'] == source_type_filter]
-        
-        filtered_destinations = [d for d in destinations if d['priority'] == dest_priority and d['needed_qty'] > 0]
-        
-        # 如果指定了接收類型過濾器，則按類型篩選
-        if dest_type_filter:
-            filtered_destinations = [d for d in filtered_destinations if d['dest_type'] == dest_type_filter]
-        
-        # 執行匹配
-        for source in filtered_sources:
-            source_added_to_transfer = source['site'] in transfer_sites
-            
-            for dest in filtered_destinations:
-                if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
-                    continue
-                
-                # 使用統一的前置過濾函數（v2.11.2 優化）- 減少代碼重複 -60 行
-                if not self._can_transfer(source, dest, mode, article, transfer_sites, receive_sites,
-                                         source_to_receive_sites, received_qty_by_site, source_type_filter):
-                    continue
-                
-                # 確定轉移數量
-                receive_site_key = f"{dest['site']}_{article}"
-                current_received_qty = received_qty_by_site.get(receive_site_key, 0)
-                
-                transfer_qty = self._compute_transfer_qty(
-                    source, dest, mode, current_received_qty)
-                
-                if transfer_qty <= 0:
-                    continue
-                
-                # 創建調貨建議
-                notes = self._create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode)
-                recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received_qty)
-                recommendations.append(recommendation)
-
-                apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received_qty)
-
-                # 將轉出店鋪添加到轉出集合（只在實際產生轉移後才添加）
-                if source['site'] not in transfer_sites:
-                    transfer_sites.add(source['site'])
-                
-                # 將接收店鋪添加到接收集合（防止已接收的店舖再做轉出）
-                receive_sites.add(dest['site'])
-
-                # 記錄source已配對的receive店鋪（用於限制每個source的配對店數）
-                source_site = source.get('site')
-                matched_sites = source_to_receive_sites.setdefault(source_site, set())
-                matched_sites.add(dest['site'])
-                
-                # 更新目標達成標誌
-                if dest['dest_type'] == '重點補0' and received_qty_by_site[receive_site_key] >= dest.get('target_qty', float('inf')):
-                    dest['needed_qty'] = 0
-                elif self._is_b_special_mode(mode) and 'target_qty' in dest and received_qty_by_site[receive_site_key] >= dest['target_qty']:
-                    dest['needed_qty'] = 0
-                elif self._is_d_family_mode(mode) and 'target_qty' in dest and received_qty_by_site[receive_site_key] >= dest['target_qty']:
-                    dest['needed_qty'] = 0
+        _match_by_priority_impl(self, sources, destinations, recommendations, article, group_id,
+                                product_desc, source_priority, dest_priority, transfer_sites,
+                                received_qty_by_site, mode, source_type_filter, dest_type_filter,
+                                receive_sites, source_to_receive_sites, max_receive_sites_per_source)
 
     def _get_record_sales_total(self, rec: Dict[str, Any], prefix: str) -> int:
-        """取得建議記錄中指定端點的總銷量（上月 + MTD）。"""
-        last_month = int(rec.get(f'{prefix} Last Month Sold Qty', 0) or 0)
-        mtd = int(rec.get(f'{prefix} MTD Sold Qty', 0) or 0)
-        return last_month + mtd
+        return _get_record_sales_total_impl(rec, prefix)
 
     def _infer_source_rp_type(self, source_type: str) -> str:
-        """根據來源類型文字推斷RP Type，避免重建備註時缺欄位。"""
-        return 'ND' if 'ND' in str(source_type) else 'RF'
+        return _infer_source_rp_type_impl(source_type)
 
     def _refresh_recommendation_fields(self, recommendations: List[Dict], mode: str) -> None:
-        """重算優化後的庫存/累計欄位與備註，確保輸出一致。"""
-        source_running: Dict[Tuple[str, str, str], int] = {}
-        receive_running: Dict[Tuple[str, str], int] = {}
-
-        for rec in recommendations:
-            qty = int(rec.get('Transfer Qty', 0) or 0)
-            rec['Transfer Qty'] = qty
-
-            source_key = (
-                str(rec.get('Article', '')),
-                str(rec.get('Transfer Site', '')),
-                str(rec.get('Transfer OM', '')),
-            )
-            receive_key = (
-                str(rec.get('Article', '')),
-                str(rec.get('Receive Site', '')),
-            )
-
-            source_before = source_running.get(source_key, 0)
-            receive_before = receive_running.get(receive_key, 0)
-            original_stock = int(rec.get('Original Stock', 0) or 0)
-
-            rec['After Transfer Stock'] = original_stock - (source_before + qty)
-            rec['Cumulative Received Qty'] = receive_before + qty
-
-            source_running[source_key] = source_before + qty
-            receive_running[receive_key] = receive_before + qty
-
-            source_info = {
-                'source_type': rec.get('Source Type', ''),
-                'priority': int(rec.get('Source Priority', 2) or 2),
-                'rp_type': self._infer_source_rp_type(str(rec.get('Source Type', ''))),
-                'original_stock': original_stock,
-                'total_transferred': source_before,
-                'last_month_sold_qty': int(rec.get('Transfer Site Last Month Sold Qty', 0) or 0),
-                'mtd_sold_qty': int(rec.get('Transfer Site MTD Sold Qty', 0) or 0),
-                'om': rec.get('Transfer OM', ''),
-            }
-            dest_info = {
-                'dest_type': rec.get('Destination Type', ''),
-                'priority': int(rec.get('Destination Priority', 2) or 2),
-                'target_qty': int(rec.get('Target Qty', 0) or 0),
-                'safety_stock': int(rec.get('Safety Stock', 0) or 0),
-                'current_stock': int(rec.get('Receive Original Stock', 0) or 0),
-                'pending_received': 0,
-                'rp_type': 'RF',
-                'last_month_sold_qty': int(rec.get('Receive Site Last Month Sold Qty', 0) or 0),
-                'mtd_sold_qty': int(rec.get('Receive Site MTD Sold Qty', 0) or 0),
-                'om': rec.get('Receive OM', ''),
-            }
-            rec['Notes'] = self._create_recommendation_note(source_info, dest_info, receive_before, qty, mode)
+        _refresh_recommendation_fields_impl(recommendations, mode, self._create_recommendation_note)
 
     def _optimize_single_piece_transfers(self, recommendations: List[Dict], mode: str) -> List[Dict]:
-        """
-        全模式後處理：盡量消除同一來源店舖下的1件調貨。
-        例外：若該來源店舖該SKU總調貨量本身只有1件，則保留1件。
-        """
-        if not recommendations:
-            return recommendations
-
-        groups: Dict[Tuple[str, str, str], List[Dict]] = {}
-        for rec in recommendations:
-            key = (
-                str(rec.get('Article', '')),
-                str(rec.get('Transfer Site', '')),
-                str(rec.get('Transfer OM', '')),
-            )
-            groups.setdefault(key, []).append(rec)
-
-        has_change = False
-
-        for group_recs in groups.values():
-            if len(group_recs) <= 1:
-                continue
-
-            total_qty = sum(int(r.get('Transfer Qty', 0) or 0) for r in group_recs)
-            if total_qty <= 1:
-                continue
-
-            max_iterations = len(group_recs) + 2
-            iteration = 0
-            while iteration < max_iterations:
-                iteration += 1
-                singles = [r for r in group_recs if int(r.get('Transfer Qty', 0) or 0) == 1]
-                if not singles:
-                    break
-
-                group_changed = False
-
-                for single_rec in singles:
-                    if int(single_rec.get('Transfer Qty', 0) or 0) != 1:
-                        continue
-
-                    other_recs = [r for r in group_recs if r is not single_rec and int(r.get('Transfer Qty', 0) or 0) > 0]
-                    if not other_recs:
-                        continue
-
-                    # 方案1：從大單挪1件給1件單，直接變2件（避免出現1件）。
-                    donors_ge3 = [r for r in other_recs if int(r.get('Transfer Qty', 0) or 0) >= 3]
-                    if donors_ge3:
-                        donor = max(
-                            donors_ge3,
-                            key=lambda r: (
-                                int(r.get('Transfer Qty', 0) or 0),
-                                self._get_record_sales_total(r, 'Receive Site'),
-                            ),
-                        )
-                        donor['Transfer Qty'] = int(donor.get('Transfer Qty', 0) or 0) - 1
-                        single_rec['Transfer Qty'] = 2
-                        group_changed = True
-                        has_change = True
-                        continue
-
-                    # 方案2：若無法挪出（例如只有2+1），將1件合併到較高銷量目的店。
-                    merge_targets = [r for r in other_recs if int(r.get('Transfer Qty', 0) or 0) >= 2]
-                    if merge_targets:
-                        best_target = max(
-                            merge_targets,
-                            key=lambda r: (
-                                self._get_record_sales_total(r, 'Receive Site'),
-                                int(r.get('Transfer Qty', 0) or 0),
-                            ),
-                        )
-                        single_sales = self._get_record_sales_total(single_rec, 'Receive Site')
-                        target_sales = self._get_record_sales_total(best_target, 'Receive Site')
-
-                        if len(group_recs) == 2 or single_sales <= target_sales:
-                            best_target['Transfer Qty'] = int(best_target.get('Transfer Qty', 0) or 0) + 1
-                            single_rec['Transfer Qty'] = 0
-                            group_changed = True
-                            has_change = True
-                        else:
-                            # 方案3：銷量較高的1件單不願合併，改從2件單挪1件使其變2件
-                            donor_ge2 = [r for r in other_recs if int(r.get('Transfer Qty', 0) or 0) >= 2]
-                            if donor_ge2 and len(group_recs) >= 3:
-                                donor = max(donor_ge2, key=lambda r: int(r.get('Transfer Qty', 0) or 0))
-                                donor['Transfer Qty'] = int(donor.get('Transfer Qty', 0) or 0) - 1
-                                single_rec['Transfer Qty'] = 2
-                                group_changed = True
-                                has_change = True
-
-                group_recs[:] = [r for r in group_recs if int(r.get('Transfer Qty', 0) or 0) > 0]
-
-                if not group_changed or len(group_recs) <= 1:
-                    break
-
-        if not has_change:
-            return recommendations
-
-        optimized = [r for r in recommendations if int(r.get('Transfer Qty', 0) or 0) > 0]
-        self._refresh_recommendation_fields(optimized, mode)
-        return optimized
+        return _optimize_single_piece_transfers_impl(recommendations, mode, self._create_recommendation_note)
     
     def generate_transfer_recommendations(self, df: pd.DataFrame, mode: str) -> List[Dict]:
         """
