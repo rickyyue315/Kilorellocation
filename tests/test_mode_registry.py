@@ -127,10 +127,11 @@ class TestDerivedQueries:
 
     def test_get_source_filter_names(self):
         names = get_source_filter_names()
-        assert "附加B(特別模式)" not in names
+        assert "附加B(特別模式)" in names
         assert "保守轉貨" not in names
         assert "強制轉出" in names
         assert "精簡SKU(限同OM)" in names
+        assert len(names) == 18
 
     def test_get_codes_needing_column(self):
         e_modes = get_codes_needing_column('ALL')
