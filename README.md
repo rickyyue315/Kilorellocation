@@ -1,4 +1,4 @@
-# KiLo 庫存調貨建議系統 v2.12.0
+# KiLo 庫存調貨建議系統 v2.15.0
 
 ## 系統概述
 
@@ -211,6 +211,7 @@ python -m pytest tests/test_b2_b3_source_receive_site_limit.py tests/test_b2_pri
 
 - `app.py`：Streamlit 介面與操作流程（含雙分頁：調貨系統 / 模式教學）
 - `business_logic.py`：來源/接收識別與配對規則
+- `services/matching_engine.py`：核心配對引擎（轉移量計算、前置過濾、多回合匹配）
 - `data_processor.py`：Excel 讀取、驗證、欄位標準化、預設資料補齊
 - `excel_generator.py`：報表匯出
 - `ui/tutorial.py`：模式教學分頁（24 種模式圖例化教學）
@@ -239,5 +240,5 @@ python -m pytest tests/test_b2_b3_source_receive_site_limit.py tests/test_b2_pri
 
 ## 版本
 
-- 目前版本：`v2.12.0`
+- 目前版本：`v2.15.0`
 - 詳細異動請見 `VERSION.md`

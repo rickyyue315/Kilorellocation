@@ -5,6 +5,7 @@ B特別模式匹配策略（委派給 _match_by_priority 引擎）
 from typing import Any, Callable, Dict, List, Optional
 
 from strategies.base import BaseMatchStrategy
+from services.matching_engine import prep_temp_lists
 
 
 class BSpecialStrategy(BaseMatchStrategy):
@@ -25,10 +26,7 @@ class BSpecialStrategy(BaseMatchStrategy):
     ) -> List[Dict[str, Any]]:
         recommendations = []
 
-        temp_sources = [s.copy() for s in sources]
-        for s in temp_sources:
-            s['total_transferred'] = 0
-        temp_destinations = [d.copy() for d in destinations]
+        temp_sources, temp_destinations = prep_temp_lists(sources, destinations)
 
         transfer_sites = set()
         receive_sites = set()

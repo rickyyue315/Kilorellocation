@@ -20,32 +20,48 @@ from services.recommendation_factory import build_recommendation, apply_transfer
 from strategies.predicates import is_hd_to_hk_restricted
 
 
+def _clamp_target_qty(is_b_special: bool, is_d_family: bool, dest: Dict,
+                      transfer_qty: int, current_received_qty: int) -> int:
+    if 'target_qty' not in dest:
+        return transfer_qty
+    if is_b_special or dest['dest_type'] == '重點補0' or is_d_family:
+        return min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
+    return transfer_qty
+
+
+def _adjust_d_family_remainder(is_d_family: bool, source: Dict, transfer_qty: int) -> int:
+    if not is_d_family or source['rp_type'] != 'ND':
+        return transfer_qty
+    final_remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
+    if final_remaining != 1:
+        return transfer_qty
+    if source['transferable_qty'] >= transfer_qty + 1:
+        return transfer_qty + 1
+    if transfer_qty > 1:
+        return transfer_qty - 1
+    return transfer_qty
+
+
+def prep_temp_lists(sources: List[Dict], destinations: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+    temp_sources = [{**s, 'total_transferred': 0} for s in sources]
+    temp_destinations = [d.copy() for d in destinations]
+    return temp_sources, temp_destinations
+
+
 def compute_transfer_qty(logic, source: Dict, dest: Dict, mode: str, current_received_qty: int) -> int:
+    is_b_special = logic._is_b_special_mode(mode)
+    is_d_family = logic._is_d_family_mode(mode)
+
     transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
 
-    if logic._is_b_special_mode(mode) and 'target_qty' in dest:
-        remaining_capacity = dest['target_qty'] - current_received_qty
-        transfer_qty = min(transfer_qty, remaining_capacity)
-    elif dest['dest_type'] == '重點補0' and 'target_qty' in dest:
-        remaining_needed = dest['target_qty'] - current_received_qty
-        transfer_qty = min(transfer_qty, remaining_needed)
-    elif logic._is_d_family_mode(mode) and 'target_qty' in dest:
-        remaining_capacity = dest['target_qty'] - current_received_qty
-        transfer_qty = min(transfer_qty, remaining_capacity)
-
-    if logic._is_d_family_mode(mode) and source['rp_type'] == 'ND':
-        final_remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-        if final_remaining == 1:
-            if source['transferable_qty'] >= transfer_qty + 1:
-                transfer_qty += 1
-            elif transfer_qty > 1:
-                transfer_qty -= 1
+    transfer_qty = _clamp_target_qty(is_b_special, is_d_family, dest, transfer_qty, current_received_qty)
+    transfer_qty = _adjust_d_family_remainder(is_d_family, source, transfer_qty)
 
     if transfer_qty == 1 and source['transferable_qty'] >= 2:
-        if source['source_type'] in ['ND轉出', 'ND清貨轉出', 'RF加強轉出', 'RF過剩轉出']:
+        if source['source_type'] in ('ND轉出', 'ND清貨轉出', 'RF加強轉出', 'RF過剩轉出'):
             already_out_opt = source.get('total_transferred', 0)
             remaining_after_opt = source['original_stock'] - already_out_opt - 2
-            if logic._is_d_family_mode(mode) and source['rp_type'] == 'ND' and remaining_after_opt == 1:
+            if is_d_family and source['rp_type'] == 'ND' and remaining_after_opt == 1:
                 if source['transferable_qty'] >= 3:
                     transfer_qty = 3
             else:
@@ -54,20 +70,8 @@ def compute_transfer_qty(logic, source: Dict, dest: Dict, mode: str, current_rec
 
     transfer_qty = min(transfer_qty, source['transferable_qty'])
 
-    if logic._is_b_special_mode(mode) and 'target_qty' in dest:
-        transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
-    elif dest['dest_type'] == '重點補0' and 'target_qty' in dest:
-        transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
-    elif logic._is_d_family_mode(mode) and 'target_qty' in dest:
-        transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
-
-    if logic._is_d_family_mode(mode) and source['rp_type'] == 'ND':
-        final_remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
-        if final_remaining == 1:
-            if source['transferable_qty'] >= transfer_qty + 1:
-                transfer_qty += 1
-            elif transfer_qty > 1:
-                transfer_qty -= 1
+    transfer_qty = _clamp_target_qty(is_b_special, is_d_family, dest, transfer_qty, current_received_qty)
+    transfer_qty = _adjust_d_family_remainder(is_d_family, source, transfer_qty)
 
     return max(transfer_qty, 0)
 
@@ -91,13 +95,13 @@ def can_transfer(logic, source: Dict, dest: Dict, mode: str, article: str,
         if dest.get('site') not in matched_sites and len(matched_sites) >= logic.b_special_max_receive_sites_per_source:
             return False
 
-    if source.get('om') and dest.get('om') and source.get('om') != dest.get('om'):
+    is_cross_om = bool(source.get('om') and dest.get('om') and source.get('om') != dest.get('om'))
+    if is_cross_om:
         if is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
             return False
         if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
             return False
-
-    if logic._is_b3_family_mode(mode):
+    elif logic._is_b3_family_mode(mode):
         if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
             return False
         if is_hd_to_hk_restricted(source.get('site', ''), dest.get('site', '')):
@@ -112,19 +116,22 @@ def can_transfer(logic, source: Dict, dest: Dict, mode: str, article: str,
     receive_site_key = f"{dest['site']}_{article}"
     current_received_qty = received_qty_by_site.get(receive_site_key, 0)
 
-    if logic._is_b_special_mode(mode) and 'target_qty' in dest:
-        if current_received_qty >= dest['target_qty']:
-            return False
+    is_b_special = logic._is_b_special_mode(mode)
+    is_d_family = logic._is_d_family_mode(mode)
 
-    if dest['dest_type'] == '重點補0' and 'target_qty' in dest:
-        if current_received_qty >= dest['target_qty']:
-            return False
-
-    if logic._is_d_family_mode(mode) and 'target_qty' in dest:
+    if 'target_qty' in dest and (is_b_special or dest['dest_type'] == '重點補0' or is_d_family):
         if current_received_qty >= dest['target_qty']:
             return False
 
     return True
+
+
+def _mark_dest_saturated(mode: str, dest: Dict, received_qty_by_site: Dict,
+                         receive_site_key: str, is_b_special: bool, is_d_family: bool):
+    received = received_qty_by_site.get(receive_site_key, 0)
+    if 'target_qty' in dest and (dest['dest_type'] == '重點補0' or is_b_special or is_d_family):
+        if received >= dest['target_qty']:
+            dest['needed_qty'] = 0
 
 
 def match_by_priority(logic, sources: List[Dict], destinations: List[Dict],
@@ -160,9 +167,10 @@ def match_by_priority(logic, sources: List[Dict], destinations: List[Dict],
     if dest_type_filter:
         filtered_destinations = [d for d in filtered_destinations if d['dest_type'] == dest_type_filter]
 
-    for source in filtered_sources:
-        source_added_to_transfer = source['site'] in transfer_sites
+    is_b_special = logic._is_b_special_mode(mode)
+    is_d_family = logic._is_d_family_mode(mode)
 
+    for source in filtered_sources:
         for dest in filtered_destinations:
             if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
                 continue
@@ -194,22 +202,14 @@ def match_by_priority(logic, sources: List[Dict], destinations: List[Dict],
             matched_sites = source_to_receive_sites.setdefault(source_site, set())
             matched_sites.add(dest['site'])
 
-            if dest['dest_type'] == '重點補0' and received_qty_by_site[receive_site_key] >= dest.get('target_qty', float('inf')):
-                dest['needed_qty'] = 0
-            elif logic._is_b_special_mode(mode) and 'target_qty' in dest and received_qty_by_site[receive_site_key] >= dest['target_qty']:
-                dest['needed_qty'] = 0
-            elif logic._is_d_family_mode(mode) and 'target_qty' in dest and received_qty_by_site[receive_site_key] >= dest['target_qty']:
-                dest['needed_qty'] = 0
+            _mark_dest_saturated(mode, dest, received_qty_by_site, receive_site_key, is_b_special, is_d_family)
 
 
 def match_general_mode(logic, sources: List[Dict], destinations: List[Dict],
                        article: str, om: str, product_desc: str, mode: str) -> List[Dict]:
     recommendations = []
 
-    temp_sources = [s.copy() for s in sources]
-    for s in temp_sources:
-        s['total_transferred'] = 0
-    temp_destinations = [d.copy() for d in destinations]
+    temp_sources, temp_destinations = prep_temp_lists(sources, destinations)
 
     transfer_sites = set()
     receive_sites = set()

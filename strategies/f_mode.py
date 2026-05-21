@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from strategies.base import BaseMatchStrategy
 from strategies.predicates import is_hd_to_hk_restricted
 from services.recommendation_factory import build_recommendation, apply_transfer
+from services.matching_engine import prep_temp_lists
 
 
 class FModeStrategy(BaseMatchStrategy):
@@ -25,10 +26,7 @@ class FModeStrategy(BaseMatchStrategy):
     ) -> List[Dict[str, Any]]:
         recommendations = []
 
-        temp_sources = [s.copy() for s in sources]
-        for s in temp_sources:
-            s['total_transferred'] = 0
-        temp_destinations = [d.copy() for d in destinations]
+        temp_sources, temp_destinations = prep_temp_lists(sources, destinations)
 
         temp_destinations.sort(key=lambda x: x['priority'])
 

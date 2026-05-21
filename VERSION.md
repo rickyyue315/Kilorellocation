@@ -1,5 +1,31 @@
 # 版本更新記錄
 
+## v2.15.0 (2026-05-21)
+
+### 匹配引擎去重與代碼品質優化
+
+#### matching_engine.py 去重
+- 提取 `_clamp_target_qty()` 輔助函數，統一 b_special / 重點補0 / d_family 三向 target_qty 限制邏輯（原重複 2 次）
+- 提取 `_adjust_d_family_remainder()` 輔助函數，統一 D 系列「避免剩餘1件」調整邏輯（原重複 2 次）
+- 提取 `_mark_dest_saturated()` 輔助函數，統一飽和度檢查（原分散於 match_by_priority）
+- `compute_transfer_qty` 從 72 行縮減至 ~40 行，消除重複代碼塊
+
+#### can_transfer 冗餘修正
+- 修正 B3 模式下跨 OM 檢查重複執行的問題（通用跨 OM 檢查 + B3 專屬檢查 → 改為 if/elif 互斥）
+
+#### prep_temp_lists 統一
+- 提取 `prep_temp_lists()` 共用函數至 matching_engine.py
+- 消除 8 個策略檔案中重複的 temp_sources/temp_destinations 初始化樣板（b_special、f_mode、e1_mode、e2_mode、nd_mode、c2_mode、simplified_sku、matching_engine）
+
+#### mode_info 快取
+- `business_logic.py` 的 `_create_recommendation_note` 每次調用時不再重新建立 mode_info 字典
+- 改為在 `__init__` 中預先快取所有 24 種模式的 mode_info（`_mode_info_cache`），查表取代 9 次 `_is_*_mode` 調用
+
+#### 影響範圍
+- 純內部重構，無外部 API 變更
+- 所有 265 項測試全部通過
+- 不影響 Zeabur 或 Streamlit Community Cloud 部署
+
 ## v2.14.0 (2026-05-21)
 
 ### 模式參數化表 + 效能架構準備

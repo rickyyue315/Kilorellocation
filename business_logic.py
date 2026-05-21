@@ -1,5 +1,5 @@
 """
-業務邏輯模組 v2.14.0
+業務邏輯模組 v2.15.0
 實現調貨規則、源/目的地識別和匹配算法
 支持二十四模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B2L(附加B特別模式-Type=L保留2件)/B2La(附加B特別模式-Type=L保留2件-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/B3L(附加B跨OM特別模式-Type=L保留2件)/B3La(附加B跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
 """
@@ -110,7 +110,7 @@ def _compute_max_protected_sold(df) -> float:
 
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.14.0"""
+    """調貨業務邏輯類 v2.15.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False):
@@ -129,6 +129,21 @@ class TransferLogic:
             setattr(self, d.attr_name, d.name)
 
         self.MODE_FAMILIES = get_mode_families()
+
+        self._mode_info_cache = {}
+        for d in MODE_DEFS:
+            families = d.families
+            self._mode_info_cache[d.name] = {
+                'is_d_family': 'd_family' in families,
+                'is_b_special': 'b_special' in families,
+                'is_b_l_retain': 'b_l_retain' in families,
+                'is_simplified_sku': 'simplified_sku' in families,
+                'mode_e1': self.mode_e1,
+                'mode_e1b': self.mode_e1b,
+                'mode_e2': self.mode_e2,
+                'mode_d2': self.mode_d2,
+                'mode_simplified_sku_same': self.mode_simplified_sku_same,
+            }
 
         self._ALL_MODES = get_all_mode_names()
         self._CROSS_OM_GROUPING_MODES = get_cross_om_grouping_names()
@@ -997,15 +1012,18 @@ class TransferLogic:
 
     def _create_recommendation_note(self, source: Dict, dest: Dict, current_received_qty: int, transfer_qty: int, mode: str) -> str:
         from services.notes import create_recommendation_note
-        mode_info = {
-            'is_d_family': self._is_d_family_mode(mode),
-            'is_b_special': self._is_b_special_mode(mode),
-            'is_b_l_retain': self._is_b_l_retain_mode(mode),
-            'is_simplified_sku': self._is_simplified_sku_mode(mode),
-            'mode_e1': self.mode_e1,
-            'mode_e1b': self.mode_e1b,
-            'mode_e2': self.mode_e2,
-            'mode_d2': self.mode_d2,
-            'mode_simplified_sku_same': self.mode_simplified_sku_same,
-        }
+        mode_info = self._mode_info_cache.get(mode)
+        if mode_info is None:
+            mode_info = {
+                'is_d_family': self._is_d_family_mode(mode),
+                'is_b_special': self._is_b_special_mode(mode),
+                'is_b_l_retain': self._is_b_l_retain_mode(mode),
+                'is_simplified_sku': self._is_simplified_sku_mode(mode),
+                'mode_e1': self.mode_e1,
+                'mode_e1b': self.mode_e1b,
+                'mode_e2': self.mode_e2,
+                'mode_d2': self.mode_d2,
+                'mode_simplified_sku_same': self.mode_simplified_sku_same,
+            }
+            self._mode_info_cache[mode] = mode_info
         return create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode, mode_info)
