@@ -7,13 +7,13 @@ import streamlit as st
 
 def _flow_node(text, color="blue", width="auto"):
     colors = {
-        "blue": ("#DBEAFE", "#1E40AF", "#93C5FD"),
-        "green": ("#D1FAE5", "#065F46", "#6EE7B7"),
-        "red": ("#FEE2E2", "#991B1B", "#FCA5A5"),
-        "yellow": ("#FEF3C7", "#92400E", "#FCD34D"),
-        "gray": ("#F3F4F6", "#4B5563", "#D1D5DB"),
-        "purple": ("#EDE9FE", "#5B21B6", "#C4B5FD"),
-        "orange": ("#FFEDD5", "#9A3412", "#FDBA74"),
+        "blue": ("#0F1E3D", "#60A5FA", "#2563EB"),
+        "green": ("#052E16", "#34D399", "#059669"),
+        "red": ("#450A0A", "#FCA5A5", "#DC2626"),
+        "yellow": ("#3D1D06", "#FCD34D", "#D97706"),
+        "gray": ("#18181B", "#A1A1AA", "#52525B"),
+        "purple": ("#250E4A", "#C4B5FD", "#7C3AED"),
+        "orange": ("#431407", "#FDBA74", "#EA580C"),
     }
     bg, border, accent = colors.get(color, colors["blue"])
     w = f"width:{width};" if width != "auto" else ""
@@ -25,8 +25,8 @@ def _flow_node(text, color="blue", width="auto"):
 
 
 def _flow_arrow(label=""):
-    lbl = f'<span style="font-size:11px;color:#6B7280;">{label}</span><br>' if label else ""
-    return f'<div style="text-align:center;margin:2px 0;">{lbl}<span style="font-size:18px;">&#8595;</span></div>'
+    lbl = f'<span style="font-size:11px;color:#A1A1AA;">{label}</span><br>' if label else ""
+    return f'<div style="text-align:center;margin:2px 0;">{lbl}<span style="font-size:18px;color:#71717A;">&#8595;</span></div>'
 
 
 def _flow_row(items, gap="12px"):
@@ -50,10 +50,9 @@ def _scenario_table(headers, rows):
         + "</tbody></table>"
     )
 
-
 def _risk_badge(level):
-    colors = {"低": "#28A745", "中": "#FFC107", "高": "#DC3545"}
-    c = colors.get(level, "#6C757D")
+    colors = {"低": "#10B981", "中": "#F5A623", "高": "#EF4444"}
+    c = colors.get(level, "#71717A")
     return f'<span style="background:{c};color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;">風險：{level}</span>'
 
 

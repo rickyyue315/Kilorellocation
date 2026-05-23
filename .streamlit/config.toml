@@ -7,3 +7,11 @@ headless = true
 [browser]
 # 停用使用統計上報，避免啟動時外部網路請求
 gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#F5A623"
+backgroundColor = "#0A0A0F"
+secondaryBackgroundColor = "#12121A"
+textColor = "#FAFAFA"
+font = "sans serif"

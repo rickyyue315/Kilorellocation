@@ -82,26 +82,26 @@ INTEGER_COLUMNS = [
 
 STRING_COLUMNS = ['OM', 'RP Type', 'Site']
 
-# ── 配色方案 (淺色模式) ────────────────────────────────────────────
+# ── 配色方案 (Kilo.ai 風格深色模式) ────────────────────────────────
 
 THEME = {
-    'bg_primary': '#FFFFFF',
-    'bg_secondary': '#F8F9FA',
-    'text_primary': '#212529',
-    'text_secondary': '#6C757D',
-    'accent': '#4A90E2',
-    'accent_hover': '#357ABD',
-    'success': '#28A745',
-    'success_bg': '#D4EDDA',
-    'success_text': '#155724',
-    'info': '#17A2B8',
-    'info_bg': '#D1ECF1',
-    'info_text': '#0C5460',
-    'warning': '#FFC107',
-    'warning_bg': '#FFF3CD',
-    'warning_text': '#856404',
-    'error_bg': '#F8D7DA',
-    'error_text': '#721C24',
-    'border': '#DEE2E6',
-    'shadow': 'rgba(0,0,0,0.05)',
+    'bg_primary': '#0A0A0F',
+    'bg_secondary': '#12121A',
+    'text_primary': '#FAFAFA',
+    'text_secondary': '#A1A1AA',
+    'accent': '#F5A623',
+    'accent_hover': '#E8950C',
+    'success': '#10B981',
+    'success_bg': '#064E3B',
+    'success_text': '#D1FAE5',
+    'info': '#3B82F6',
+    'info_bg': '#0C1F3F',
+    'info_text': '#DBEAFE',
+    'warning': '#F5A623',
+    'warning_bg': '#4A2E08',
+    'warning_text': '#FEF3C7',
+    'error_bg': '#7F1D1D',
+    'error_text': '#FEE2E2',
+    'border': '#1E1E2A',
+    'shadow': 'rgba(0,0,0,0.2)',
 }

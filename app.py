@@ -234,7 +234,7 @@ with tab_system:
 
     st.markdown("---")
     st.markdown(f"""
-    <div style="text-align: center; color: #6C757D; padding: 30px 0;">
+    <div style="text-align: center; color: #71717A; padding: 30px 0;">
         <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 {VERSION}</p>
         <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
     </div>

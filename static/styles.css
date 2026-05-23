@@ -1,150 +1,150 @@
 <style>
-    /* 全局樣式 */
+    /* 全局樣式 — Kilo.ai 風格深色主題 */
     .stApp {
-        background-color: #FFFFFF;
-        color: #212529;
+        background-color: #0A0A0F;
+        color: #E4E4E7;
     }
-    
+
     /* 側邊欄 */
     section[data-testid="stSidebar"] {
-        background-color: #F8F9FA;
-        border-right: 1px solid #DEE2E6;
+        background-color: #0F0F17;
+        border-right: 1px solid #1E1E2A;
     }
-    
+
     /* 標題優化 */
     h1, h2, h3 {
-        color: #212529;
+        color: #FAFAFA;
         font-weight: 600;
         letter-spacing: -0.5px;
     }
-    
+
     /* 主按鈕樣式 */
     .stButton > button {
-        background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
-        color: white;
+        background: linear-gradient(135deg, #F5A623 0%, #E8950C 100%);
+        color: #0A0A0F;
         border: none;
         border-radius: 8px;
         padding: 12px 28px;
         font-weight: 600;
         font-size: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 16px rgba(245, 166, 35, 0.2);
         transition: all 0.3s ease;
         width: 100%;
     }
-    
+
     .stButton > button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+        box-shadow: 0 6px 24px rgba(245, 166, 35, 0.3);
     }
-    
+
     /* 卡片樣式 */
     .info-card {
-        background: #F8F9FA;
-        border: 1px solid #DEE2E6;
+        background: #12121A;
+        border: 1px solid #1E1E2A;
         border-radius: 8px;
         padding: 16px;
         margin: 8px 0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    
+
     /* 上傳區域 */
     .uploadedFile {
-        background: #F8F9FA;
-        border: 2px dashed #DEE2E6;
+        background: #12121A;
+        border: 2px dashed #1E1E2A;
         border-radius: 8px;
         padding: 20px;
     }
-    
+
     /* 數據表格 */
     .dataframe {
-        background: #F8F9FA;
+        background: #12121A;
         border-radius: 8px;
     }
-    
+
     /* Metric卡片 */
     div[data-testid="stMetricValue"] {
-        color: #4A90E2;
+        color: #F5A623;
         font-weight: 700;
     }
-    
+
     /* 成功/錯誤訊息 */
     .stSuccess {
-        background-color: #D4EDDA !important;
-        color: #155724 !important;
-        border-left: 4px solid #28A745;
+        background-color: #064E3B !important;
+        color: #D1FAE5 !important;
+        border-left: 4px solid #10B981;
         border-radius: 6px;
         padding: 12px 16px;
     }
-    
+
     .stSuccess svg {
-        color: #28A745 !important;
+        color: #10B981 !important;
     }
-    
+
     .stInfo {
-        background-color: #D1ECF1 !important;
-        color: #0C5460 !important;
-        border-left: 4px solid #17A2B8;
+        background-color: #0C1F3F !important;
+        color: #DBEAFE !important;
+        border-left: 4px solid #3B82F6;
         border-radius: 6px;
         padding: 12px 16px;
     }
-    
+
     .stInfo svg {
-        color: #17A2B8 !important;
+        color: #3B82F6 !important;
     }
-    
+
     .stWarning {
-        background-color: #FFF3CD !important;
-        color: #856404 !important;
-        border-left: 4px solid #FFC107;
+        background-color: #4A2E08 !important;
+        color: #FEF3C7 !important;
+        border-left: 4px solid #F5A623;
         border-radius: 6px;
         padding: 12px 16px;
     }
-    
+
     .stWarning svg {
-        color: #FFC107 !important;
+        color: #F5A623 !important;
     }
-    
+
     .stError {
-        background-color: #F8D7DA !important;
-        color: #721C24 !important;
-        border-left: 4px solid #DC3545;
+        background-color: #7F1D1D !important;
+        color: #FEE2E2 !important;
+        border-left: 4px solid #EF4444;
         border-radius: 6px;
         padding: 12px 16px;
     }
-    
+
     .stError svg {
-        color: #DC3545 !important;
+        color: #EF4444 !important;
     }
-    
+
     /* 確保所有文字都有足夠對比度 */
     p, span, div, label {
-        color: #212529;
+        color: #E4E4E7;
     }
-    
+
     .stMarkdown {
-        color: #212529;
+        color: #E4E4E7;
     }
-    
+
     /* 精簡進度條 */
     .stProgress > div > div {
-        background-color: #4A90E2;
+        background-color: #F5A623;
     }
-    
+
     /* 下載按鈕 */
     .stDownloadButton > button {
-        background: #28A745;
-        color: white;
+        background: #10B981;
+        color: #0A0A0F;
         border-radius: 8px;
         padding: 12px 28px;
         font-weight: 600;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
     }
 
     /* ===== Tutorial Page Styles ===== */
     .flow-container {
         padding: 16px;
-        background: #FAFBFC;
-        border: 1px solid #E1E4E8;
+        background: #12121A;
+        border: 1px solid #1E1E2A;
         border-radius: 10px;
         margin: 8px 0;
         overflow-x: auto;
@@ -157,40 +157,40 @@
     .flow-label {
         font-weight: 600;
         font-size: 14px;
-        color: #24292F;
+        color: #E4E4E7;
         margin: 8px 0 4px 0;
-        border-left: 3px solid #4A90E2;
+        border-left: 3px solid #F5A623;
         padding-left: 8px;
     }
 
     .mode-section {
         margin: 12px 0;
         padding: 16px;
-        background: #FFFFFF;
-        border: 1px solid #E1E4E8;
+        background: #0F0F17;
+        border: 1px solid #1E1E2A;
         border-radius: 10px;
     }
 
     .mode-title {
-        color: #1A1A2E;
+        color: #FAFAFA;
         font-size: 16px;
         margin: 0 0 8px 0;
         padding-bottom: 8px;
-        border-bottom: 1px solid #E1E4E8;
+        border-bottom: 1px solid #1E1E2A;
     }
 
     .mode-scenario {
         font-size: 14px;
-        color: #4B5563;
+        color: #A1A1AA;
         margin: 4px 0 12px 0;
         line-height: 1.6;
     }
 
     .mode-notes {
         font-size: 13px;
-        color: #6B7280;
-        background: #FFF8E1;
-        border: 1px solid #FFE082;
+        color: #FDE68A;
+        background: #3D2E0A;
+        border: 1px solid #5C3D0E;
         border-radius: 6px;
         padding: 8px 12px;
         margin: 8px 0;
@@ -199,7 +199,7 @@
 
     .mode-divider {
         border: none;
-        border-top: 2px dashed #E1E4E8;
+        border-top: 2px dashed #1E1E2A;
         margin: 20px 0;
     }
 
@@ -209,7 +209,7 @@
         flex-wrap: wrap;
         gap: 6px;
         padding: 8px;
-        background: #F6F8FA;
+        background: #16161D;
         border-radius: 8px;
     }
 
@@ -217,16 +217,16 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: #FFFFFF;
-        border: 1px solid #D0D7DE;
+        background: #1A1A24;
+        border: 1px solid #27272A;
         border-radius: 6px;
         padding: 4px 10px;
         font-size: 12px;
     }
 
     .match-num {
-        background: #4A90E2;
-        color: #FFFFFF;
+        background: #F5A623;
+        color: #0A0A0F;
         border-radius: 50%;
         width: 20px;
         height: 20px;
@@ -239,17 +239,17 @@
     }
 
     .match-src {
-        color: #065F46;
+        color: #34D399;
         font-weight: 600;
     }
 
     .match-arrow {
-        color: #9CA3AF;
+        color: #71717A;
         font-size: 14px;
     }
 
     .match-dst {
-        color: #1E40AF;
+        color: #60A5FA;
         font-weight: 600;
     }
 
@@ -262,8 +262,8 @@
     }
 
     .scenario-table th {
-        background: #4A90E2;
-        color: #FFFFFF;
+        background: #F5A623;
+        color: #0A0A0F;
         padding: 6px 10px;
         text-align: center;
         font-weight: 600;
@@ -274,15 +274,16 @@
     .scenario-table td {
         padding: 5px 10px;
         text-align: center;
-        border-bottom: 1px solid #E5E7EB;
+        border-bottom: 1px solid #1E1E2A;
         font-size: 12px;
+        color: #D4D4D8;
     }
 
     .scenario-table tr:nth-child(even) td {
-        background: #F8FAFC;
+        background: #12121A;
     }
 
     .scenario-table tr:hover td {
-        background: #EFF6FF;
+        background: #1A1A2A;
     }
 </style>
