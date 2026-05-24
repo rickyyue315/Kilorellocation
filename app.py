@@ -62,8 +62,19 @@ b_special_max_receive_sites_per_source = sidebar_result['b_special_max_receive_s
 b_special_receive_site_limit_option = sidebar_result['b_special_receive_site_limit_option']
 f2_allow_hd_transfer = sidebar_result['f2_allow_hd_transfer']
 
-st.title("📦 庫存調貨建議系統")
-st.caption(f"{VERSION} | Intelligent Inventory Reallocation System")
+st.markdown(f"""
+<div style="display: flex; align-items: center; gap: 16px; margin: 10px 0 25px 0; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <div style="background: linear-gradient(135deg, #F5A623 0%, #D97706 100%); width: 52px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 4px 20px rgba(245, 166, 35, 0.25);">
+        📦
+    </div>
+    <div>
+        <h1 style="margin: 0 !important; font-size: 2.2rem !important; font-weight: 800; background: linear-gradient(135deg, #FAFAFA 40%, #A1A1AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.2;">庫存調貨建議系統</h1>
+        <p style="margin: 4px 0 0 0 !important; color: #8E8E9F; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.5px;">
+            {VERSION} | Intelligent Inventory Reallocation System
+        </p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 tab_system, tab_tutorial = st.tabs(["🏠 調貨系統", "📖 模式教學"])
 
@@ -232,10 +243,13 @@ with tab_system:
             if 'progress_bar' in locals():
                 progress_bar.progress(100, text="處理失敗!")
 
-    st.markdown("---")
     st.markdown(f"""
-    <div style="text-align: center; color: #71717A; padding: 30px 0;">
-        <p style="margin: 0; font-size: 12px;">庫存調貨建議系統 {VERSION}</p>
-        <p style="margin: 5px 0 0 0; font-size: 11px;">Inventory Reallocation System (2026) | Developed by Ricky Yue</p>
+    <div style="text-align: center; color: #52525B; padding: 40px 0 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 50px;">
+        <p style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.5px; color: #71717A;">
+            📦 庫存調貨建議系統 <span style="color: #F5A623; font-weight: 700;">{VERSION}</span>
+        </p>
+        <p style="margin: 6px 0 0 0; font-size: 11.5px; color: #52525B; font-family: 'Inter';">
+            Intelligent Inventory Reallocation System (2026) | Crafted with ♥ by Ricky Yue
+        </p>
     </div>
     """, unsafe_allow_html=True)

@@ -19,9 +19,15 @@ def render_sidebar() -> Dict:
     with st.sidebar:
         st.markdown("### 📦 系統資訊")
         st.markdown(f"""
-        <div class="info-card">
-        <b>版本</b>: {VERSION}<br>
-        <b>開發者</b>: Ricky
+        <div class="info-card" style="margin-top: -10px; padding: 12px 16px; background: rgba(255, 255, 255, 0.02); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="color: #8E8E9F; font-size: 13px; font-weight: 500;">系統版本</span>
+                <span style="color: #F5A623; font-size: 13px; font-weight: 700; font-family: monospace;">{VERSION}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #8E8E9F; font-size: 13px; font-weight: 500;">開發者</span>
+                <span style="color: #FFFFFF; font-size: 13px; font-weight: 600; font-family: 'Inter';">Ricky Yue</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
