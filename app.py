@@ -68,7 +68,7 @@ st.markdown(f"""
         📦
     </div>
     <div>
-        <h1 style="margin: 0 !important; font-size: 2rem !important; font-weight: 800; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; line-height: 1.25; letter-spacing: -0.5px;">庫存調貨建議系統</h1>
+        <h1 style="margin: 0 !important; font-size: 2.6rem !important; font-weight: 900; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; line-height: 1.2; letter-spacing: -0.5px; text-shadow: 0 0 30px rgba(6, 182, 212, 0.15);">庫存調貨建議系統</h1>
         <p style="margin: 5px 0 0 0 !important; color: #64748B; font-size: 0.875rem; font-weight: 500; letter-spacing: 0.5px;">
             {VERSION} · Intelligent Inventory Reallocation System
         </p>
@@ -245,11 +245,11 @@ with tab_system:
 
     st.markdown(f"""
     <div style="text-align: center; color: #52525B; padding: 40px 0 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 50px;">
-        <p style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.5px; color: #71717A;">
+        <p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; color: #71717A;">
             📦 庫存調貨建議系統 <span style="color: #F5A623; font-weight: 700;">{VERSION}</span>
         </p>
-        <p style="margin: 6px 0 0 0; font-size: 11.5px; color: #52525B; font-family: 'Inter';">
-            Intelligent Inventory Reallocation System (2026) | Crafted with ♥ by Ricky Yue
+        <p style="margin: 6px 0 0 0; font-size: 13px; color: #52525B; font-family: 'Inter';">
+            Intelligent Inventory Reallocation System (2026) | Developed by Ricky Yue. 只限RP Team使用.
         </p>
     </div>
     """, unsafe_allow_html=True)
