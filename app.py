@@ -63,14 +63,14 @@ b_special_receive_site_limit_option = sidebar_result['b_special_receive_site_lim
 f2_allow_hd_transfer = sidebar_result['f2_allow_hd_transfer']
 
 st.markdown(f"""
-<div style="display: flex; align-items: center; gap: 16px; margin: 10px 0 25px 0; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.06);">
-    <div style="background: linear-gradient(135deg, #F5A623 0%, #D97706 100%); width: 52px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 4px 20px rgba(245, 166, 35, 0.25);">
+<div style="display: flex; align-items: center; gap: 18px; margin: 8px 0 28px 0; padding-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <div style="background: #1A1A2E; border: 2px solid rgba(6, 182, 212, 0.4); width: 56px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 28px;">
         📦
     </div>
     <div>
-        <h1 style="margin: 0 !important; font-size: 2.2rem !important; font-weight: 800; background: linear-gradient(135deg, #FAFAFA 40%, #A1A1AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.2;">庫存調貨建議系統</h1>
-        <p style="margin: 4px 0 0 0 !important; color: #8E8E9F; font-size: 0.95rem; font-weight: 500; letter-spacing: 0.5px;">
-            {VERSION} | Intelligent Inventory Reallocation System
+        <h1 style="margin: 0 !important; font-size: 2rem !important; font-weight: 800; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; line-height: 1.25; letter-spacing: -0.5px;">庫存調貨建議系統</h1>
+        <p style="margin: 5px 0 0 0 !important; color: #64748B; font-size: 0.875rem; font-weight: 500; letter-spacing: 0.5px;">
+            {VERSION} · Intelligent Inventory Reallocation System
         </p>
     </div>
 </div>

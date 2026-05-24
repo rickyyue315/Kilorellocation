@@ -3,8 +3,8 @@
 
     /* 全局樣式 — Kilo.ai 極致奢華深色主題 */
     .stApp {
-        background-color: #0A0A10;
-        color: #E4E4E7;
+        background-color: #090910;
+        color: #E2E8F0;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif !important;
     }
 
@@ -14,15 +14,15 @@
         height: 8px;
     }
     ::-webkit-scrollbar-track {
-        background: #0A0A10;
+        background: #090910;
     }
     ::-webkit-scrollbar-thumb {
-        background: #27272A;
+        background: #1E293B;
         border-radius: 6px;
-        border: 2px solid #0A0A10;
+        border: 2px solid #090910;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #F5A623;
+        background: #06B6D4;
     }
 
     /* 頁面寬度與間距調整 */
@@ -36,8 +36,8 @@
 
     /* 側邊欄玻璃擬態 (Glassmorphism) */
     section[data-testid="stSidebar"] {
-        background-color: #0F0F16 !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+        background-color: #0D0D1A !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.04) !important;
         box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
     }
     section[data-testid="stSidebar"] .block-container {
@@ -46,7 +46,7 @@
 
     /* 標題與文字層級優化 */
     h1, h2, h3, h4, h5, h6 {
-        color: #FFFFFF !important;
+        color: #F8FAFC !important;
         font-weight: 700 !important;
         letter-spacing: -0.025em !important;
         margin-top: 0.5rem !important;
@@ -54,33 +54,33 @@
     }
 
     h1 {
-        font-size: 2.2rem !important;
-        background: linear-gradient(135deg, #FAFAFA 40%, #D4D4D8 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        font-size: 2rem !important;
+        color: #FFFFFF !important;
     }
 
     h2 {
-        font-size: 1.6rem !important;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.04);
+        font-size: 1.5rem !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         padding-bottom: 0.5rem;
+        color: #F8FAFC !important;
     }
 
     h3 {
-        font-size: 1.25rem !important;
-        color: #F4F4F5 !important;
+        font-size: 1.2rem !important;
+        color: #E2E8F0 !important;
         display: flex;
         align-items: center;
         gap: 8px;
     }
 
     p, span, div, label {
-        color: #D4D4D8;
+        color: #CBD5E1;
         font-size: 0.95rem;
     }
 
     .stMarkdown p {
         line-height: 1.6 !important;
+        color: #CBD5E1 !important;
     }
 
     /* 側邊欄選單及選項微調 */
@@ -113,43 +113,43 @@
     }
 
     div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
-        background: rgba(245, 166, 35, 0.06) !important;
-        color: #FBBF24 !important;
+        background: rgba(6, 182, 212, 0.06) !important;
+        color: #22D3EE !important;
     }
 
     div[data-testid="stRadio"] div[role="radiogroup"] label[data-selected="true"] {
-        background: rgba(245, 166, 35, 0.12) !important;
-        border-color: rgba(245, 166, 35, 0.3) !important;
-        color: #FBBF24 !important;
+        background: rgba(6, 182, 212, 0.12) !important;
+        border-color: rgba(6, 182, 212, 0.3) !important;
+        color: #22D3EE !important;
         font-weight: 700 !important;
     }
 
-    /* 主按鈕豪華微光效果 */
+    /* 主按鈕 — 青色漸層霓虹光效果 */
     .stButton > button {
-        background: linear-gradient(135deg, #F5A623 0%, #D97706 100%) !important;
-        color: #0A0A0F !important;
+        background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%) !important;
+        color: #FFFFFF !important;
         border: none !important;
         border-radius: 10px !important;
         padding: 12px 28px !important;
         font-weight: 700 !important;
         font-size: 16px !important;
         letter-spacing: 0.5px !important;
-        box-shadow: 0 4px 20px rgba(245, 166, 35, 0.22) !important;
+        box-shadow: 0 4px 20px rgba(6, 182, 212, 0.25) !important;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
         width: 100%;
     }
 
     .stButton > button:hover {
         transform: translateY(-2px) !important;
-        background: linear-gradient(135deg, #FBBF24 0%, #E8950C 100%) !important;
-        box-shadow: 0 8px 28px rgba(245, 166, 35, 0.35) !important;
+        background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%) !important;
+        box-shadow: 0 8px 28px rgba(6, 182, 212, 0.4) !important;
     }
 
     .stButton > button:active {
         transform: translateY(0px) !important;
     }
 
-    /* 下載按鈕設計 */
+    /* 下載按鈕 — 翠玉綠漸層 */
     .stDownloadButton > button {
         background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
         color: #FFFFFF !important;
@@ -159,80 +159,80 @@
         font-weight: 700 !important;
         font-size: 16px !important;
         letter-spacing: 0.5px !important;
-        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.22) !important;
+        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25) !important;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
 
     .stDownloadButton > button:hover {
         transform: translateY(-2px) !important;
         background: linear-gradient(135deg, #34D399 0%, #10B981 100%) !important;
-        box-shadow: 0 8px 28px rgba(16, 185, 129, 0.35) !important;
+        box-shadow: 0 8px 28px rgba(16, 185, 129, 0.4) !important;
     }
 
     /* 頂級卡片樣式 */
     .info-card {
-        background: #13131F;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: #0F0F1E;
+        border: 1px solid rgba(255, 255, 255, 0.06);
         border-radius: 12px;
         padding: 16px 20px;
         margin: 10px 0;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
         transition: all 0.3s ease;
     }
 
     .info-card:hover {
-        border-color: rgba(245, 166, 35, 0.15);
+        border-color: rgba(6, 182, 212, 0.2);
         transform: translateY(-1px);
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
     }
 
     /* 現代化檔案上傳區域 */
     section[data-testid="stFileUploadDropzone"] {
-        border: 2px dashed rgba(255, 255, 255, 0.1) !important;
-        background: #11111B !important;
+        border: 2px dashed rgba(255, 255, 255, 0.08) !important;
+        background: #0D0D1A !important;
         border-radius: 12px !important;
         padding: 30px !important;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
 
     section[data-testid="stFileUploadDropzone"]:hover {
-        border-color: #F5A623 !important;
-        background: #141424 !important;
-        box-shadow: 0 0 24px rgba(245, 166, 35, 0.12) !important;
+        border-color: #06B6D4 !important;
+        background: #111128 !important;
+        box-shadow: 0 0 24px rgba(6, 182, 212, 0.1) !important;
     }
 
     /* 數據表格與容器優化 */
     .dataframe {
-        background: #11111B !important;
+        background: #0D0D1A !important;
         border-radius: 10px !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
     }
 
     /* 強化 Metric 卡片 */
     div[data-testid="stMetric"] {
-        background: #12121E !important;
-        border: 1px solid rgba(255, 255, 255, 0.04) !important;
+        background: #0F0F1E !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
         border-radius: 12px !important;
         padding: 18px 24px !important;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
 
     div[data-testid="stMetric"]:hover {
-        border-color: rgba(245, 166, 35, 0.2) !important;
+        border-color: rgba(6, 182, 212, 0.25) !important;
         transform: translateY(-2px);
-        box-shadow: 0 12px 36px rgba(245, 166, 35, 0.08) !important;
+        box-shadow: 0 12px 36px rgba(6, 182, 212, 0.08) !important;
     }
 
     div[data-testid="stMetricValue"] {
-        color: #F5A623 !important;
+        color: #22D3EE !important;
         font-weight: 800 !important;
         font-size: 1.8rem !important;
         letter-spacing: -0.02em !important;
     }
 
     div[data-testid="stMetricLabel"] {
-        color: #A1A1AA !important;
+        color: #94A3B8 !important;
         font-weight: 500 !important;
         font-size: 0.88rem !important;
         margin-bottom: 6px !important;
@@ -240,16 +240,16 @@
 
     /* 高階折疊面板 (st.expander) */
     div[data-testid="stExpander"] {
-        background: #12121E !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        background: #0F0F1E !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
         border-radius: 10px !important;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
         margin-bottom: 12px !important;
         transition: all 0.3s ease;
     }
 
     div[data-testid="stExpander"]:hover {
-        border-color: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.12) !important;
     }
 
     div[data-testid="stExpander"] > details {
@@ -257,28 +257,28 @@
     }
 
     div[data-testid="stExpander"] summary {
-        color: #E4E4E7 !important;
+        color: #CBD5E1 !important;
         font-weight: 600 !important;
         padding: 12px 18px !important;
     }
 
     div[data-testid="stExpander"] summary:hover {
-        color: #F5A623 !important;
+        color: #22D3EE !important;
     }
 
-    /* 智能狀態提示框 (Alerts) */
+    /* 智能狀態提示框 (Alerts) — 青色主題 */
     .stSuccess, .stInfo, .stWarning, .stError {
         border-radius: 10px !important;
         padding: 14px 20px !important;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
         border: 1px solid transparent !important;
     }
 
     .stSuccess {
-        background-color: rgba(6, 78, 59, 0.45) !important;
-        color: #D1FAE5 !important;
+        background-color: rgba(6, 78, 59, 0.5) !important;
+        color: #6EE7B7 !important;
         border-left: 5px solid #10B981 !important;
-        border-color: rgba(16, 185, 129, 0.15) !important;
+        border-color: rgba(16, 185, 129, 0.2) !important;
     }
 
     .stSuccess svg {
@@ -286,10 +286,10 @@
     }
 
     .stInfo {
-        background-color: rgba(12, 31, 63, 0.45) !important;
-        color: #DBEAFE !important;
+        background-color: rgba(30, 58, 138, 0.5) !important;
+        color: #93C5FD !important;
         border-left: 5px solid #3B82F6 !important;
-        border-color: rgba(59, 130, 246, 0.15) !important;
+        border-color: rgba(59, 130, 246, 0.2) !important;
     }
 
     .stInfo svg {
@@ -297,65 +297,65 @@
     }
 
     .stWarning {
-        background-color: rgba(74, 46, 8, 0.45) !important;
-        color: #FEF3C7 !important;
-        border-left: 5px solid #F5A623 !important;
-        border-color: rgba(245, 166, 35, 0.15) !important;
+        background-color: rgba(120, 53, 15, 0.5) !important;
+        color: #FDE68A !important;
+        border-left: 5px solid #F59E0B !important;
+        border-color: rgba(245, 158, 11, 0.2) !important;
     }
 
     .stWarning svg {
-        color: #F5A623 !important;
+        color: #F59E0B !important;
     }
 
     .stError {
-        background-color: rgba(127, 29, 29, 0.45) !important;
-        color: #FEE2E2 !important;
+        background-color: rgba(127, 29, 29, 0.5) !important;
+        color: #FCA5A5 !important;
         border-left: 5px solid #EF4444 !important;
-        border-color: rgba(239, 68, 68, 0.15) !important;
+        border-color: rgba(239, 68, 68, 0.2) !important;
     }
 
     .stError svg {
         color: #EF4444 !important;
     }
 
-    /* 進度條美化 */
+    /* 進度條 — 青色漸層 */
     .stProgress > div > div {
-        background-color: #F5A623 !important;
+        background: linear-gradient(90deg, #06B6D4, #22D3EE) !important;
         height: 6px !important;
         border-radius: 3px !important;
     }
 
-    /* 頂層分頁 (st.tabs) 高級樣式 */
+    /* 頂層分頁 (st.tabs) — 青色高亮 */
     button[data-baseweb="tab"] {
-        font-size: 16px !important;
+        font-size: 15px !important;
         font-weight: 600 !important;
-        color: #8E8E9F !important;
+        color: #64748B !important;
         background-color: transparent !important;
         border: none !important;
-        padding: 14px 24px !important;
+        padding: 12px 22px !important;
         transition: all 0.2s ease !important;
         border-top-left-radius: 8px !important;
         border-top-right-radius: 8px !important;
     }
 
     button[data-baseweb="tab"]:hover {
-        color: #FFFFFF !important;
+        color: #E2E8F0 !important;
         background-color: rgba(255, 255, 255, 0.02) !important;
     }
 
     button[data-baseweb="tab"][aria-selected="true"] {
-        color: #F5A623 !important;
-        background-color: rgba(245, 166, 35, 0.03) !important;
+        color: #22D3EE !important;
+        background-color: rgba(6, 182, 212, 0.04) !important;
     }
 
     div[data-baseweb="tab-highlight"] {
-        background-color: #F5A623 !important;
+        background: linear-gradient(90deg, #06B6D4, #22D3EE) !important;
         height: 3px !important;
         border-radius: 3px 3px 0 0 !important;
     }
 
     div[data-testid="stTabs"] {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
     }
 
     /* ===== 教學頁面精緻卡片 (Tutorial Page) ===== */
