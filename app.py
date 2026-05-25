@@ -68,7 +68,7 @@ st.markdown(f"""
         📦
     </div>
     <div>
-        <h1 style="margin: 0 !important; font-size: 68.4rem !important; font-weight: 900; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; line-height: 1.1; letter-spacing: -0.5px; text-shadow: 0 0 40px rgba(0, 212, 255, 0.25);">庫存調貨建議系統</h1>
+        <h1 style="margin: 0 !important; font-size: 2.6rem !important; font-weight: 900; background: linear-gradient(135deg, #00d4ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.1; letter-spacing: -0.5px; text-shadow: none;">庫存調貨建議系統</h1>
         <p style="margin: 5px 0 0 0 !important; color: #A0A0B0; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.5px;">
             {VERSION} · Intelligent Inventory Reallocation System
         </p>
