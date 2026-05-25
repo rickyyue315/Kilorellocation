@@ -99,9 +99,12 @@ def render_sidebar() -> Dict:
 
         st.markdown("---")
 
-        st.markdown("### ⚙️ 模式選擇")
+        st.markdown(
+            '<div style="font-size: 0.5rem; font-weight: 700; color: #E2E8F0; margin-bottom: 0.5rem;">⚙️ 選擇轉貨模式</div>',
+            unsafe_allow_html=True
+        )
         transfer_mode = st.radio(
-            "選擇轉貨模式",
+            "",
             _MODE_OPTIONS,
             key='transfer_mode',
             help="選擇適合的調貨模式"
