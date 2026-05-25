@@ -11,7 +11,7 @@ def _flow_node(text, color="blue", width="auto"):
         "green": ("#052E16", "#34D399", "#059669"),
         "red": ("#450A0A", "#FCA5A5", "#DC2626"),
         "yellow": ("#3D1D06", "#FCD34D", "#D97706"),
-        "gray": ("#18181B", "#A1A1AA", "#52525B"),
+        "gray": ("#1E1E2E", "#E0E0F0", "#8080A0"),
         "purple": ("#250E4A", "#C4B5FD", "#7C3AED"),
         "orange": ("#431407", "#FDBA74", "#EA580C"),
     }
@@ -25,8 +25,8 @@ def _flow_node(text, color="blue", width="auto"):
 
 
 def _flow_arrow(label=""):
-    lbl = f'<span style="font-size:11px;color:#A1A1AA;">{label}</span><br>' if label else ""
-    return f'<div style="text-align:center;margin:2px 0;">{lbl}<span style="font-size:18px;color:#71717A;">&#8595;</span></div>'
+    lbl = f'<span style="font-size:11px;color:#C0C0D0;">{label}</span><br>' if label else ""
+    return f'<div style="text-align:center;margin:2px 0;">{lbl}<span style="font-size:18px;color:#909090;">&#8595;</span></div>'
 
 
 def _flow_row(items, gap="12px"):

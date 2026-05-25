@@ -69,7 +69,7 @@ st.markdown(f"""
     </div>
     <div>
         <h1 style="margin: 0 !important; font-size: 68.4rem !important; font-weight: 900; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; line-height: 1.1; letter-spacing: -0.5px; text-shadow: 0 0 40px rgba(0, 212, 255, 0.25);">庫存調貨建議系統</h1>
-        <p style="margin: 5px 0 0 0 !important; color: #666677; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.5px;">
+        <p style="margin: 5px 0 0 0 !important; color: #A0A0B0; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.5px;">
             {VERSION} · Intelligent Inventory Reallocation System
         </p>
     </div>
@@ -244,11 +244,11 @@ with tab_system:
                 progress_bar.progress(100, text="處理失敗!")
 
     st.markdown(f"""
-    <div style="text-align: center; color: #52525B; padding: 40px 0 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 50px;">
-        <p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; color: #71717A;">
+    <div style="text-align: center; color: #888899; padding: 40px 0 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 50px;">
+        <p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; color: #B0B0C0;">
             📦 庫存調貨建議系統 <span style="color: #00d4ff; font-weight: 700;">{VERSION}</span>
         </p>
-        <p style="margin: 6px 0 0 0; font-size: 13px; color: #52525B; font-family: 'Inter';">
+        <p style="margin: 6px 0 0 0; font-size: 13px; color: #888899; font-family: 'Inter';">
             Intelligent Inventory Reallocation System (2026) | Developed by Ricky Yue. 只限RP Team使用.
         </p>
     </div>

@@ -74,13 +74,13 @@
     }
 
     p, span, div, label {
-        color: #888899;
+        color: #A8A8B8;
         font-size: 1rem;
     }
 
     .stMarkdown p {
         line-height: 1.6 !important;
-        color: #888899 !important;
+        color: #A8A8B8 !important;
     }
 
     /* 側邊欄選單及選項微調 */
@@ -233,7 +233,7 @@
     }
 
     div[data-testid="stMetricLabel"] {
-        color: #888899 !important;
+        color: #B0B0C0 !important;
         font-weight: 500 !important;
         font-size: 0.95rem !important;
         margin-bottom: 6px !important;
@@ -258,7 +258,7 @@
     }
 
     div[data-testid="stExpander"] summary {
-        color: #888899 !important;
+        color: #B0B0C0 !important;
         font-weight: 600 !important;
         padding: 12px 18px !important;
     }
@@ -330,7 +330,7 @@
     button[data-baseweb="tab"] {
         font-size: 16px !important;
         font-weight: 600 !important;
-        color: #666677 !important;
+        color: #A0A0B0 !important;
         background-color: transparent !important;
         border: none !important;
         padding: 14px 24px !important;
@@ -412,7 +412,7 @@
 
     .mode-scenario {
         font-size: 14px;
-        color: #888899;
+        color: #B0B0C0;
         margin: 6px 0 14px 0;
         line-height: 1.6;
     }
@@ -483,7 +483,7 @@
     }
 
     .match-arrow {
-        color: #444455;
+        color: #707080;
         font-size: 14px;
     }
 
