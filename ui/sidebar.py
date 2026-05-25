@@ -100,7 +100,7 @@ def render_sidebar() -> Dict:
         st.markdown("---")
 
         st.markdown(
-            '<div style="font-size: 0.5rem; font-weight: 700; color: #ffffff; margin-bottom: 0.5rem;">⚙️ 選擇轉貨模式</div>',
+            '<div style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin-bottom: 0.5rem;">⚙️ 選擇轉貨模式</div>',
             unsafe_allow_html=True
         )
         transfer_mode = st.radio(
