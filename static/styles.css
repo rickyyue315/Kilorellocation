@@ -1,9 +1,9 @@
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-    /* 全局樣式 — Kilo.ai 極致奢華深色主題 */
+    /* 全局樣式 — i14 深色主題 */
     .stApp {
-        background-color: #090910;
+        background-color: #0a0a0f;
         color: #E2E8F0;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif !important;
     }
@@ -14,15 +14,15 @@
         height: 8px;
     }
     ::-webkit-scrollbar-track {
-        background: #090910;
+        background: #0a0a0f;
     }
     ::-webkit-scrollbar-thumb {
-        background: #1E293B;
+        background: #1e1e2e;
         border-radius: 6px;
-        border: 2px solid #090910;
+        border: 2px solid #0a0a0f;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #06B6D4;
+        background: #00d4ff;
     }
 
     /* 頁面寬度與間距調整 */
@@ -34,10 +34,10 @@
         max-width: 96% !important;
     }
 
-    /* 側邊欄玻璃擬態 (Glassmorphism) */
+    /* 側邊欄 */
     section[data-testid="stSidebar"] {
-        background-color: #0D0D1A !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.04) !important;
+        background-color: #12121a !important;
+        border-right: 1px solid #1e1e2e !important;
         box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
     }
     section[data-testid="stSidebar"] .block-container {
@@ -46,7 +46,7 @@
 
     /* 標題與文字層級優化 */
     h1, h2, h3, h4, h5, h6 {
-        color: #F8FAFC !important;
+        color: #ffffff !important;
         font-weight: 700 !important;
         letter-spacing: -0.025em !important;
         margin-top: 0.5rem !important;
@@ -55,45 +55,45 @@
 
     h1 {
         font-size: 2.2rem !important;
-        color: #FFFFFF !important;
+        color: #ffffff !important;
     }
 
     h2 {
         font-size: 1.65rem !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        border-bottom: 1px solid #1e1e2e;
         padding-bottom: 0.5rem;
-        color: #F8FAFC !important;
+        color: #ffffff !important;
     }
 
     h3 {
         font-size: 1.35rem !important;
-        color: #E2E8F0 !important;
+        color: #ffffff !important;
         display: flex;
         align-items: center;
         gap: 8px;
     }
 
     p, span, div, label {
-        color: #CBD5E1;
+        color: #888899;
         font-size: 1rem;
     }
 
     .stMarkdown p {
         line-height: 1.6 !important;
-        color: #CBD5E1 !important;
+        color: #888899 !important;
     }
 
     /* 側邊欄選單及選項微調 */
     div[data-testid="stRadio"] > label {
         font-weight: 600 !important;
-        color: #F4F4F5 !important;
+        color: #ffffff !important;
         margin-bottom: 4px !important;
         font-size: 0.325rem !important;
     }
 
     div[data-testid="stRadio"] div[role="radiogroup"] {
-        background: #0F0F18 !important;
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: #12121a !important;
+        border: 1px solid #1e1e2e;
         border-radius: 8px;
         padding: 4px !important;
         gap: 1px !important;
@@ -108,42 +108,42 @@
         border: 1px solid transparent;
         font-size: 0.25rem !important;
         font-weight: 500 !important;
-        color: #FAFAFA !important;
+        color: #ffffff !important;
         letter-spacing: 0.1px;
         line-height: 1.3;
     }
 
     div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
-        background: rgba(6, 182, 212, 0.06) !important;
-        color: #22D3EE !important;
+        background: rgba(0, 212, 255, 0.06) !important;
+        color: #00d4ff !important;
     }
 
     div[data-testid="stRadio"] div[role="radiogroup"] label[data-selected="true"] {
-        background: rgba(6, 182, 212, 0.12) !important;
-        border-color: rgba(6, 182, 212, 0.3) !important;
-        color: #22D3EE !important;
+        background: rgba(0, 212, 255, 0.12) !important;
+        border-color: rgba(0, 212, 255, 0.3) !important;
+        color: #00d4ff !important;
         font-weight: 700 !important;
     }
 
-    /* 主按鈕 — 青色漸層霓虹光效果 */
+    /* 主按鈕 — 青色漸層 */
     .stButton > button {
-        background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%) !important;
-        color: #FFFFFF !important;
+        background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%) !important;
+        color: #0a0a0f !important;
         border: none !important;
         border-radius: 10px !important;
         padding: 14px 32px !important;
         font-weight: 700 !important;
         font-size: 17px !important;
         letter-spacing: 0.5px !important;
-        box-shadow: 0 4px 20px rgba(6, 182, 212, 0.25) !important;
+        box-shadow: 0 4px 20px rgba(0, 212, 255, 0.25) !important;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
         width: 100%;
     }
 
     .stButton > button:hover {
         transform: translateY(-2px) !important;
-        background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%) !important;
-        box-shadow: 0 8px 28px rgba(6, 182, 212, 0.4) !important;
+        background: linear-gradient(135deg, #00d4ff 0%, #00d4ff 100%) !important;
+        box-shadow: 0 8px 28px rgba(0, 212, 255, 0.4) !important;
     }
 
     .stButton > button:active {
@@ -172,8 +172,8 @@
 
     /* 頂級卡片樣式 */
     .info-card {
-        background: #0F0F1E;
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: #12121a;
+        border: 1px solid #1e1e2e;
         border-radius: 12px;
         padding: 16px 20px;
         margin: 10px 0;
@@ -182,37 +182,37 @@
     }
 
     .info-card:hover {
-        border-color: rgba(6, 182, 212, 0.2);
+        border-color: rgba(0, 212, 255, 0.2);
         transform: translateY(-1px);
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
     }
 
     /* 現代化檔案上傳區域 */
     section[data-testid="stFileUploadDropzone"] {
-        border: 2px dashed rgba(255, 255, 255, 0.08) !important;
-        background: #0D0D1A !important;
+        border: 2px dashed #00d4ff44 !important;
+        background: #12121a !important;
         border-radius: 12px !important;
         padding: 30px !important;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
 
     section[data-testid="stFileUploadDropzone"]:hover {
-        border-color: #06B6D4 !important;
-        background: #111128 !important;
-        box-shadow: 0 0 24px rgba(6, 182, 212, 0.1) !important;
+        border-color: #00d4ff !important;
+        background: #0a0a0f !important;
+        box-shadow: 0 0 24px rgba(0, 212, 255, 0.1) !important;
     }
 
     /* 數據表格與容器優化 */
     .dataframe {
-        background: #0D0D1A !important;
+        background: #12121a !important;
         border-radius: 10px !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid #1e1e2e !important;
     }
 
     /* 強化 Metric 卡片 */
     div[data-testid="stMetric"] {
-        background: #0F0F1E !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        background: #12121a !important;
+        border: 1px solid #1e1e2e !important;
         border-radius: 12px !important;
         padding: 18px 24px !important;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
@@ -220,20 +220,20 @@
     }
 
     div[data-testid="stMetric"]:hover {
-        border-color: rgba(6, 182, 212, 0.25) !important;
+        border-color: rgba(0, 212, 255, 0.25) !important;
         transform: translateY(-2px);
-        box-shadow: 0 12px 36px rgba(6, 182, 212, 0.08) !important;
+        box-shadow: 0 12px 36px rgba(0, 212, 255, 0.08) !important;
     }
 
     div[data-testid="stMetricValue"] {
-        color: #22D3EE !important;
+        color: #00d4ff !important;
         font-weight: 800 !important;
         font-size: 2rem !important;
         letter-spacing: -0.02em !important;
     }
 
     div[data-testid="stMetricLabel"] {
-        color: #94A3B8 !important;
+        color: #888899 !important;
         font-weight: 500 !important;
         font-size: 0.95rem !important;
         margin-bottom: 6px !important;
@@ -241,8 +241,8 @@
 
     /* 高階折疊面板 (st.expander) */
     div[data-testid="stExpander"] {
-        background: #0F0F1E !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        background: #12121a !important;
+        border: 1px solid #1e1e2e !important;
         border-radius: 10px !important;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
         margin-bottom: 12px !important;
@@ -250,7 +250,7 @@
     }
 
     div[data-testid="stExpander"]:hover {
-        border-color: rgba(255, 255, 255, 0.12) !important;
+        border-color: #1e1e2e !important;
     }
 
     div[data-testid="stExpander"] > details {
@@ -258,16 +258,16 @@
     }
 
     div[data-testid="stExpander"] summary {
-        color: #CBD5E1 !important;
+        color: #888899 !important;
         font-weight: 600 !important;
         padding: 12px 18px !important;
     }
 
     div[data-testid="stExpander"] summary:hover {
-        color: #22D3EE !important;
+        color: #00d4ff !important;
     }
 
-    /* 智能狀態提示框 (Alerts) — 青色主題 */
+    /* 智能狀態提示框 (Alerts) */
     .stSuccess, .stInfo, .stWarning, .stError {
         border-radius: 10px !important;
         padding: 14px 20px !important;
@@ -321,16 +321,16 @@
 
     /* 進度條 — 青色漸層 */
     .stProgress > div > div {
-        background: linear-gradient(90deg, #06B6D4, #22D3EE) !important;
+        background: linear-gradient(90deg, #00d4ff, #0099cc) !important;
         height: 6px !important;
         border-radius: 3px !important;
     }
 
-    /* 頂層分頁 (st.tabs) — 青色高亮 */
+    /* 頂層分頁 (st.tabs) */
     button[data-baseweb="tab"] {
         font-size: 16px !important;
         font-weight: 600 !important;
-        color: #64748B !important;
+        color: #666677 !important;
         background-color: transparent !important;
         border: none !important;
         padding: 14px 24px !important;
@@ -340,30 +340,30 @@
     }
 
     button[data-baseweb="tab"]:hover {
-        color: #E2E8F0 !important;
+        color: #ffffff !important;
         background-color: rgba(255, 255, 255, 0.02) !important;
     }
 
     button[data-baseweb="tab"][aria-selected="true"] {
-        color: #22D3EE !important;
-        background-color: rgba(6, 182, 212, 0.04) !important;
+        color: #00d4ff !important;
+        background-color: rgba(0, 212, 255, 0.04) !important;
     }
 
     div[data-baseweb="tab-highlight"] {
-        background: linear-gradient(90deg, #06B6D4, #22D3EE) !important;
+        background: linear-gradient(90deg, #00d4ff, #0099cc) !important;
         height: 3px !important;
         border-radius: 3px 3px 0 0 !important;
     }
 
     div[data-testid="stTabs"] {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border-bottom: 1px solid #1e1e2e !important;
     }
 
     /* ===== 教學頁面精緻卡片 (Tutorial Page) ===== */
     .flow-container {
         padding: 20px;
-        background: #11111B;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: #12121a;
+        border: 1px solid #1e1e2e;
         border-radius: 12px;
         margin: 12px 0;
         box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -376,7 +376,7 @@
     .flow-label {
         font-weight: 600;
         font-size: 14px;
-        color: #F4F4F5;
+        color: #ffffff;
         margin: 10px 0 6px 0;
         border-left: 3px solid #F5A623;
         padding-left: 10px;
@@ -386,8 +386,8 @@
     .mode-section {
         margin: 16px 0;
         padding: 20px;
-        background: #12121F;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: #12121a;
+        border: 1px solid #1e1e2e;
         border-radius: 12px;
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
         transition: all 0.3s ease;
@@ -404,7 +404,7 @@
         font-weight: 700;
         margin: 0 0 10px 0;
         padding-bottom: 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid #1e1e2e;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -412,7 +412,7 @@
 
     .mode-scenario {
         font-size: 14px;
-        color: #A1A1AA;
+        color: #888899;
         margin: 6px 0 14px 0;
         line-height: 1.6;
     }
@@ -430,7 +430,7 @@
 
     .mode-divider {
         border: none;
-        border-top: 1px dashed rgba(255, 255, 255, 0.08);
+        border-top: 1px dashed #1e1e2e;
         margin: 24px 0;
     }
 
@@ -440,16 +440,16 @@
         flex-wrap: wrap;
         gap: 8px;
         padding: 10px;
-        background: #0D0D15;
+        background: #12121a;
         border-radius: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.03);
+        border: 1px solid #1e1e2e;
     }
 
     .match-row {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        background: #171724;
+        background: #1e1e2e;
         border: 1px solid rgba(255, 255, 255, 0.04);
         border-radius: 8px;
         padding: 6px 12px;
@@ -458,13 +458,13 @@
     }
 
     .match-row:hover {
-        background: #1F1F30;
+        background: #1e1e2e;
         border-color: rgba(255, 255, 255, 0.08);
     }
 
     .match-num {
         background: #F5A623;
-        color: #0A0A10;
+        color: #0a0a0f;
         border-radius: 50%;
         width: 22px;
         height: 22px;
@@ -483,7 +483,7 @@
     }
 
     .match-arrow {
-        color: #52525B;
+        color: #444455;
         font-size: 14px;
     }
 
@@ -499,14 +499,14 @@
         border-spacing: 0;
         font-size: 13px;
         margin: 8px 0;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        border: 1px solid #1e1e2e;
         border-radius: 8px;
         overflow: hidden;
     }
 
     .scenario-table th {
         background: #F5A623;
-        color: #0A0A10;
+        color: #0a0a0f;
         padding: 8px 12px;
         text-align: center;
         font-weight: 700;
@@ -518,9 +518,9 @@
     .scenario-table td {
         padding: 7px 12px;
         text-align: center;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        border-bottom: 1px solid #1e1e2e;
         font-size: 12.5px;
-        color: #E4E4E7;
+        color: #ffffff;
     }
 
     .scenario-table tr:last-child td {
@@ -528,7 +528,7 @@
     }
 
     .scenario-table tr:nth-child(even) td {
-        background: #141421;
+        background: #12121a;
     }
 
     .scenario-table tr:hover td {

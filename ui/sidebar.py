@@ -22,7 +22,7 @@ def render_sidebar() -> Dict:
         <div class="info-card" style="margin-top: -10px; padding: 12px 16px; background: rgba(255, 255, 255, 0.02); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <span style="color: #8E8E9F; font-size: 13px; font-weight: 500;">系統版本</span>
-                <span style="color: #F5A623; font-size: 13px; font-weight: 700; font-family: monospace;">{VERSION}</span>
+                <span style="color: #00d4ff; font-size: 13px; font-weight: 700; font-family: monospace;">{VERSION}</span>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span style="color: #8E8E9F; font-size: 13px; font-weight: 500;">開發者</span>
@@ -100,7 +100,7 @@ def render_sidebar() -> Dict:
         st.markdown("---")
 
         st.markdown(
-            '<div style="font-size: 0.5rem; font-weight: 700; color: #E2E8F0; margin-bottom: 0.5rem;">⚙️ 選擇轉貨模式</div>',
+            '<div style="font-size: 0.5rem; font-weight: 700; color: #ffffff; margin-bottom: 0.5rem;">⚙️ 選擇轉貨模式</div>',
             unsafe_allow_html=True
         )
         transfer_mode = st.radio(

@@ -82,26 +82,26 @@ INTEGER_COLUMNS = [
 
 STRING_COLUMNS = ['OM', 'RP Type', 'Site']
 
-# ── 配色方案 (Kilo.ai 風格深色模式) ────────────────────────────────
+# ── 配色方案 (i14 深色主題) ──────────────────────────────────────────
 
 THEME = {
-    'bg_primary': '#0A0A0F',
-    'bg_secondary': '#12121A',
-    'text_primary': '#FAFAFA',
-    'text_secondary': '#A1A1AA',
-    'accent': '#F5A623',
-    'accent_hover': '#E8950C',
+    'bg_primary': '#0a0a0f',
+    'bg_secondary': '#12121a',
+    'text_primary': '#ffffff',
+    'text_secondary': '#888899',
+    'accent': '#00d4ff',
+    'accent_hover': '#0099cc',
     'success': '#10B981',
     'success_bg': '#064E3B',
     'success_text': '#D1FAE5',
     'info': '#3B82F6',
     'info_bg': '#0C1F3F',
     'info_text': '#DBEAFE',
-    'warning': '#F5A623',
+    'warning': '#F59E0B',
     'warning_bg': '#4A2E08',
     'warning_text': '#FEF3C7',
     'error_bg': '#7F1D1D',
     'error_text': '#FEE2E2',
-    'border': '#1E1E2A',
+    'border': '#1e1e2e',
     'shadow': 'rgba(0,0,0,0.2)',
 }
