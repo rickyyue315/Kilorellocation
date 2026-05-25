@@ -104,10 +104,11 @@ def render_sidebar() -> Dict:
             unsafe_allow_html=True
         )
         transfer_mode = st.radio(
-            "",
+            "選擇轉貨模式",
             _MODE_OPTIONS,
             key='transfer_mode',
-            help="選擇適合的調貨模式"
+            help="選擇適合的調貨模式",
+            label_visibility="collapsed"
         )
         transfer_mode = fix_mojibake_text(transfer_mode)
         mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
