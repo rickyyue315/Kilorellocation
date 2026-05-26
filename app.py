@@ -163,7 +163,7 @@ with tab_system:
 
             current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{uploaded_file.name}_{uploaded_file.size}"
             if st.session_state.get('_run_key') != current_run_key:
-                for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key']:
+                for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name']:
                     st.session_state.pop(k, None)
                 for k in [k for k in st.session_state if k.startswith('_display_df_')]:
                     st.session_state.pop(k)
@@ -213,7 +213,7 @@ with tab_system:
 
                 render_kpi_cards(statistics)
 
-                render_results_table(recommendations, df, current_run_key, mode_name_ui)
+                render_results_table(recommendations, df, current_run_key, st.session_state.get('active_mode_name', ''))
 
                 render_statistics(statistics)
 
@@ -223,7 +223,7 @@ with tab_system:
                 if st.session_state.get('excel_run_key') != current_run_key or 'excel_data' not in st.session_state:
                     with st.spinner("生成 Excel 文件..."):
                         excel_generator = ExcelGenerator()
-                        st.session_state['excel_data'] = excel_generator.generate_excel_file(recommendations, statistics, mode=mode_name_ui)
+                        st.session_state['excel_data'] = excel_generator.generate_excel_file(recommendations, statistics, mode=st.session_state.get('active_mode_name', ''))
                         st.session_state['excel_filename'] = excel_generator.output_filename
                         st.session_state['excel_run_key'] = current_run_key
 
