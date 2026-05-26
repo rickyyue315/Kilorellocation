@@ -899,7 +899,7 @@ def _render_nd_sku_group():
 
     content_sku_return_d001 = _build_mode_content(
         "精簡SKU(退D001)", "精簡SKU全數退回D001", "低",
-        scenario="RF店舖存貨上限 = Max(Safety&#215;2, 2月銷量&#215;2)，超出部分轉出；ND店舖全數可轉出。所有轉出的數量一律回退D001（無數量限制），不進行RF接收配對",
+        scenario="RF店舖存貨上限 = Max(Safety&#215;2, 2月銷量&#215;2)，超出部分轉出；ND店舖全數可轉出。所有轉出的數量一律回退D001，RF僅1件不退回。不進行RF接收配對",
         source_flow=(
             _flow_row([
                 _flow_node("ND店舖<br>SaSa Net Stock &gt; 0", "purple"),
@@ -922,7 +922,7 @@ def _render_nd_sku_group():
                 ["RF店舖超出Cap", "RF", "超出Cap部分", "D001"],
             ]
         ),
-        extra_notes="無數量限制，即使是1件也可回退D001。不進行RF接收配對，每個來源店舖直接產出一行回退D001建議",
+        extra_notes="RF僅1件不退回（避免浪費人力），ND不受此限。不進行RF接收配對，每個來源店舖直接產出一行回退D001建議",
         diff_table=_scenario_table(
             ["項目", "精簡SKU(限同OM/跨OM)", "精簡SKU(退D001)"],
             [
