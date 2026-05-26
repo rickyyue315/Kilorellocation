@@ -73,6 +73,7 @@ OPTIONAL_COLUMNS = [
     'ALL',
     'Target',
     'Type',
+    'Supply source',
 ]
 
 INTEGER_COLUMNS = [

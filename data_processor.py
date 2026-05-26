@@ -181,6 +181,21 @@ class DataProcessor:
                 df['Type'] = ""
                 logger.info("未找到Type欄位，自動創建空欄位")
             
+            # 處理Supply source欄位：無論大小寫，都轉換為標準化的'Supply source'欄位
+            supply_source_cols = [col for col in df.columns if col.upper().replace(' ', '') == 'SUPPLYSOURCE']
+            if supply_source_cols:
+                canonical = 'Supply source' if 'Supply source' in supply_source_cols else supply_source_cols[0]
+                rename_map = {col: 'Supply source' for col in supply_source_cols if col != 'Supply source'}
+                if rename_map:
+                    df = df.rename(columns=rename_map)
+                duplicate_cols = [col for col in df.columns if col == 'Supply source']
+                if len(duplicate_cols) > 1:
+                    df = df.loc[:, ~df.columns.duplicated(keep='first')]
+                logger.info("找到Supply source欄位")
+            else:
+                df['Supply source'] = None
+                logger.info("未找到Supply source欄位，自動創建空欄位")
+
             # 處理商品描述欄位
             if 'Article Description' not in df.columns and 'Article Long Text (60 Chars)' in df.columns:
                 df['Article Description'] = df['Article Long Text (60 Chars)']

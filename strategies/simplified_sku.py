@@ -4,6 +4,8 @@
 
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
+
 from strategies.base import BaseMatchStrategy
 from strategies.predicates import is_hd_to_hk_restricted
 from services.recommendation_factory import build_recommendation, apply_transfer
@@ -81,6 +83,10 @@ class SimplifiedSKUStrategy(BaseMatchStrategy):
         for source in temp_sources:
             remaining = source['transferable_qty']
             if remaining <= 0:
+                continue
+
+            supply_source = source.get('supply_source')
+            if supply_source is not None and pd.notna(supply_source) and int(supply_source) in (1, 4):
                 continue
 
             notes = f"精簡SKU模式：剩餘庫存{remaining}件退回D001"
