@@ -1,5 +1,31 @@
 # 版本更新記錄
 
+## v2.16.0 (2026-05-26)
+
+### 新增精簡SKU(退D001)模式
+
+#### 功能說明
+- 新增第 25 種模式：`精簡SKU(退D001)`
+- 與精簡SKU(限同OM/跨OM)共用相同的來源識別邏輯（ND 全轉出、RF 超出 Cap 轉出）
+- **核心差異**：所有轉出數量一律直接回退 D001，不進行 RF 接收配對
+- 無數量限制（即使是 1 件也可回退 D001）
+- 報告新增「D001 Receive Qty」欄位（僅此模式顯示）
+
+#### 程式碼更新
+- [`strategies/simplified_sku_return_d001.py`](strategies/simplified_sku_return_d001.py)（新增）— SimplifiedSKUReturnD001Strategy 匹配策略
+- [`models/mode_registry.py`](models/mode_registry.py) — MODE_DEFS 新增精簡SKU(退D001) 記錄
+- [`business_logic.py`](business_logic.py) — 策略路由、mode_info 快取、docstring 更新
+- [`excel_generator.py`](excel_generator.py) — D001 Receive Qty 欄位條件顯示、docstring 更新
+- [`ui/tutorial.py`](ui/tutorial.py) — ND/SKU 專項組新增精簡SKU(退D001) 教學內容，決策指南更新
+
+#### 文件同步
+- [`README.md`](README.md) — 模式對照表新增精簡SKU(退D001)、版本號更新
+- [`VERSION.md`](VERSION.md) — 本版本記錄
+- [`config.py`](config.py) — 版本號 bump 至 v2.16.0
+- [`app.py`](app.py) — docstring 更新
+- [`調貨模式詳解.txt`](調貨模式詳解.txt) — 模式25 精簡SKU(退D001) 說明
+- [`transfer_logic_ai_brief.md`](transfer_logic_ai_brief.md) — 模式概覽更新為 25 模式、新增完整模式說明
+
 ## v2.15.0 (2026-05-21)
 
 ### 匹配引擎去重與代碼品質優化

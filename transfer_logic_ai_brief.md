@@ -72,10 +72,11 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - F Mode ND Transfer / F Mode RF Transfer (F mode)
 - ND Smart Transfer (ND1/ND2 mode)
 - 精簡SKU ND轉出 / 精簡SKU RF轉出 (Simplified SKU modes)
+- 精簡SKU(退D001) 退回D001 (Simplified SKU Return to D001 mode)
 
 ---
 
-# Mode Overview (24 Modes: A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, ND1, ND2, 精簡SKU(限同OM), 精簡SKU(跨OM))
+# Mode Overview (25 Modes: A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, ND1, ND2, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001))
 
 ## Mode A: Conservative
 - Source rules: RF only, Surplus Transfer
@@ -281,7 +282,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 1. Start block: Input Excel -> Data validation -> Compute derived fields
 2. Common Rules block (ND only source, protect highest RF, no dual role)
-3. Split into modes A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, ND1, ND2, 精簡SKU(限同OM), 精簡SKU(跨OM) (parallel columns)
+3. Split into modes A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, ND1, ND2, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001) (parallel columns)
 4. For each mode, show:
    - Source criteria
    - Transfer caps
@@ -308,13 +309,23 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - F Target priority (ND/RF can receive, Target Qty = needed_qty)
   - F2 Target-only reception (ND/RF can receive, Target Qty = needed_qty)
   - ND1/ND2 ND mutual transfer (breaks ND-no-receive rule)
-  - 精簡SKU(限同OM) surplus beyond Cap + D001 fallback
-  - 精簡SKU(跨OM) cross-OM + HD/Windy + D001 fallback
+   - 精簡SKU(限同OM) surplus beyond Cap + D001 fallback
+   - 精簡SKU(跨OM) cross-OM + HD/Windy + D001 fallback
+   - 精簡SKU(退D001) all surplus directly returns to D001, no RF receive pairing
 
-## 精簡SKU(退D001) 模式
+## Mode 精簡SKU(退D001): Simplified SKU - Return All to D001
 - source_method: `_sources_simplified_sku` (reuse existing)
 - strategy: `simplified_sku_return_d001`
-- RF儲店存貨上限 = Max(Safety×2, 2月銷量×2)，超出部分轉出
-- ND全數可轉出
-- 所有數量一律回退D001，不配對RF接收
-- supply_source 1/4 不回退
+- Source rules:
+  1. ND: full transfer (all SaSa Net Stock)
+  2. RF: transfer surplus beyond Cap
+     - Cap = Max(Safety Stock × 2, Last 2 Month Sold Qty × 2)
+     - Transferable = min(Total Available - Cap, SaSa Net Stock)
+     - Protect highest sales store
+- **No RF receive pairing**: all transferred quantities directly return to D001
+- No minimum quantity limit (even 1 piece can return to D001)
+- supply_source 1/4 excluded from return
+- Source labels: 精簡SKU ND轉出, 精簡SKU RF轉出
+- Dest labels: 退回D001
+- Report includes additional "D001 Receive Qty" column (only this mode)
+- Goal: SKU rationalization with all surplus returned to warehouse D001

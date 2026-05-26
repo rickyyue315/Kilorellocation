@@ -897,7 +897,43 @@ def _render_nd_sku_group():
         diff_table=None,
     )
 
-    return [content_nd1, content_nd2, content_sku_om, content_sku_cross]
+    content_sku_return_d001 = _build_mode_content(
+        "精簡SKU(退D001)", "精簡SKU全數退回D001", "低",
+        scenario="RF店舖存貨上限 = Max(Safety&#215;2, 2月銷量&#215;2)，超出部分轉出；ND店舖全數可轉出。所有轉出的數量一律回退D001（無數量限制），不進行RF接收配對",
+        source_flow=(
+            _flow_row([
+                _flow_node("ND店舖<br>SaSa Net Stock &gt; 0", "purple"),
+                _flow_node("全數轉出", "green"),
+            ])
+            + _flow_arrow()
+            + _flow_row([
+                _flow_node("RF店舖<br>Total Available &gt; Cap<br>Cap=Max(Safety&#215;2, 2月銷量&#215;2)", "blue"),
+                _flow_node("超出部分轉出", "green"),
+            ])
+        ),
+        dest_flow=_flow_row([
+            _flow_node("無配對接收<br>所有轉出數量<br>直接回退D001", "yellow"),
+        ]),
+        match_order=None,
+        scenario_table=_scenario_table(
+            ["場景", "來源", "數量", "回退"],
+            [
+                ["ND店舖有庫存", "ND", "全數庫存", "D001"],
+                ["RF店舖超出Cap", "RF", "超出Cap部分", "D001"],
+            ]
+        ),
+        extra_notes="無數量限制，即使是1件也可回退D001。不進行RF接收配對，每個來源店舖直接產出一行回退D001建議",
+        diff_table=_scenario_table(
+            ["項目", "精簡SKU(限同OM/跨OM)", "精簡SKU(退D001)"],
+            [
+                ["RF接收配對", "&#9989; 可配對RF店舖接收", "&#10060; 不配對，全退D001"],
+                ["D001回退", "剩餘無法配對才退", "全部直接回退"],
+                ["報告欄位", "標準", "新增D001 Receive Qty"],
+            ]
+        ),
+    )
+
+    return [content_nd1, content_nd2, content_sku_om, content_sku_cross, content_sku_return_d001]
 
 
 def _render_decision_guide():
@@ -911,7 +947,7 @@ def _render_decision_guide():
         ("重點補零庫存店舖？", "C / C1 / C2", "blue"),
         ("有Type分類需求？", "B2~B3La系列", "green"),
         ("ND店舖互轉？", "ND1 / ND2", "blue"),
-        ("SKU精簡？", "精簡SKU(同OM/跨OM)", "green"),
+        ("SKU精簡？", "精簡SKU(同OM/跨OM/退D001)", "green"),
         ("基礎調貨", "A(保守) / B(加強)", "gray"),
     ]
 
@@ -944,6 +980,9 @@ def _render_decision_guide():
 | Type=L需保留2件 | B2L/B2La/B3L/B3La |
 | Type=T不可出貨 | B2a/B2La/B3a/B3La |
 | 需跨OM配對 | B3/B3a/B3L/B3La |
+| SKU精簡僅同OM | 精簡SKU(限同OM) |
+| SKU精簡可跨OM | 精簡SKU(跨OM) |
+| SKU精簡全退D001不配對 | 精簡SKU(退D001) |
 | 僅同OM基礎調貨 | A（保守）/ B（加強） |
 """)
 
@@ -952,7 +991,7 @@ def render_tutorial_page():
     _render_global_rules()
 
     st.markdown("---")
-    st.markdown("### 24 種模式教學")
+    st.markdown("### 25 種模式教學")
     st.markdown("按業務場景分為 8 組，展開查看詳細教學。")
 
     _render_group("基礎調貨模式（A / B）", "1", _render_basic_group)
@@ -968,75 +1007,3 @@ def render_tutorial_page():
     _render_decision_guide()
 
 
-def _render_simplified_sku_return_d001_group():
-    """精簡SKU(退D001)模式教學"""
-    with st.expander("精簡SKU(退D001) — 全數回退D001", expanded=False):
-        cols = st.columns([1, 1, 8])
-        with cols[0]:
-            st.markdown("### 精簡SKU(退D001)")
-        with cols[1]:
-            st.markdown(_risk_badge("低"), unsafe_allow_html=True)
-        with cols[2]:
-            st.markdown(
-                """
-RF店舖存貨上限 = Max(Safety×2, 2月銷量×2)，超出部分轉出；ND店舖全數可轉出。  
-所有轉出的數量一律回退D001（無數量限制），不進行RF接收配對。
-""",
-                unsafe_allow_html=True,
-            )
-
-        st.markdown("#### 來源流程圖（同精簡SKU模式）")
-        with st.container():
-            st.markdown(
-                _flow_row(
-                    [
-                        _flow_node("ND店舖", "purple"),
-                        _flow_node("有庫存?<br>SaSa Net Stock > 0", "blue"),
-                        _flow_node("全數轉出", "green"),
-                    ]
-                ),
-                unsafe_allow_html=True,
-            )
-
-        with st.container():
-            st.markdown(
-                _flow_row(
-                    [
-                        _flow_node("RF店舖", "purple"),
-                        _flow_node("Total Available > Cap?<br>Cap=Max(Safety×2, 2月銷量×2)", "blue"),
-                        _flow_node("超出部分轉出", "green"),
-                        _flow_node("回退D001", "yellow", "200px"),
-                    ]
-                ),
-                unsafe_allow_html=True,
-            )
-
-        st.markdown("#### 接收流程圖")
-        st.markdown("**無配對接收** — 所有轉出數量直接回退D001")
-
-        st.markdown("### 配對優先級")
-        st.info("不進行配對。每個來源店舖直接產出一行回退D001建議。")
-
-        headers = ["場景", "來源", "數量", "回退"]
-        rows = [
-            ["ND店舖有庫存", "ND", "全數庫存", "D001"],
-            ["RF店舖超出Cap", "RF", "超出Cap部分", "D001"],
-        ]
-        st.markdown(_scenario_table(headers, rows), unsafe_allow_html=True)
-
-        st.markdown("### 數量說明")
-        st.info("無數量限制，即使是1件也可回退D001。")
-
-        st.markdown('<div class="diff-section">', unsafe_allow_html=True)
-        st.markdown("### 與精簡SKU(限同OM/跨OM)差異")
-        st.markdown(
-            """
-| 項目 | 精簡SKU(限同OM/跨OM) | 精簡SKU(退D001) |
-|------|----------------------|-----------------|
-| RF接收配對 | ✅ 可配對RF店舖接收 | ❌ 不配對，全退D001 |
-| D001回退 | 剩餘無法配對才退 | 全部直接回退 |
-| 報告欄位 | 標準 | 新增D001 Receive Qty |
-""",
-            unsafe_allow_html=True,
-        )
-        st.markdown('</div>', unsafe_allow_html=True)

@@ -1,4 +1,4 @@
-# KiLo 庫存調貨建議系統 v2.15.0
+# KiLo 庫存調貨建議系統 v2.16.0
 
 ## 系統概述
 
@@ -166,6 +166,7 @@ streamlit run app.py
 | ND2 | ND 混合 OM 轉貨 | ND 店舖可互轉（跨 OM），Windy 只轉 Windy，接收上限 2×兩月銷量，可限制單一出貨店配對接收店數 |
 | 精簡SKU(限同OM) | 精簡SKU 調貨 | RF 超出 Cap（Max(Safety×2, 2月銷量×2)）部分轉出，ND 全轉出，剩餘退回 D001，僅同 OM |
 | 精簡SKU(跨OM) | 精簡SKU 跨 OM 調貨 | 同精簡SKU(限同OM)，允許跨 OM，含 Windy/HD 限制 |
+| 精簡SKU(退D001) | 精簡SKU 全數退回 D001 | RF 超出 Cap 全數回退 D001，ND 全數回退 D001，不配對 RF 接收 |
 
 ## 介面操作流程
 
@@ -215,7 +216,7 @@ python -m pytest tests/test_b2_b3_source_receive_site_limit.py tests/test_b2_pri
 - `services/matching_engine.py`：核心配對引擎（轉移量計算、前置過濾、多回合匹配）
 - `data_processor.py`：Excel 讀取、驗證、欄位標準化、預設資料補齊
 - `excel_generator.py`：報表匯出
-- `ui/tutorial.py`：模式教學分頁（24 種模式圖例化教學）
+- `ui/tutorial.py`：模式教學分頁（25 種模式圖例化教學）
 - `調貨模式詳解.txt`：中文規則細節
 - `VERSION.md`：版本紀錄
 
@@ -241,5 +242,5 @@ python -m pytest tests/test_b2_b3_source_receive_site_limit.py tests/test_b2_pri
 
 ## 版本
 
-- 目前版本：`v2.15.0`
+- 目前版本：`v2.16.0`
 - 詳細異動請見 `VERSION.md`
