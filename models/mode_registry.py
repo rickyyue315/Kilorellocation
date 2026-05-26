@@ -132,6 +132,7 @@ MODE_DEFS: List[ModeDef] = [
             families=frozenset({'simplified_sku'}),
             source_filter=True,
             cross_om_grouping=True,
+            cross_om_matching=True,
             strategy_key='simplified_sku_return_d001',
             source_method='_sources_simplified_sku'),
 ]
