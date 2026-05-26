@@ -1,7 +1,7 @@
 """
-業務邏輯模組 v2.15.0
+業務邏輯模組 v2.16.0
 實現調貨規則、源/目的地識別和匹配算法
-支持二十四模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B2L(附加B特別模式-Type=L保留2件)/B2La(附加B特別模式-Type=L保留2件-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/B3L(附加B跨OM特別模式-Type=L保留2件)/B3La(附加B跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
+支持二十五模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B2L(附加B特別模式-Type=L保留2件)/B2La(附加B特別模式-Type=L保留2件-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/B3L(附加B跨OM特別模式-Type=L保留2件)/B3La(附加B跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
 """
 
 import pandas as pd
@@ -111,7 +111,7 @@ def _compute_max_protected_sold(df) -> float:
 
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.15.0"""
+    """調貨業務邏輯類 v2.16.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False):
@@ -144,6 +144,7 @@ class TransferLogic:
                 'mode_e2': self.mode_e2,
                 'mode_d2': self.mode_d2,
                 'mode_simplified_sku_same': self.mode_simplified_sku_same,
+                'mode_simplified_sku_return_d001': self.mode_simplified_sku_return_d001,
             }
 
         self._ALL_MODES = get_all_mode_names()
@@ -155,6 +156,7 @@ class TransferLogic:
 
     def _init_strategies(self):
         from strategies.simplified_sku import SimplifiedSKUStrategy
+        from strategies.simplified_sku_return_d001 import SimplifiedSKUReturnD001Strategy
         from strategies.c2_mode import C2ModeStrategy
         from strategies.f_mode import FModeStrategy
         from strategies.e1_mode import E1ModeStrategy
@@ -163,6 +165,7 @@ class TransferLogic:
         from strategies.b_special import BSpecialStrategy
         return {
             'simplified_sku': SimplifiedSKUStrategy(),
+            'simplified_sku_return_d001': SimplifiedSKUReturnD001Strategy(),
             'c2_mode': C2ModeStrategy(),
             'f_mode': FModeStrategy(
                 create_note=self._create_recommendation_note,
@@ -1025,6 +1028,7 @@ class TransferLogic:
                 'mode_e2': self.mode_e2,
                 'mode_d2': self.mode_d2,
                 'mode_simplified_sku_same': self.mode_simplified_sku_same,
+                'mode_simplified_sku_return_d001': self.mode_simplified_sku_return_d001,
             }
             self._mode_info_cache[mode] = mode_info
         return create_recommendation_note(source, dest, current_received_qty, transfer_qty, mode, mode_info)

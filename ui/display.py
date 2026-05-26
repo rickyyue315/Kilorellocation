@@ -138,7 +138,7 @@ def render_kpi_cards(statistics: dict):
     st.markdown("")
 
 
-def _build_display_data(recommendations: list, df: pd.DataFrame) -> list:
+def _build_display_data(recommendations: list, df: pd.DataFrame, mode: str = None) -> list:
     _stock_lookup = (
         df[['Article', 'Site', 'SaSa Net Stock', 'Safety Stock', 'MOQ']]
         .set_index(['Article', 'Site'])
@@ -168,7 +168,7 @@ def _build_display_data(recommendations: list, df: pd.DataFrame) -> list:
         cumulative_transfers[source_key] += rec['Transfer Qty']
         source_after_transfer_stock = source_stock - cumulative_transfers[source_key]
 
-        display_data.append({
+        row_data = {
             'Article': rec['Article'],
             'Product Desc': rec['Product Desc'],
             'Transfer OM': rec['Transfer OM'],
@@ -186,17 +186,20 @@ def _build_display_data(recommendations: list, df: pd.DataFrame) -> list:
             'Receive MOQ': dest_moq,
             'Source Type': rec.get('Source Type', ''),
             'Destination Type': rec.get('Destination Type', ''),
-        })
+        }
+        if mode == "精簡SKU(退D001)":
+            row_data['D001 Receive Qty'] = rec['Transfer Qty']
+        display_data.append(row_data)
 
     return display_data
 
 
-def render_results_table(recommendations: list, df: pd.DataFrame, current_run_key: str):
+def render_results_table(recommendations: list, df: pd.DataFrame, current_run_key: str, mode: str = None):
     st.markdown("### 📋 調貨建議清單")
 
     cache_key = f"_display_df_{current_run_key}"
     if cache_key not in st.session_state:
-        st.session_state[cache_key] = pd.DataFrame(_build_display_data(recommendations, df))
+        st.session_state[cache_key] = pd.DataFrame(_build_display_data(recommendations, df, mode))
     rec_df = st.session_state[cache_key]
 
     total_recs = len(rec_df)

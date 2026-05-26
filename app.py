@@ -1,7 +1,7 @@
 """
-庫存調貨建議系統 v2.15.0 - Streamlit應用程序
-支持二十四模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
-含模式教學分頁：24種調貨模式圖例化教學（繁體中文）
+庫存調貨建議系統 v2.16.0 - Streamlit應用程序
+支持二十五模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
+含模式教學分頁：25種調貨模式圖例化教學（繁體中文）
 """
 
 import streamlit as st
@@ -189,6 +189,7 @@ with tab_system:
                     st.session_state['statistics'] = statistics
                     st.session_state['quality_passed'] = quality_passed
                     st.session_state['quality_errors'] = transfer_logic.quality_errors
+                    st.session_state['active_mode_name'] = mode_name
 
                 progress_bar.progress(90, text="分析完成!正在準備結果展示...")
 
@@ -212,7 +213,7 @@ with tab_system:
 
                 render_kpi_cards(statistics)
 
-                render_results_table(recommendations, df, current_run_key)
+                render_results_table(recommendations, df, current_run_key, mode_name_ui)
 
                 render_statistics(statistics)
 
@@ -222,7 +223,7 @@ with tab_system:
                 if st.session_state.get('excel_run_key') != current_run_key or 'excel_data' not in st.session_state:
                     with st.spinner("生成 Excel 文件..."):
                         excel_generator = ExcelGenerator()
-                        st.session_state['excel_data'] = excel_generator.generate_excel_file(recommendations, statistics)
+                        st.session_state['excel_data'] = excel_generator.generate_excel_file(recommendations, statistics, mode=mode_name_ui)
                         st.session_state['excel_filename'] = excel_generator.output_filename
                         st.session_state['excel_run_key'] = current_run_key
 

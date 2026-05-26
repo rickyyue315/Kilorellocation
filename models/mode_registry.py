@@ -127,6 +127,13 @@ MODE_DEFS: List[ModeDef] = [
             cross_om_matching=True, source_filter=True,
             strategy_key='simplified_sku',
             source_method='_sources_simplified_sku', dest_method='_dests_simplified_sku'),
+    ModeDef("精簡SKU(退D001)", "精簡SKU(退D001)", "精簡SKU全數退回D001",
+            attr_name="mode_simplified_sku_return_d001",
+            families=frozenset({'simplified_sku'}),
+            source_filter=True,
+            cross_om_grouping=True,
+            strategy_key='simplified_sku_return_d001',
+            source_method='_sources_simplified_sku'),
 ]
 
 

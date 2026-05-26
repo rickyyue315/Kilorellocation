@@ -310,3 +310,11 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - ND1/ND2 ND mutual transfer (breaks ND-no-receive rule)
   - 精簡SKU(限同OM) surplus beyond Cap + D001 fallback
   - 精簡SKU(跨OM) cross-OM + HD/Windy + D001 fallback
+
+## 精簡SKU(退D001) 模式
+- source_method: `_sources_simplified_sku` (reuse existing)
+- strategy: `simplified_sku_return_d001`
+- RF儲店存貨上限 = Max(Safety×2, 2月銷量×2)，超出部分轉出
+- ND全數可轉出
+- 所有數量一律回退D001，不配對RF接收
+- supply_source 1/4 不回退

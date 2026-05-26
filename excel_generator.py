@@ -1,7 +1,7 @@
 """
-Excel輸出模組 v2.15.0
+Excel輸出模組 v2.16.0
 生成調貨建議和統計摘要的Excel文件
-支持二十四模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
+支持二十五模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)
 增加詳細Notes分類資訊
 """
 
@@ -48,7 +48,7 @@ class ExcelGenerator:
         """
         return f"{source_type} → {dest_type}"
     
-    def create_transfer_recommendations_sheet(self, writer, recommendations: List[Dict]):
+    def create_transfer_recommendations_sheet(self, writer, recommendations: List[Dict], mode: str = None):
         """
         創建調貨建議工作表
         
@@ -59,6 +59,7 @@ class ExcelGenerator:
         logger.info("創建調貨建議工作表")
         
         # 準備數據
+        show_d001_col = mode == "精簡SKU(退D001)" if mode else False
         df_data = []
         for rec in recommendations:
             # 生成Remark
@@ -66,7 +67,7 @@ class ExcelGenerator:
             dest_type = rec.get('Destination Type') or rec.get('Receive Type', '')
             remark = self._generate_remark(source_type, dest_type) if source_type and dest_type else ''
             
-            df_data.append({
+            row_data = {
                 'Brand': rec.get('Product Hierarchy') or rec.get('Brand') or rec.get('品牌', ''),
                 'Article': rec['Article'],
                 'Product Desc': rec['Product Desc'],
@@ -88,7 +89,10 @@ class ExcelGenerator:
                 'Receive Site MTD Sold Qty': rec.get('Receive Site MTD Sold Qty', 0),
                 # 新增Receive Original Stock欄位
                 'Receive Original Stock': rec.get('Receive Original Stock', 0)
-            })
+            }
+            if show_d001_col:
+                row_data['D001 Receive Qty'] = rec['Transfer Qty']
+            df_data.append(row_data)
         
         # 創建DataFrame
         df = pd.DataFrame(df_data)
@@ -120,6 +124,8 @@ class ExcelGenerator:
         worksheet.set_column('Q:Q', 18)  # Receive Site Last Month Sold Qty
         worksheet.set_column('R:R', 15)  # Receive Site MTD Sold Qty
         worksheet.set_column('S:S', 15)  # Receive Original Stock
+        if show_d001_col:
+            worksheet.set_column('T:T', 18)  # D001 Receive Qty
         
         # 添加標題格式
         header_format = workbook.add_format({
@@ -158,7 +164,10 @@ class ExcelGenerator:
         # 應用數據格式（使用列格式避免逐格寫入，提高效能）
         worksheet.set_column('A:M', None, data_format)
         worksheet.set_column('N:N', 75, notes_format)
-        worksheet.set_column('O:S', None, data_format)
+        if show_d001_col:
+            worksheet.set_column('O:T', None, data_format)
+        else:
+            worksheet.set_column('O:S', None, data_format)
 
         # 設置標題行高度與預設行高（避免逐行設定）
         worksheet.set_row(0, 40)
@@ -317,7 +326,8 @@ class ExcelGenerator:
         worksheet.set_row(6, 20)  # KPI值行
     
     def generate_excel_file(self, recommendations: List[Dict], statistics: Dict,
-                           output_path: Optional[str] = None) -> bytes:
+                           output_path: Optional[str] = None,
+                           mode: str = None) -> bytes:
         """
         生成完整的Excel文件，返回 bytes（記憶體操作，無磁碟 I/O）
         
@@ -338,7 +348,7 @@ class ExcelGenerator:
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
             # 創建調貨建議工作表
-            self.create_transfer_recommendations_sheet(writer, recommendations)
+            self.create_transfer_recommendations_sheet(writer, recommendations, mode)
             
             # 創建統計摘要工作表
             self.create_summary_dashboard_sheet(writer, statistics)
