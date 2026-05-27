@@ -5,7 +5,7 @@ E1/E1b/E2模式（僅同OM配對）匹配策略
 from typing import Any, Dict, List, Optional
 
 from strategies.base import BaseMatchStrategy
-from strategies.predicates import is_hd_to_hk_restricted
+from strategies.predicates import validate_pair, is_hd_to_hk_restricted
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.matching_engine import prep_temp_lists
 
@@ -44,20 +44,15 @@ class E1ModeStrategy(BaseMatchStrategy):
             for dest in same_om_dests:
                 if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
                     continue
-                if source['site'] == dest['site']:
+                if not validate_pair(source, dest, transfer_sites,
+                                     check_nd_receive=True,
+                                     check_source_in_receive_sites=False,
+                                     cross_om=False,
+                                     source_to_receive_sites=source_to_receive_sites,
+                                     max_receive_sites_per_source=max_receive_sites_per_source):
                     continue
-                if dest['site'] in transfer_sites:
-                    continue
-                if dest.get('rp_type') == 'ND':
-                    continue
-
                 if is_hd_to_hk_restricted(source['site'], dest['site']):
                     continue
-
-                if max_receive_sites_per_source is not None:
-                    matched_sites = source_to_receive_sites.get(source['site'], set())
-                    if dest['site'] not in matched_sites and len(matched_sites) >= max_receive_sites_per_source:
-                        continue
 
                 transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
 
@@ -81,4 +76,5 @@ class E1ModeStrategy(BaseMatchStrategy):
                 matched = source_to_receive_sites.setdefault(source['site'], set())
                 matched.add(dest['site'])
 
+        self._log_match_stats(recommendations, temp_sources, temp_destinations, article, mode)
         return recommendations

@@ -57,4 +57,5 @@ class BSpecialStrategy(BaseMatchStrategy):
                 max_receive_sites_per_source=max_receive_sites_per_source,
             )
 
+        self._log_match_stats(recommendations, temp_sources, temp_destinations, article, mode)
         return recommendations

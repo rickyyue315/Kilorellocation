@@ -345,6 +345,107 @@ class TransferLogic:
         sources.sort(key=lambda x: x['priority'])
         return sources
 
+    def _identify_nd_sources(self, group_df: pd.DataFrame, mode: str,
+                             type_series) -> List[Dict]:
+        sources = []
+        nd_sources = group_df[group_df['RP Type'] == 'ND']
+        for _, row in nd_sources.iterrows():
+            if self._is_b_tourist_no_source_mode(mode) and type_series is not None and type_series.loc[row.name] == 'T':
+                continue
+            if row['SaSa Net Stock'] > 0:
+                last_month_sold = int(row['Last Month Sold Qty'])
+                mtd_sold = int(row['MTD Sold Qty'])
+
+                if self._is_d_family_mode(mode) and last_month_sold == 0 and mtd_sold == 0:
+                    source_type = 'ND清貨轉出'
+                elif mode == self.mode_d2:
+                    continue
+                else:
+                    source_type = 'ND轉出'
+
+                source_store_type = type_series.loc[row.name] if type_series is not None else ''
+                sources.append(_make_source(row, int(row['SaSa Net Stock']), 1, source_type,
+                                            store_type=source_store_type))
+        return sources
+
+    def _identify_b_special_type_l_sources(self, group_df: pd.DataFrame, mode: str,
+                                           type_series) -> List[Dict]:
+        sources = []
+        type_l_sources = group_df[(type_series == 'L') & (group_df['RP Type'] == 'RF')]
+        for _, row in type_l_sources.iterrows():
+            last_month_sold = int(row['Last Month Sold Qty'])
+            mtd_sold = int(row['MTD Sold Qty'])
+            if max(last_month_sold, mtd_sold) > 2:
+                continue
+
+            net_stock = int(row['SaSa Net Stock'])
+            if self._is_b_l_retain_mode(mode):
+                transferable_qty = max(net_stock - 2, 0)
+            else:
+                transferable_qty = net_stock
+
+            if transferable_qty > 0:
+                sources.append(_make_source(row, transferable_qty, 2, 'Local店舖全轉出',
+                                            store_type=type_series.loc[row.name]))
+        return sources
+
+    def _compute_rf_transferable(self, row, mode: str, total_available: int,
+                                  safety_stock: int) -> Optional[Tuple[int, str]]:
+        if mode == self.mode_a:
+            base_transferable = total_available - safety_stock
+            if base_transferable <= 0:
+                return None
+
+            upper_limit = max(int(total_available * A_MODE_PERCENTAGE_CAP), A_MODE_MIN_TRANSFER)
+            actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
+            if actual_transferable <= 0:
+                return None
+
+            remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+            if remaining_stock >= safety_stock:
+                source_type = 'RF過剩轉出'
+                if actual_transferable == 1 and remaining_stock >= 3:
+                    actual_transferable = 2
+            else:
+                return None
+            return (actual_transferable, source_type)
+
+        elif mode in (self.mode_c, self.mode_c1, self.mode_c2):
+            if mode == self.mode_c1:
+                base_transferable = int(row['SaSa Net Stock']) - 2
+            else:
+                base_transferable = total_available - safety_stock
+            if base_transferable <= 0:
+                return None
+
+            ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
+            abs_cap = C_MODE_ABS_CAP
+            capped_ratio = max(ratio_cap, 0)
+            raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
+            upper_limit = max(2, raw_upper) if mode == self.mode_c1 else max(1, raw_upper)
+
+            actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
+            if actual_transferable <= 0:
+                return None
+
+            remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+            source_type = 'RF過剩轉出' if remaining_stock >= safety_stock else 'RF加強轉出'
+            return (actual_transferable, source_type)
+
+        else:
+            base_transferable = total_available - safety_stock
+            if base_transferable <= 0:
+                return None
+
+            upper_limit = max(int(total_available * B_MODE_PERCENTAGE_CAP), B_MODE_MIN_TRANSFER)
+            actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
+            if actual_transferable <= 0:
+                return None
+
+            remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
+            source_type = 'RF過剩轉出' if remaining_stock >= safety_stock else 'RF加強轉出'
+            return (actual_transferable, source_type)
+
     def _sources_general(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
         sources: List[Dict] = []
         if self._is_b_special_mode(mode):
@@ -355,59 +456,16 @@ class TransferLogic:
         else:
             type_series = None
 
-        nd_sources = group_df[group_df['RP Type'] == 'ND']
-        for _, row in nd_sources.iterrows():
-            if self._is_b_tourist_no_source_mode(mode) and type_series is not None and type_series.loc[row.name] == 'T':
-                continue
-            if row['SaSa Net Stock'] > 0:  # 只考慮有庫存的店鋪
-                # D模式特殊處理：檢查是否為清貨對象（銷量為0）
-                last_month_sold = int(row['Last Month Sold Qty'])
-                mtd_sold = int(row['MTD Sold Qty'])
-                
-                if self._is_d_family_mode(mode) and last_month_sold == 0 and mtd_sold == 0:
-                    # D/D2模式：清貨轉貨，針對無銷售記錄的ND店鋪
-                    source_type = 'ND清貨轉出'
-                elif mode == self.mode_d2:
-                    # D2模式：僅清貨轉出(無銷售記錄)，有銷售的ND不轉出
-                    continue
-                else:
-                    # 其他模式：正常ND轉出
-                    source_type = 'ND轉出'
+        sources.extend(self._identify_nd_sources(group_df, mode, type_series))
 
-                source_store_type = type_series.loc[row.name] if type_series is not None else ''
-                
-                sources.append(_make_source(row, int(row['SaSa Net Stock']), 1, source_type,
-                                            store_type=source_store_type))
-
-        # B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式特殊處理：Type=L 低銷量特例
         if self._is_b_special_mode(mode):
+            sources.extend(self._identify_b_special_type_l_sources(group_df, mode, type_series))
 
-            type_l_sources = group_df[(type_series == 'L') & (group_df['RP Type'] == 'RF')]
-            for _, row in type_l_sources.iterrows():
-                last_month_sold = int(row['Last Month Sold Qty'])
-                mtd_sold = int(row['MTD Sold Qty'])
-                if max(last_month_sold, mtd_sold) > 2:
-                    continue
-
-                net_stock = int(row['SaSa Net Stock'])
-                if self._is_b_l_retain_mode(mode):
-                    transferable_qty = max(net_stock - 2, 0)
-                else:
-                    transferable_qty = net_stock
-
-                if transferable_qty > 0:
-                    sources.append(_make_source(row, transferable_qty, 2, 'Local店舖全轉出',
-                                                store_type=type_series.loc[row.name]))
-
-        # D2模式：RF完全不做轉出，僅ND清貨轉出
         if mode == self.mode_d2:
             sources.sort(key=lambda x: x['priority'])
             return sources
 
-        # 優先級2：RF類型轉出
         rf_sources = group_df[group_df['RP Type'] == 'RF']
-
-        # 找出該Article+OM組合中的最高有效銷量（用於避免從最高動銷店轉出）
         max_sold_qty = _compute_max_protected_sold(rf_sources)
 
         rf_source_count_before_filter = 0
@@ -429,14 +487,9 @@ class TransferLogic:
             safety_stock = int(row['Safety Stock'])
             effective_sold = int(row['Effective Sold Qty'])
 
-            # 條件1：(庫存+在途) > Safety Stock
             is_stock_above_safety = total_available > safety_stock
-
-            # 條件2：不是最高銷量店鋪（保護最高動銷店）
             is_not_highest_sold = effective_sold < max_sold_qty
 
-            # 不符合前置條件則略過
-            # C1微調：允許低於Safety，但必須可在轉後保留至少2件。
             if mode == self.mode_c1:
                 if not (int(row['SaSa Net Stock']) > 2 and is_not_highest_sold):
                     continue
@@ -446,97 +499,13 @@ class TransferLogic:
 
             rf_source_count_after_filter += 1
 
-            # 根據模式計算可轉出數量（已明確階梯：A < C < B）
-            if mode == self.mode_a:
-                # A模式(保守轉貨)
-                # 僅動用明顯過剩庫存，嚴格不跌破 Safety Stock
-                base_transferable = total_available - safety_stock
-                if base_transferable <= 0:
-                    continue
+            result = self._compute_rf_transferable(row, mode, total_available, safety_stock)
+            if result is None:
+                continue
 
-                # 上限：20% total_available，至少 2 件
-                upper_limit = max(int(total_available * A_MODE_PERCENTAGE_CAP), A_MODE_MIN_TRANSFER)
+            actual_transferable, source_type = result
 
-                actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
-                if actual_transferable <= 0:
-                    continue
-
-                remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
-
-                # 僅當仍維持 >= Safety Stock 才允許轉出
-                if remaining_stock >= safety_stock:
-                    source_type = 'RF過剩轉出'
-                    # 若轉出僅1件且淨庫存餘3件以上，上調至2件 (避免單件調貨；放寬Safety Stock -1)
-                    if actual_transferable == 1 and remaining_stock >= 3:
-                        bump_remaining = int(row['SaSa Net Stock']) - 2
-                        actual_transferable = 2
-                        remaining_stock = bump_remaining
-                else:
-                    continue
-
-            elif mode in (self.mode_c, self.mode_c1, self.mode_c2):
-                # C模式(重點補0) / C1模式(只補0/1) / C2模式(附加C跨OM重點補0)
-                # 中等強度，小量精準支援 0 / 低庫存店，不做大規模抽貨。
-                if mode == self.mode_c1:
-                    # C1：允許低於Safety Stock，以淨庫存-2為基準（至少保留2件）
-                    base_transferable = int(row['SaSa Net Stock']) - 2
-                else:
-                    base_transferable = total_available - safety_stock
-                if base_transferable <= 0:
-                    continue
-
-                # 上限設計：
-                # - 比例：最多 30% total_available
-                # - 件數：最多 3 件
-                # - 並允許至少 1 件（支援補0微調貨）
-                ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
-                abs_cap = C_MODE_ABS_CAP
-                # 有效上限不能為負
-                capped_ratio = max(ratio_cap, 0)
-                raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
-                upper_limit = max(2, raw_upper) if mode == self.mode_c1 else max(1, raw_upper)
-
-                actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
-                if actual_transferable <= 0:
-                    continue
-
-                remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
-
-                # 類型標記：
-                # - 若仍 >= Safety → RF過剩轉出（風險低）
-                # - 若略低於 Safety → RF加強轉出（為重點補0作有限犧牲）
-                if remaining_stock >= safety_stock:
-                    source_type = 'RF過剩轉出'
-                else:
-                    source_type = 'RF加強轉出'
-
-            else:
-                # B模式(加強轉貨) / B2模式(附加B) / B3模式(附加B跨OM)
-                # 最 aggressive：最大釋放，多於 C 模式，並可在可控範圍下下探 Safety。
-                base_transferable = total_available - safety_stock
-                if base_transferable <= 0:
-                    continue
-
-                # 上限：最多 50% total_available，至少 2 件
-                upper_limit = max(int(total_available * B_MODE_PERCENTAGE_CAP), B_MODE_MIN_TRANSFER)
-
-                actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stock']))
-                if actual_transferable <= 0:
-                    continue
-
-                remaining_stock = int(row['SaSa Net Stock']) - actual_transferable
-
-                # 類型標記：
-                # - 若仍 >= Safety → RF過剩轉出
-                # - 若 < Safety → RF加強轉出（接受更強調撥出）
-                if remaining_stock >= safety_stock:
-                    source_type = 'RF過剩轉出'
-                else:
-                    source_type = 'RF加強轉出'
-
-            # 加入可轉出來源（所有模式共用）
             if actual_transferable > 0:
-                # C1模式：避免只可轉出1件的來源參與配對
                 if mode == self.mode_c1 and actual_transferable < C1_MODE_MIN_TRANSFER:
                     continue
 
@@ -551,9 +520,7 @@ class TransferLogic:
                 f"max_sold_qty={'inf' if max_sold_qty == float('inf') else max_sold_qty}"
             )
 
-        # 按優先級排序（ND優先，RF其次）
         sources.sort(key=lambda x: x['priority'])
-
         return sources
     
     def identify_destinations(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:

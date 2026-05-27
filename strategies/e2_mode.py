@@ -7,7 +7,7 @@ import pandas as pd
 
 from config import C_MODE_PERCENTAGE_CAP, C_MODE_ABS_CAP
 from strategies.base import BaseMatchStrategy
-from strategies.predicates import is_hd_to_hk_restricted
+from strategies.predicates import validate_pair, is_hd_to_hk_restricted
 
 
 def _make_source(row, transferable_qty: int, priority: int, source_type: str, **extra) -> Dict:
@@ -68,6 +68,7 @@ class E2ModeStrategy(BaseMatchStrategy):
                 build_recommendation, apply_transfer,
             )
 
+        self._log_match_stats(recommendations, temp_sources, temp_destinations, article, mode)
         return recommendations
 
     def _match_e_mode_phase(
@@ -92,19 +93,15 @@ class E2ModeStrategy(BaseMatchStrategy):
             for dest in candidate_dests:
                 if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
                     continue
-                if source['site'] == dest['site']:
-                    continue
-                if dest['site'] in transfer_sites:
-                    continue
-                if dest.get('rp_type') == 'ND':
+                if not validate_pair(source, dest, transfer_sites,
+                                     check_nd_receive=True,
+                                     check_source_in_receive_sites=False,
+                                     cross_om=False,
+                                     source_to_receive_sites=source_to_receive_sites,
+                                     max_receive_sites_per_source=max_receive_sites_per_source):
                     continue
                 if is_hd_to_hk_restricted(source['site'], dest['site']):
                     continue
-
-                if max_receive_sites_per_source is not None:
-                    matched_sites = source_to_receive_sites.get(source['site'], set())
-                    if dest['site'] not in matched_sites and len(matched_sites) >= max_receive_sites_per_source:
-                        continue
 
                 transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
                 receive_site_key = f"{dest['site']}_{article}"
@@ -197,13 +194,10 @@ class E2ModeStrategy(BaseMatchStrategy):
             for dest in unfulfilled_dests:
                 if dest['needed_qty'] <= 0:
                     continue
-                if source['site'] == dest['site']:
-                    continue
-                if dest['site'] in transfer_sites:
-                    continue
-                if dest['site'] in receive_sites:
-                    continue
-                if dest.get('rp_type') == 'ND':
+                if not validate_pair(source, dest, transfer_sites, receive_sites,
+                                     check_nd_receive=True,
+                                     check_source_in_receive_sites=True,
+                                     cross_om=False):
                     continue
                 if is_hd_to_hk_restricted(source['site'], dest['site']):
                     continue

@@ -5,7 +5,7 @@ F/F2模式匹配策略
 from typing import Any, Dict, List, Optional
 
 from strategies.base import BaseMatchStrategy
-from strategies.predicates import is_hd_to_hk_restricted
+from strategies.predicates import validate_pair, is_hd_to_hk_restricted
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.matching_engine import prep_temp_lists
 
@@ -71,9 +71,10 @@ class FModeStrategy(BaseMatchStrategy):
                     if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0 or remaining_demand <= 0:
                         continue
 
-                    if source['site'] == dest['site']:
-                        continue
-                    if dest['site'] in transfer_sites:
+                    if not validate_pair(source, dest, transfer_sites,
+                                         check_nd_receive=False,
+                                         check_source_in_receive_sites=False,
+                                         cross_om=False):
                         continue
 
                     if priority_level == 2:
@@ -108,4 +109,5 @@ class FModeStrategy(BaseMatchStrategy):
                     if dest.get('target_qty') is not None and received_qty_by_site[receive_site_key] >= dest['target_qty']:
                         dest['needed_qty'] = 0
 
+        self._log_match_stats(recommendations, temp_sources, temp_destinations, article, mode)
         return recommendations

@@ -6,7 +6,7 @@ C2模式（跨OM重點補0）匹配策略
 from typing import Any, Dict, List, Optional
 
 from strategies.base import BaseMatchStrategy
-from strategies.predicates import is_hd_to_hk_restricted
+from strategies.predicates import validate_pair
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.matching_engine import prep_temp_lists
 
@@ -56,6 +56,7 @@ class C2ModeStrategy(BaseMatchStrategy):
                 transfer_sites, receive_sites, received_qty_by_site,
             )
 
+        self._log_match_stats(recommendations, temp_sources, temp_destinations, article, mode)
         return recommendations
 
     def _match_round(
@@ -87,17 +88,10 @@ class C2ModeStrategy(BaseMatchStrategy):
             for dest in filtered_destinations:
                 if dest['needed_qty'] <= 0:
                     continue
-                if source['site'] == dest['site']:
-                    continue
-                if dest['site'] in transfer_sites:
-                    continue
-                if source['site'] in receive_sites:
-                    continue
-                if dest.get('rp_type') == 'ND':
-                    continue
-                if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
-                    continue
-                if is_hd_to_hk_restricted(source['site'], dest['site']):
+                if not validate_pair(source, dest, transfer_sites, receive_sites,
+                                     check_nd_receive=True,
+                                     check_source_in_receive_sites=True,
+                                     cross_om=True):
                     continue
 
                 transfer_qty = min(source['transferable_qty'], dest['needed_qty'])

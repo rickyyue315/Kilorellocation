@@ -45,4 +45,5 @@ class SimplifiedSKUReturnD001Strategy(BaseMatchStrategy):
             )
             recommendations.append(rec)
 
+        self._log_match_stats(recommendations, temp_sources, [], article, mode)
         return recommendations

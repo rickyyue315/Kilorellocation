@@ -5,7 +5,7 @@ ND1/ND2模式匹配策略
 from typing import Any, Dict, List, Optional
 
 from strategies.base import BaseMatchStrategy
-from strategies.predicates import is_hd_to_hk_restricted
+from strategies.predicates import validate_pair, is_hd_to_hk_restricted
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.matching_engine import prep_temp_lists
 
@@ -42,24 +42,17 @@ class NDModeStrategy(BaseMatchStrategy):
             for source in temp_sources:
                 if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
                     continue
-                if source['site'] == dest['site']:
+                if not validate_pair(source, dest, transfer_sites, receive_sites,
+                                     check_nd_receive=False,
+                                     check_source_in_receive_sites=True,
+                                     cross_om=cross_om,
+                                     source_to_receive_sites=source_to_receive_sites,
+                                     max_receive_sites_per_source=max_receive_sites_per_source):
                     continue
-                if dest['site'] in transfer_sites:
-                    continue
-                if source['site'] in receive_sites:
-                    continue
-
                 if not cross_om and source['om'] != dest['om']:
-                    continue
-                if cross_om and source.get('om') == 'Windy' and dest.get('om') != 'Windy':
                     continue
                 if is_hd_to_hk_restricted(source['site'], dest['site']):
                     continue
-
-                if max_receive_sites_per_source is not None:
-                    matched_sites = source_to_receive_sites.get(source['site'], set())
-                    if dest['site'] not in matched_sites and len(matched_sites) >= max_receive_sites_per_source:
-                        continue
 
                 receive_key = f"{dest['site']}_{article}"
                 current_received = received_qty_by_site.get(receive_key, 0)
@@ -86,4 +79,5 @@ class NDModeStrategy(BaseMatchStrategy):
                 if received_qty_by_site[receive_key] >= max_receive:
                     dest['needed_qty'] = 0
 
+        self._log_match_stats(recommendations, temp_sources, temp_destinations, article, mode)
         return recommendations
