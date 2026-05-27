@@ -236,7 +236,9 @@ def render_statistics(statistics: dict):
             if article_stats:
                 article_df = pd.DataFrame([
                     {
+                        'Brand': stats.get('brand', ''),
                         'Article': article,
+                        'Product Desc': stats.get('product_desc', ''),
                         'Total Qty': stats['total_qty'],
                         'Count': stats['count'],
                         'OM Count': stats['om_count'],

@@ -17,7 +17,13 @@ def compute_transfer_statistics(recommendations: List[Dict[str, Any]]) -> Dict[s
     for rec in recommendations:
         article = rec['Article']
         if article not in article_stats:
-            article_stats[article] = {'total_qty': 0, 'count': 0, 'oms': set()}
+            article_stats[article] = {
+                'brand': rec.get('Brand') or rec.get('Product Hierarchy', ''),
+                'product_desc': rec.get('Product Desc', ''),
+                'total_qty': 0,
+                'count': 0,
+                'oms': set(),
+            }
         article_stats[article]['total_qty'] += rec['Transfer Qty']
         article_stats[article]['count'] += 1
         article_stats[article]['oms'].add(rec['Transfer OM'])

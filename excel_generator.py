@@ -248,18 +248,22 @@ class ExcelGenerator:
         
         # 按Article統計
         row = 8
-        worksheet.write(f'A{row}', '按Article統計', header_format)
-        worksheet.write(f'B{row}', '總調貨件數', header_format)
-        worksheet.write(f'C{row}', '調貨行數', header_format)
-        worksheet.write(f'D{row}', '涉及OM數量', header_format)
+        worksheet.write(f'A{row}', 'Brand', header_format)
+        worksheet.write(f'B{row}', '按Article統計', header_format)
+        worksheet.write(f'C{row}', 'Product Desc', header_format)
+        worksheet.write(f'D{row}', '總調貨件數', header_format)
+        worksheet.write(f'E{row}', '調貨行數', header_format)
+        worksheet.write(f'F{row}', '涉及OM數量', header_format)
         
         article_stats = statistics.get('article_stats', {})
         for article, stats in article_stats.items():
             row += 1
-            worksheet.write(f'A{row}', article, data_format)
-            worksheet.write(f'B{row}', stats['total_qty'], data_format)
-            worksheet.write(f'C{row}', stats['count'], data_format)
-            worksheet.write(f'D{row}', stats['om_count'], data_format)
+            worksheet.write(f'A{row}', stats.get('brand', ''), data_format)
+            worksheet.write(f'B{row}', article, data_format)
+            worksheet.write(f'C{row}', stats.get('product_desc', ''), data_format)
+            worksheet.write(f'D{row}', stats['total_qty'], data_format)
+            worksheet.write(f'E{row}', stats['count'], data_format)
+            worksheet.write(f'F{row}', stats['om_count'], data_format)
         
         # 空白行
         row += 2
