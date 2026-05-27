@@ -89,6 +89,9 @@ class SimplifiedSKUStrategy(BaseMatchStrategy):
             if supply_source is not None and pd.notna(supply_source) and int(supply_source) in (1, 4):
                 continue
 
+            if remaining == 1 and source['source_type'] == '精簡SKU RF轉出':
+                continue
+
             notes = f"精簡SKU模式：剩餘庫存{remaining}件退回D001"
             rec = build_recommendation(
                 article, product_desc, source, {}, remaining, notes, 0,
