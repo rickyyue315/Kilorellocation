@@ -19,9 +19,9 @@
         --border-active:   rgba(6, 182, 212, 0.4);
 
         /* 文字 */
-        --text-primary:    #F1F5F9;
-        --text-secondary:  #94A3B8;
-        --text-muted:      #64748B;
+        --text-primary:    #FFFFFF;
+        --text-secondary:  #CBD5E1;
+        --text-muted:      #94A3B8;
 
         /* 強調色 — 來自截圖 Dashboard */
         --accent-orange:   #F59E0B;
@@ -111,7 +111,7 @@
     }
 
     p, span, div, label {
-        color: var(--text-secondary);
+        color: var(--text-primary);
         font-size: 1rem;
     }
 
@@ -199,6 +199,7 @@
         letter-spacing: 0.5px !important;
         box-shadow: 0 4px 20px rgba(52, 211, 153, 0.35) !important;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
     }
 
     .stDownloadButton > button:hover {
@@ -271,8 +272,8 @@
     }
 
     div[data-testid="stMetricLabel"] {
-        color: var(--text-secondary) !important;
-        font-weight: 500 !important;
+        color: var(--text-primary) !important;
+        font-weight: 600 !important;
         font-size: 0.95rem !important;
         margin-bottom: 6px !important;
     }
@@ -296,7 +297,7 @@
     }
 
     div[data-testid="stExpander"] summary {
-        color: var(--text-secondary) !important;
+        color: var(--text-primary) !important;
         font-weight: 600 !important;
         padding: 12px 18px !important;
     }
@@ -450,7 +451,7 @@
 
     .mode-scenario {
         font-size: 14px;
-        color: var(--text-secondary);
+        color: var(--text-primary);
         margin: 6px 0 14px 0;
         line-height: 1.6;
     }
