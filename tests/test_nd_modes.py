@@ -128,13 +128,13 @@ class TestND1Mode:
         assert 'ND01' in transfer_sites, "0銷量店舖應優先轉出"
 
     def test_receive_cap_2x_two_month_sales(self):
-        """接收量不超過 2×兩月銷量"""
+        """接收量不超過 2×過去2個月銷量"""
         logic = self._logic()
         df = make_df([
             # 轉出源：ND 店舖，0銷量，大量庫存
             {'Article': '000000000001', 'OM': 'Ivy', 'Site': 'ND01', 'RP Type': 'ND',
              'SaSa Net Stock': 50, 'Last Month Sold Qty': 0, 'MTD Sold Qty': 0},
-            # 接收方：兩月銷量 = 3，接收上限 = 6
+            # 接收方：過去2個月銷量 = 3，接收上限 = 6
             {'Article': '000000000001', 'OM': 'Ivy', 'Site': 'ND02', 'RP Type': 'ND',
              'SaSa Net Stock': 0, 'Last Month Sold Qty': 2, 'MTD Sold Qty': 1},
         ])
@@ -144,7 +144,7 @@ class TestND1Mode:
             assert total_received <= 6, f"接收量 {total_received} 不應超過 2×(2+1)=6"
 
     def test_zero_sales_nd_cannot_receive(self):
-        """兩月銷量=0 的 ND 店舖不可接收"""
+        """過去2個月銷量=0 的 ND 店舖不可接收"""
         logic = self._logic()
         df = make_df([
             # 轉出源

@@ -73,7 +73,7 @@ def render_upload_requirements(mode_code: str):
 
             **⚠️ 特殊要求:**
             - ND1 模式僅同OM配對；ND2 模式允許跨OM配對
-            - ND 店舖在 ND1/ND2 模式可作為接收方，但兩月銷量=0 的 ND 店舖不可接收
+            - ND 店舖在 ND1/ND2 模式可作為接收方，但過去2個月銷量=0 的 ND 店舖不可接收
             - 同一SKU下可設定單一出貨店舖最多配對接收店舖數：優先1間 / 最多2間 / 不限
             """)
     elif mode_code in ["精簡SKU(限同OM)", "精簡SKU(跨OM)"]:

@@ -93,7 +93,7 @@ flowchart TD
     F --> H[identify_destinations - ND模式]
     H --> H1[RF 緊急缺貨 - 優先級1]
     H --> H2[ND 潛在缺貨 - 優先級2]
-    H --> H3[接收量上限: 2倍兩月銷量]
+    H --> H3[接收量上限: 2倍過去2個月銷量]
     
     G1 --> I{ND1 or ND2?}
     G2 --> I
@@ -124,7 +124,7 @@ flowchart TD
 | Windy 限制 | 視模式而定 | N/A 同OM | ✅ Windy 只轉 Windy |
 | 轉出排序 | ND優先級1 + RF優先級2 | 按銷量排序 | 按銷量排序 |
 | 接收排序 | 緊急缺貨 + 潛在缺貨 | RF緊急 → ND按銷量 | RF緊急 → ND按銷量 |
-| 接收上限 | Safety Stock 倍數 | 2倍兩月銷量 | 2倍兩月銷量 |
+| 接收上限 | Safety Stock 倍數 | 2倍過去2個月銷量 | 2倍過去2個月銷量 |
 | 轉出類型 | ND轉出 / RF轉出 | ND智能轉出 | ND智能轉出 |
 | 接收類型 | 緊急/潛在缺貨 | RF緊急缺貨 + ND潛在缺貨接收 | RF緊急缺貨 + ND潛在缺貨接收 |
 
@@ -158,7 +158,7 @@ def _is_nd_transfer_mode(self, mode: str) -> bool:
 - 優先級 1：RF 緊急缺貨（SaSa Net Stock = 0 且有銷售記錄）
 - 優先級 2：ND 潛在缺貨（ND 店舖按銷量高低排序接收）
 - 接收上限：`2 × (Last Month Sold Qty + MTD Sold Qty)`
-- 若兩月銷量為 0，不列為接收候選
+- 若過去2個月銷量為 0，不列為接收候選
 - 接收類型標記：`RF緊急缺貨補貨`、`ND潛在缺貨接收`
 
 #### 4.1.5 新增 `_match_transfers_nd1_mode()` — 同 OM 匹配
@@ -290,7 +290,7 @@ if self._is_nd_transfer_mode(mode):
         if total_sales <= 0:
             continue  # 0銷量不接收
         
-        max_receive = 2 * total_sales  # 2倍兩月銷量
+        max_receive = 2 * total_sales  # 2倍過去2個月銷量
         current_stock = net_stock + pending
         
         if current_stock >= max_receive:
@@ -419,5 +419,5 @@ def perform_quality_checks(self, df: pd.DataFrame, mode: str = None) -> bool:
 1. **breaking change**：ND1/ND2 模式打破「ND 不可接收」的全局規則，需確保不影響其他 13 個模式
 2. **quality_checks**：新增 mode 參數傳遞，需同步修改 `app.py` 呼叫端
 3. **後處理**：`_optimize_single_piece_transfers` 需確認對 ND 接收的建議也能正確處理
-4. **接收上限為 0**：若 ND 店舖兩月銷量 = 0，理論上不能接收 → 需確保 identify_destinations 已排除
+4. **接收上限為 0**：若 ND 店舖過去2個月銷量 = 0，理論上不能接收 → 需確保 identify_destinations 已排除
 5. **Windy 限制**：ND2 模式需特別處理，所有 HD 開頭的 Windy 店舖之間的跨 OM 轉貨邏輯

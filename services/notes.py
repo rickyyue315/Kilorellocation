@@ -11,7 +11,7 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
         total_sales = source.get('last_month_sold_qty', 0) + source.get('mtd_sold_qty', 0)
         if total_sales == 0:
             return f"【轉出分析: ND智能轉出，0銷量店舖優先轉出，轉出後剩餘{remaining}件】"
-        return f"【轉出分析: ND智能轉出，兩月銷量{total_sales}件(按銷量升序排序)，轉出後剩餘{remaining}件】"
+        return f"【轉出分析: ND智能轉出，過去2個月銷量{total_sales}件(按銷量升序排序)，轉出後剩餘{remaining}件】"
     if src_type == 'ND轉出' and not mode_info['is_d_family']:
         return "【轉出分析: ND類型店鋪，無庫存限制，可全數轉出】"
     if src_type == 'F模式ND轉出':
@@ -38,7 +38,7 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
         return f"【轉出分析: 精簡SKU模式ND轉出，全數可轉出，轉出後剩餘{remaining}件】"
     if src_type == '精簡SKU RF轉出':
         last_2m = source.get('last_2_month_sold_qty', 0)
-        return f"【轉出分析: 精簡SKU模式RF轉出，超出Cap(Safety×2與2月銷量×2取高者)部分轉出，2月銷量{last_2m}件，轉出後剩餘{remaining}件】"
+        return f"【轉出分析: 精簡SKU模式RF轉出，超出Cap(Safety×2與過去2個月銷量×2取高者)部分轉出，過去2個月銷量{last_2m}件，轉出後剩餘{remaining}件】"
     return ""
 
 
@@ -64,7 +64,7 @@ def _note_dest_analysis(dest, current_received_qty, transfer_qty):
     if dest_type == 'ND潛在缺貨接收':
         total_sales = dest.get('total_sales', 0)
         max_receive = dest.get('max_receive_qty', total_sales * 2)
-        return f"【接收分析: ND潛在缺貨接收，兩月銷量{total_sales}件，接收上限{max_receive}件(2×兩月銷量)，累計已接收{cumulative}件】"
+        return f"【接收分析: ND潛在缺貨接收，過去2個月銷量{total_sales}件，接收上限{max_receive}件(2×過去2個月銷量)，累計已接收{cumulative}件】"
     if dest_type == 'RF緊急缺貨補貨':
         return "【接收分析: RF緊急缺貨補貨，RF店鋪零庫存但有銷售記錄（ND模式優先滿足）】"
     if dest_type == '緊急缺貨補貨':
@@ -78,7 +78,7 @@ def _note_dest_analysis(dest, current_received_qty, transfer_qty):
         return f"【接收分析: 潛在缺貨補貨，庫存不足{shortage}件，補充至安全庫存{safety_stock}件】"
     if dest_type == '精簡SKU接收':
         target_qty = dest.get('target_qty', 0)
-        return f"【接收分析: 精簡SKU接收，接收上限Cap=Max(Safety×2, 2月銷量×2)={target_qty}件，累計已接收{cumulative}件】"
+        return f"【接收分析: 精簡SKU接收，接收上限Cap=Max(Safety×2, 過去2個月銷量×2)={target_qty}件，累計已接收{cumulative}件】"
     return ""
 
 
@@ -142,6 +142,6 @@ def create_recommendation_note(source, dest, current_received_qty, transfer_qty,
             notes_parts.append("【特殊標記: 精簡SKU模式，剩餘庫存退回D001】")
         elif dest.get('dest_type') == '精簡SKU接收':
             mode_variant = "限同OM" if mode == mode_info['mode_simplified_sku_same'] else "跨OM"
-            notes_parts.append(f"【特殊標記: 精簡SKU模式({mode_variant})，RF存貨上限=Max(Safety×2, 2月銷量×2)，參考C1模式最少2件起轉】")
+            notes_parts.append(f"【特殊標記: 精簡SKU模式({mode_variant})，RF存貨上限=Max(Safety×2, 過去2個月銷量×2)，參考C1模式最少2件起轉】")
 
     return " | ".join(notes_parts)

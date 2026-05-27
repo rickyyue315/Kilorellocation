@@ -777,7 +777,7 @@ def _render_nd_sku_group():
         "ND1", "ND同OM轉貨", "中",
         scenario="ND 店舖之間需要互相調貨，或 ND 轉給 RF 店舖。打破「ND 不可接收」限制",
         source_flow=(
-            _flow_row([_flow_node("ND 店舖<br>按2月銷量升序<br>(0銷量優先轉出)", "blue")])
+            _flow_row([_flow_node("ND 店舖<br>按過去2個月銷量升序<br>(0銷量優先轉出)", "blue")])
             + _flow_arrow("保護最高銷量ND")
             + _flow_row([
                 _flow_node("最高銷量 ND 店<br>不轉出", "purple"),
@@ -786,14 +786,14 @@ def _render_nd_sku_group():
         ),
         dest_flow=_flow_row([
             _flow_node("1&#65039;&#8419; RF 緊急缺貨<br>Net Stock=0 有銷量", "red"),
-            _flow_node("2&#65039;&#8419; ND 潛在缺貨<br>按2月銷量降序<br>上限=2&#215;銷量", "orange"),
+            _flow_node("2&#65039;&#8419; ND 潛在缺貨<br>按過去2個月銷量降序<br>上限=2&#215;銷量", "orange"),
         ]),
         match_order=[
             ("ND智能轉出", "RF緊急缺貨"),
             ("ND智能轉出", "ND潛在缺貨"),
         ],
         scenario_table=_scenario_table(
-            ["店舖", "類型", "Net Stock", "2月銷量", "角色", "調撥量"],
+            ["店舖", "類型", "Net Stock", "過去2個月銷量", "角色", "調撥量"],
             [
                 ["HA001", "ND", "10", "0", "轉出(0銷量優先)", "-8"],
                 ["HA002", "ND", "5", "3", "轉出(低銷量)", "-3"],
@@ -802,7 +802,7 @@ def _render_nd_sku_group():
                 ["HA004", "ND", "1", "4", "接收(ND潛在)", "+3"],
             ]
         ),
-        extra_notes="ND1 打破全局「ND不可接收」規則。2月銷量=0 的 ND 店舖不可接收。同 OM 配對",
+        extra_notes="ND1 打破全局「ND不可接收」規則。過去2個月銷量=0 的 ND 店舖不可接收。同 OM 配對",
         diff_table=_scenario_table(
             ["對比項", "ND1", "ND2"],
             [
@@ -844,10 +844,10 @@ def _render_nd_sku_group():
         source_flow=(
             _flow_row([_flow_node("ND 店舖<br>全數轉出", "blue")])
             + _flow_arrow()
-            + _flow_row([_flow_node("RF 店舖<br>超出Cap部分轉出<br>Cap=Max(Safety&#215;2, 2月銷量&#215;2)", "green")])
+            + _flow_row([_flow_node("RF 店舖<br>超出Cap部分轉出<br>Cap=Max(Safety&#215;2, 過去2個月銷量&#215;2)", "green")])
         ),
         dest_flow=_flow_row([
-            _flow_node("RF 接收<br>上限=Max(Safety&#215;2,<br>2月銷量&#215;2)<br>最少2件", "purple"),
+            _flow_node("RF 接收<br>上限=Max(Safety&#215;2,<br>過去2個月銷量&#215;2)<br>最少2件", "purple"),
             _flow_node("剩餘未配對<br>&#10132; 退回D001", "orange"),
         ]),
         match_order=[
@@ -856,7 +856,7 @@ def _render_nd_sku_group():
             ("精簡SKU ND/RF轉出", "退回D001"),
         ],
         scenario_table=_scenario_table(
-            ["店舖", "類型", "Net Stock", "Safety", "2月銷量", "Cap", "角色"],
+            ["店舖", "類型", "Net Stock", "Safety", "過去2個月銷量", "Cap", "角色"],
             [
                 ["HA001", "ND", "10", "-", "-", "-", "精簡SKU ND轉出(-10)"],
                 ["HD001", "RF", "20", "4", "3", "8", "精簡SKU RF轉出(-12)"],
@@ -899,7 +899,7 @@ def _render_nd_sku_group():
 
     content_sku_return_d001 = _build_mode_content(
         "精簡SKU(退D001)", "精簡SKU全數退回D001", "低",
-        scenario="RF店舖存貨上限 = Max(Safety&#215;2, 2月銷量&#215;2)，超出部分轉出；ND店舖全數可轉出。所有轉出的數量一律回退D001，RF僅1件不退回。不進行RF接收配對",
+        scenario="RF店舖存貨上限 = Max(Safety&#215;2, 過去2個月銷量&#215;2)，超出部分轉出；ND店舖全數可轉出。所有轉出的數量一律回退D001，RF僅1件不退回。不進行RF接收配對",
         source_flow=(
             _flow_row([
                 _flow_node("ND店舖<br>SaSa Net Stock &gt; 0", "purple"),
@@ -907,7 +907,7 @@ def _render_nd_sku_group():
             ])
             + _flow_arrow()
             + _flow_row([
-                _flow_node("RF店舖<br>Total Available &gt; Cap<br>Cap=Max(Safety&#215;2, 2月銷量&#215;2)", "blue"),
+                _flow_node("RF店舖<br>Total Available &gt; Cap<br>Cap=Max(Safety&#215;2, 過去2個月銷量&#215;2)", "blue"),
                 _flow_node("超出部分轉出", "green"),
             ])
         ),

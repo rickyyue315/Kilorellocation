@@ -107,4 +107,4 @@ def _make_sku_note(source, dest, current_received, transfer_qty, mode):
     mode_variant = "限同OM" if mode == "精簡SKU(限同OM)" else "跨OM"
     return (f"【精簡SKU模式({mode_variant})】"
             f"{source['site']}→{dest['site']} {transfer_qty}件, "
-            f"RF存貨上限=Max(Safety×2, 2月銷量×2)")
+            f"RF存貨上限=Max(Safety×2, 過去2個月銷量×2)")
