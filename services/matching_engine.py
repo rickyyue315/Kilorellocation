@@ -79,7 +79,8 @@ def compute_transfer_qty(logic, source: Dict, dest: Dict, mode: str, current_rec
 def can_transfer(logic, source: Dict, dest: Dict, mode: str, article: str,
                  transfer_sites: set, receive_sites: set,
                  source_to_receive_sites: Dict, received_qty_by_site: Dict,
-                 source_type_filter: Optional[str] = None) -> bool:
+                 source_type_filter: Optional[str] = None,
+                 max_receive_sites_per_source: Optional[int] = None) -> bool:
     if source['site'] == dest['site']:
         return False
     if dest['site'] in transfer_sites:
@@ -89,10 +90,11 @@ def can_transfer(logic, source: Dict, dest: Dict, mode: str, article: str,
     if dest.get('rp_type') == 'ND':
         return False
 
-    if logic.b_special_max_receive_sites_per_source is not None:
+    limit = max_receive_sites_per_source if max_receive_sites_per_source is not None else logic.b_special_max_receive_sites_per_source
+    if limit is not None:
         source_site = source.get('site')
         matched_sites = source_to_receive_sites.get(source_site, set())
-        if dest.get('site') not in matched_sites and len(matched_sites) >= logic.b_special_max_receive_sites_per_source:
+        if dest.get('site') not in matched_sites and len(matched_sites) >= limit:
             return False
 
     is_cross_om = bool(source.get('om') and dest.get('om') and source.get('om') != dest.get('om'))
@@ -176,7 +178,8 @@ def match_by_priority(logic, sources: List[Dict], destinations: List[Dict],
                 continue
 
             if not can_transfer(logic, source, dest, mode, article, transfer_sites, receive_sites,
-                                source_to_receive_sites, received_qty_by_site, source_type_filter):
+                                source_to_receive_sites, received_qty_by_site, source_type_filter,
+                                max_receive_sites_per_source):
                 continue
 
             receive_site_key = f"{dest['site']}_{article}"
@@ -215,7 +218,10 @@ def match_general_mode(logic, sources: List[Dict], destinations: List[Dict],
     receive_sites = set()
     received_qty_by_site = {}
 
-    if mode == logic.mode_c:
+    is_c_mode = (mode == logic.mode_c)
+    is_c1_mode = (mode == logic.mode_c1)
+
+    if is_c_mode:
         match_by_priority(logic, temp_sources, temp_destinations, recommendations,
                           article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site, mode, None, '重點補0',
                           receive_sites=receive_sites)
@@ -228,7 +234,12 @@ def match_general_mode(logic, sources: List[Dict], destinations: List[Dict],
                       article, om, product_desc, 1, 2, transfer_sites, received_qty_by_site, mode,
                       receive_sites=receive_sites)
 
-    if mode == logic.mode_c1:
+    if is_c_mode:
+        match_by_priority(logic, temp_sources, temp_destinations, recommendations,
+                          article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出', '重點補0',
+                          receive_sites=receive_sites)
+
+    if is_c1_mode:
         match_by_priority(logic, temp_sources, temp_destinations, recommendations,
                           article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出', '重點補0',
                           receive_sites=receive_sites)
@@ -241,12 +252,12 @@ def match_general_mode(logic, sources: List[Dict], destinations: List[Dict],
                       article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出',
                       receive_sites=receive_sites)
 
-    if mode == logic.mode_c:
+    if is_c_mode:
         match_by_priority(logic, temp_sources, temp_destinations, recommendations,
-                          article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF過剩轉出', '重點補0',
+                          article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出', '重點補0',
                           receive_sites=receive_sites)
 
-    if mode == logic.mode_c1:
+    if is_c1_mode:
         match_by_priority(logic, temp_sources, temp_destinations, recommendations,
                           article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出', '重點補0',
                           receive_sites=receive_sites)
@@ -258,10 +269,5 @@ def match_general_mode(logic, sources: List[Dict], destinations: List[Dict],
     match_by_priority(logic, temp_sources, temp_destinations, recommendations,
                       article, om, product_desc, 2, 2, transfer_sites, received_qty_by_site, mode, 'RF加強轉出',
                       receive_sites=receive_sites)
-
-    if mode == logic.mode_c:
-        match_by_priority(logic, temp_sources, temp_destinations, recommendations,
-                          article, om, product_desc, 2, 1, transfer_sites, received_qty_by_site, mode, 'RF加強轉出', '重點補0',
-                          receive_sites=receive_sites)
 
     return recommendations

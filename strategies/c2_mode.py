@@ -1,5 +1,6 @@
 """
 C2模式（跨OM重點補0）匹配策略
+使用多回合優先制，與 C 模式對稱，支援跨OM配對
 """
 
 from typing import Any, Dict, List, Optional
@@ -28,14 +29,63 @@ class C2ModeStrategy(BaseMatchStrategy):
         receive_sites = set()
         received_qty_by_site = {}
 
-        temp_destinations.sort(key=lambda x: x['priority'])
+        rounds = [
+            (1, 1, '重點補0'),
+            (1, 1, None),
+            (1, 2, None),
+            (2, 1, '重點補0', 'RF過剩轉出'),
+            (2, 1, None, 'RF過剩轉出'),
+            (2, 2, None, 'RF過剩轉出'),
+            (2, 1, '重點補0', 'RF加強轉出'),
+            (2, 1, None, 'RF加強轉出'),
+            (2, 2, None, 'RF加強轉出'),
+        ]
 
-        for dest in temp_destinations:
-            if dest['needed_qty'] <= 0:
+        for round_config in rounds:
+            if len(round_config) == 3:
+                src_priority, dst_priority, dest_type_filter = round_config
+                source_type_filter = None
+            else:
+                src_priority, dst_priority, dest_type_filter, source_type_filter = round_config
+
+            self._match_round(
+                temp_sources, temp_destinations, recommendations,
+                article, product_desc, mode,
+                src_priority, dst_priority,
+                source_type_filter, dest_type_filter,
+                transfer_sites, receive_sites, received_qty_by_site,
+            )
+
+        return recommendations
+
+    def _match_round(
+        self,
+        temp_sources, temp_destinations, recommendations,
+        article, product_desc, mode,
+        src_priority, dst_priority,
+        source_type_filter, dest_type_filter,
+        transfer_sites, receive_sites, received_qty_by_site,
+    ):
+        filtered_sources = [
+            s for s in temp_sources
+            if s['priority'] == src_priority
+            and s['transferable_qty'] > 0
+            and (source_type_filter is None or s['source_type'] == source_type_filter)
+        ]
+
+        filtered_destinations = [
+            d for d in temp_destinations
+            if d['priority'] == dst_priority
+            and d['needed_qty'] > 0
+            and (dest_type_filter is None or d['dest_type'] == dest_type_filter)
+        ]
+
+        for source in filtered_sources:
+            if source['transferable_qty'] <= 0:
                 continue
 
-            for source in temp_sources:
-                if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
+            for dest in filtered_destinations:
+                if dest['needed_qty'] <= 0:
                     continue
                 if source['site'] == dest['site']:
                     continue
@@ -68,8 +118,6 @@ class C2ModeStrategy(BaseMatchStrategy):
                 if dest.get('dest_type') == '重點補0' and 'target_qty' in dest:
                     if received_qty_by_site[receive_site_key] >= dest['target_qty']:
                         dest['needed_qty'] = 0
-
-        return recommendations
 
 
 def _make_c2_note(source, dest, current_received, transfer_qty):

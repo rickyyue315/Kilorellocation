@@ -72,6 +72,10 @@ def optimize_single_piece_transfers(recommendations: List[Dict], mode: str, crea
     if not recommendations:
         return recommendations
 
+    D_FAMILY_MODES = {'清貨轉貨', '清貨轉貨(ND限定)'}
+    if mode in D_FAMILY_MODES:
+        return recommendations
+
     groups: Dict[Tuple[str, str, str], List[Dict]] = {}
     for rec in recommendations:
         key = (
