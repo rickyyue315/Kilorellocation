@@ -41,6 +41,8 @@ class C2ModeStrategy(BaseMatchStrategy):
                     continue
                 if dest['site'] in transfer_sites:
                     continue
+                if source['site'] in receive_sites:
+                    continue
                 if dest.get('rp_type') == 'ND':
                     continue
                 if source.get('om') == 'Windy' and dest.get('om') != 'Windy':

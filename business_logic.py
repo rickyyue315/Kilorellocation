@@ -469,11 +469,8 @@ class TransferLogic:
                     # 若轉出僅1件且淨庫存餘3件以上，上調至2件 (避免單件調貨；放寬Safety Stock -1)
                     if actual_transferable == 1 and remaining_stock >= 3:
                         bump_remaining = int(row['SaSa Net Stock']) - 2
-                        # 放寬安全線: bump_remaining >= safety_stock - 1
-                        # 等價於 remaining_stock >= safety_stock (原始已通過), 故此處僅檢查上限
-                        if 2 <= upper_limit:
-                            actual_transferable = 2
-                            remaining_stock = bump_remaining
+                        actual_transferable = 2
+                        remaining_stock = bump_remaining
                 else:
                     continue
 
@@ -540,7 +537,7 @@ class TransferLogic:
             # 加入可轉出來源（所有模式共用）
             if actual_transferable > 0:
                 # C1模式：避免只可轉出1件的來源參與配對
-                if mode == self.mode_c1 and actual_transferable < 2:
+                if mode == self.mode_c1 and actual_transferable < C1_MODE_MIN_TRANSFER:
                     continue
 
                 last_month_sold = int(row['Last Month Sold Qty'])

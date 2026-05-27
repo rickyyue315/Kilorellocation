@@ -153,8 +153,11 @@ class E2ModeStrategy(BaseMatchStrategy):
                 continue
             if row['Site'] in transfer_sites:
                 continue
+            # receive_sites: Phase 1/2 中已接收貨物的站點（已滿足需求）
             if row['Site'] in receive_sites:
                 continue
+            # non_e_mode_receiving_sites: 非 E 模式 OM 中仍有需求的站點（待接收）
+            # 避免同一站點既做 C 模式轉出源又做接收端
             if row['Site'] in non_e_mode_receiving_sites:
                 continue
 
