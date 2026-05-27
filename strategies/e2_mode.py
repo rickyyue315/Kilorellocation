@@ -11,30 +11,13 @@ from strategies.predicates import is_hd_to_hk_restricted
 
 
 def _make_source(row, transferable_qty: int, priority: int, source_type: str, **extra) -> Dict:
-    source = {
-        'site': row['Site'],
-        'om': row['OM'],
-        'rp_type': row['RP Type'],
-        'transferable_qty': transferable_qty,
-        'priority': priority,
-        'original_stock': int(row['SaSa Net Stock']),
-        'effective_sold_qty': int(row['Effective Sold Qty']) if pd.notna(row.get('Effective Sold Qty', 0)) else 0,
-        'source_type': source_type,
-        'store_type': '',
-        'last_month_sold_qty': int(row['Last Month Sold Qty']) if pd.notna(row.get('Last Month Sold Qty', 0)) else 0,
-        'mtd_sold_qty': int(row['MTD Sold Qty']) if pd.notna(row.get('MTD Sold Qty', 0)) else 0,
-    }
-    source.update(extra)
-    return source
+    from business_logic import _make_source as _bl_make_source
+    return _bl_make_source(row, transferable_qty, priority, source_type, **extra)
 
 
 def _compute_max_protected_sold(df) -> float:
-    if df.empty:
-        return 0
-    max_sold = df['Effective Sold Qty'].max()
-    if len(df) == 1 or max_sold == 0 or (df['Effective Sold Qty'] == max_sold).sum() >= len(df):
-        return float('inf')
-    return max_sold
+    from business_logic import _compute_max_protected_sold as _bl_compute
+    return _bl_compute(df)
 
 
 class E2ModeStrategy(BaseMatchStrategy):

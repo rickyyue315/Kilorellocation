@@ -124,7 +124,7 @@ MODE_DEFS: List[ModeDef] = [
     ModeDef("精簡SKU(跨OM)", "精簡SKU(跨OM)", "精簡SKU跨OM轉貨",
             attr_name="mode_simplified_sku_cross",
             families=frozenset({'simplified_sku'}),
-            cross_om_matching=True, source_filter=True,
+            cross_om_grouping=True, cross_om_matching=True, source_filter=True,
             strategy_key='simplified_sku',
             source_method='_sources_simplified_sku', dest_method='_dests_simplified_sku'),
     ModeDef("精簡SKU(退D001)", "精簡SKU(退D001)", "精簡SKU全數退回D001",
