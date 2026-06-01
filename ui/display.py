@@ -393,4 +393,4 @@ def render_ai_audit_report(audit: dict):
             for p in positive:
                 st.markdown(f"- {p}")
 
-    st.caption("*AI 審計僅供參考，不會修改調貨建議；正式出貨前仍需按內部流程覆核。*")
+    st.caption("*AI 審計僅供參考，不取代系統規則及人工覆核。受限於只有聚合統計資料（分析時不含完整調貨清單）。*")

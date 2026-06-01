@@ -466,7 +466,7 @@ class ExcelGenerator:
                     row += 1
 
         row += 2
-        worksheet.merge_range(row, 0, row, 4, 'AI內容僅供參考，不取代系統規則及人工覆核。', header_format)
+        worksheet.merge_range(row, 0, row, 4, 'AI內容僅供參考，不取代系統規則及人工覆核。 受限於只有聚合統計資料（分析時不含完整調貨清單）。', header_format)
 
         worksheet.set_column('A:A', 14)
         worksheet.set_column('B:B', 50)
