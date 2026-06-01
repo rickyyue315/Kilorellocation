@@ -1,5 +1,5 @@
 """
-結果展示 UI — 欄位說明、資料查覽、KPI、結果表格、統計、下載按鈕、AI顧問
+結果展示 UI — 欄位說明、資料查覽、KPI、結果表格、統計、下載按鈕
 """
 
 import streamlit as st
@@ -226,6 +226,89 @@ def render_results_table(recommendations: list, df: pd.DataFrame, current_run_ke
         st.dataframe(rec_df, use_container_width=True)
 
 
+def _build_priority_groups(recommendations: list) -> dict:
+    groups = {'🔴高優先': [], '🟡中優先': [], '🟢低優先': []}
+    for rec in recommendations:
+        p = rec.get('Priority', '🟢低優先')
+        groups[p].append(rec)
+    return groups
+
+
+def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_run_key: str, mode: str = None):
+    st.markdown("### 📋 調貨建議清單（按優先級分組）")
+
+    groups = _build_priority_groups(recommendations)
+    total_recs = len(recommendations)
+    total_qty = sum(r['Transfer Qty'] for r in recommendations)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🔴 高優先", f"{len(groups['🔴高優先']):,}")
+    col2.metric("🟡 中優先", f"{len(groups['🟡中優先']):,}")
+    col3.metric("🟢 低優先", f"{len(groups['🟢低優先']):,}")
+
+    for priority_label, color, default_expanded in [
+        ('🔴高優先', '#FF4444', True),
+        ('🟡中優先', '#FFAA00', False),
+        ('🟢低優先', '#00CC88', False),
+    ]:
+        items = groups[priority_label]
+        if not items:
+            continue
+        group_qty = sum(r['Transfer Qty'] for r in items)
+        with st.expander(
+            f"{priority_label} — {len(items):,} 條建議，共 {group_qty:,} 件",
+            expanded=default_expanded,
+        ):
+            cache_key = f"_display_priority_df_{current_run_key}_{priority_label}"
+            if cache_key not in st.session_state:
+                st.session_state[cache_key] = pd.DataFrame(_build_display_data(items, df, mode))
+            st.dataframe(st.session_state[cache_key], use_container_width=True)
+
+
+def render_ai_executive_summary_button(recommendations: list, statistics: dict, mode_name: str):
+    from services.ai_client import is_ai_enabled, chat_completion
+    from config import AI_DEFAULT_MODEL
+    import json
+
+    if not is_ai_enabled():
+        return
+
+    if st.button("🤖 生成執行摘要", use_container_width=True,
+                 help="AI 分析結果摘要（可選功能，非必要）"):
+        with st.spinner("AI 生成中..."):
+            summary_data = {
+                'total_recs': statistics.get('total_recommendations', 0),
+                'total_qty': statistics.get('total_transfer_qty', 0),
+                'unique_articles': statistics.get('unique_articles', 0),
+                'unique_oms': statistics.get('unique_oms', 0),
+                'mode': mode_name,
+                'high_priority_count': sum(1 for r in recommendations if r.get('Priority') == '🔴高優先'),
+                'high_priority_qty': sum(r['Transfer Qty'] for r in recommendations if r.get('Priority') == '🔴高優先'),
+                'medium_priority_count': sum(1 for r in recommendations if r.get('Priority') == '🟡中優先'),
+                'medium_priority_qty': sum(r['Transfer Qty'] for r in recommendations if r.get('Priority') == '🟡中優先'),
+                'source_type_distribution': statistics.get('source_type_stats', {}),
+                'dest_type_distribution': statistics.get('dest_type_stats', {}),
+            }
+            messages = [
+                {
+                    "role": "system",
+                    "content": "你是一個庫存調貨系統的分析助手。請根據以下聚合數據，生成一段約150字以內的繁體中文執行摘要，重點說明：①整體規模 ②優先級分佈 ③需要立即關注的事項。純文字輸出，無需markdown格式。"
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(summary_data, ensure_ascii=False)
+                }
+            ]
+            result = chat_completion(messages, model=AI_DEFAULT_MODEL, temperature=0.1, max_tokens=512)
+            if result:
+                st.session_state['ai_executive_summary'] = result
+
+    summary = st.session_state.get('ai_executive_summary')
+    if summary:
+        with st.expander("📊 AI 執行摘要", expanded=False):
+            st.markdown(summary)
+
+
 def render_statistics(statistics: dict):
     with st.expander("📊 詳細統計", expanded=False):
         col1, col2 = st.columns(2)
@@ -302,95 +385,3 @@ def render_download_button(excel_data: bytes, excel_filename: str, current_run_k
         on_click="ignore",
         key=f"download_excel_{current_run_key}",
     )
-
-
-def render_ai_status_badge(status: dict):
-    if not status.get('enabled'):
-        reason = status.get('reason', '未知原因')
-        st.caption(f"AI 功能未啟用 — {reason}")
-        with st.expander("AI 診斷", expanded=False):
-            st.write({
-                'enabled': status.get('enabled'),
-                'has_api_key': status.get('has_api_key'),
-                'model': status.get('model') or '[未設定]',
-                'reason': reason,
-            })
-
-
-def render_ai_advisor_card(result: dict, current_mode_code: str):
-    if not result:
-        return
-    if 'error' in result:
-        st.info("AI 模式建議暫時不可用")
-        return
-
-    mode_code = result.get('mode_code', '')
-    mode_name = result.get('mode_name', '')
-    confidence = result.get('confidence', 'low')
-
-    conf_emoji = {'high': '🟢', 'medium': '🟡', 'low': '🔴'}
-    emoji = conf_emoji.get(confidence, '🔴')
-
-    st.markdown("#### 🤖 AI 模式建議")
-
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown(f"**建議模式：** `{mode_code}`: {mode_name}")
-        reasons = result.get('reasons', [])
-        if reasons:
-            st.markdown("**原因：**")
-            for r in reasons:
-                st.markdown(f"- {r}")
-    with col2:
-        st.markdown(f"{emoji} **信心：{confidence}**")
-
-    warnings = result.get('warnings', [])
-    if warnings:
-        st.warning("**注意事項：**\n" + "\n".join(f"- {w}" for w in warnings))
-
-    if current_mode_code and mode_code != current_mode_code:
-        st.info(f"目前選擇為 `{current_mode_code}`，如需採用 AI 建議，請在左側手動切換。")
-
-    st.caption("*AI 僅供參考，請仍以業務判斷選擇模式。*")
-
-
-def render_ai_audit_report(audit: dict):
-    if not audit:
-        return
-    if 'error' in audit:
-        st.info("AI 審計暫時不可用")
-        return
-
-    risk_level = audit.get('risk_level', '低風險')
-    risk_emoji = {'高風險': '🔴', '中風險': '🟡', '低風險': '🟢'}
-    emoji = risk_emoji.get(risk_level, '🟢')
-
-    st.markdown("#### 🤖 AI 邏輯審計")
-    st.markdown(f"**風險等級：** {emoji} **{risk_level}**")
-
-    summary = audit.get('summary', '')
-    if summary:
-        st.info(summary)
-
-    warnings = audit.get('warnings', [])
-    if warnings:
-        with st.expander(f"⚠️ 風險提示（{len(warnings)} 項）", expanded=False):
-            for w in warnings:
-                severity = w.get('severity', '低')
-                title = w.get('title', '')
-                detail = w.get('detail', '')
-                suggested = w.get('suggested_check', '')
-                st.markdown(f"**{severity}** - {title}")
-                if detail:
-                    st.caption(detail)
-                if suggested:
-                    st.caption(f"建議檢查：{suggested}")
-                st.markdown("---")
-
-    positive = audit.get('positive_checks', [])
-    if positive:
-        with st.expander("✅ 正面檢查", expanded=False):
-            for p in positive:
-                st.markdown(f"- {p}")
-
-    st.caption("*AI 審計僅供參考，不取代系統規則及人工覆核。受限於只有聚合統計資料（分析時不含完整調貨清單）。*")

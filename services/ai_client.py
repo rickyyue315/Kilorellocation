@@ -98,10 +98,6 @@ def chat_completion(
 
     content = _do_request(model_name, messages, temperature, max_tokens, api_key)
 
-    if not content and config.AI_FALLBACK_MODEL and config.AI_FALLBACK_MODEL != model_name:
-        logger.info("Primary model (%s) returned empty, trying fallback (%s)", model_name, config.AI_FALLBACK_MODEL)
-        content = _do_request(config.AI_FALLBACK_MODEL, messages, temperature, max_tokens, api_key)
-
     if content:
         cache[cache_key] = content
     return content

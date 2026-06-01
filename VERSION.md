@@ -1,5 +1,41 @@
 # 版本更新記錄
 
+## v2.20.0 (2026-06-01)
+
+### 方案三：優先級分組 + 可選 AI 執行摘要
+
+#### 變更說明
+- 移除原有的 AI 模式建議（Advisor）、AI 邏輯審計（Auditor）功能
+- 取而代之的是**確定性優先級分組**（🔴🟡🟢）—— 100% 基於規則、零 API 依賴、永遠可用
+- AI 僅保留為可選的「執行摘要」按鈕（聚合統計資料 → LLM → 短文摘要）
+- Excel 不再包含 AI 分析摘要 sheet
+
+#### 新增檔案
+- `services/prioritizer.py` — 優先級指派引擎（純函式、確定性規則）
+
+#### 修改檔案
+- `business_logic.py` — 在 `generate_transfer_recommendations()` 中為每條建議賦予優先級，按優先級排序
+- `ui/display.py` — 新增 `render_results_by_priority()`（三層 expander 分組）與 `render_ai_executive_summary_button()`（可選 AI）
+- `app.py` — 移除 AI 審計按鈕與下載含 AI 摘要的 Excel 按鈕，改為優先級分組展示
+- `config.py` — 精簡 AI 配置區（13 行 → 3 行）、版本號 bump 至 v2.20.0
+- `excel_generator.py` — 移除 `ai_report` 參數與 `create_ai_analysis_sheet()` 方法
+
+#### 刪除檔案
+- `services/ai_advisor.py`
+- `services/ai_auditor.py`
+- `tests/test_ai_advisor.py`
+- `tests/test_ai_auditor.py`
+- `tests/test_ai_note_simulation.py`
+
+#### 新增測試
+- `tests/test_prioritizer.py` — 22 個測試案例覆蓋所有優先級規則
+
+#### 文件同步
+- `README.md` — 更新 AI 章節
+- `VERSION.md` — 本版本記錄
+- `config.py` — 版本號 bump 至 v2.20.0
+- `app.py` — docstring 版本更新，移除 AI advisory/audit 提及
+
 ## v2.19.0 (2026-06-01)
 
 ### 新增 ND3 模式：ND 限同 OM 轉貨（補 0）

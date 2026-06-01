@@ -4,7 +4,7 @@
 
 import os
 
-VERSION = "v2.19.0"
+VERSION = "v2.20.0"
 
 ZEABUR_ENV_KEYS = [
     'ZEABUR',
@@ -38,21 +38,11 @@ def _get_env_bool(name: str, default: bool) -> bool:
 IS_ZEABUR_RUNTIME = _is_zeabur_runtime()
 ZEABUR_RESULT_PREVIEW_LIMIT = _get_env_int('KILO_ZEABUR_RESULT_PREVIEW_LIMIT', 1000)
 
-# ── AI Integration ─────────────────────────────────────────────────
+# ── AI 整合（僅執行摘要可選功能）─────────────────────────────────
 
 AI_DEFAULT_MODEL = os.getenv('AI_MODEL', 'deepseek/deepseek-v4-flash')
-AI_FALLBACK_MODEL = os.getenv('AI_FALLBACK_MODEL', 'inclusionai/ling-2.6-flash')
-AI_MODEL_ADVISOR = os.getenv('AI_MODEL_ADVISOR', AI_DEFAULT_MODEL)
-AI_MODEL_AUDITOR = os.getenv('AI_MODEL_AUDITOR', AI_DEFAULT_MODEL)
-AI_MODEL_ENHANCER = os.getenv('AI_MODEL_ENHANCER', AI_DEFAULT_MODEL)
 AI_ENABLED = _get_env_bool('AI_ENABLED', False)
 AI_REQUEST_TIMEOUT = _get_env_int('AI_REQUEST_TIMEOUT', 30)
-AI_MAX_TOKENS_ADVISOR = _get_env_int('AI_MAX_TOKENS_ADVISOR', 512)
-AI_MAX_TOKENS_AUDITOR = _get_env_int('AI_MAX_TOKENS_AUDITOR', 1024)
-AI_MAX_TOKENS_REPORT = _get_env_int('AI_MAX_TOKENS_REPORT', 1024)
-AI_ENHANCE_NOTES_ENABLED = _get_env_bool('AI_ENHANCE_NOTES_ENABLED', False)
-AI_ENHANCE_MIN_QTY = _get_env_int('AI_ENHANCE_MIN_QTY', 10)
-AI_ENHANCE_MAX_ROWS = _get_env_int('AI_ENHANCE_MAX_ROWS', 30)
 
 # ── Magic Numbers (business_logic.py) ──────────────────────────────
 

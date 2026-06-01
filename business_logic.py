@@ -22,6 +22,7 @@ from config import (
 )
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.target_utils import parse_target_series
+from services.prioritizer import assign_priority, PRIORITY_ORDER
 from services.matching_engine import (
     compute_transfer_qty as _compute_transfer_qty_impl,
     can_transfer as _can_transfer_impl,
@@ -1019,6 +1020,16 @@ class TransferLogic:
             all_recommendations.extend(recommendations)
         
         all_recommendations = self._optimize_single_piece_transfers(all_recommendations, mode)
+
+        for rec in all_recommendations:
+            rec['Priority'] = assign_priority(rec)
+
+        all_recommendations.sort(
+            key=lambda r: (
+                PRIORITY_ORDER.get(r.get('Priority', '🟢低優先'), 99),
+                -r.get('Transfer Qty', 0),
+            )
+        )
 
         logger.info(f"共生成 {len(all_recommendations)} 條調貨建議")
         

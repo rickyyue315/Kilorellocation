@@ -1,15 +1,12 @@
 """
-庫存調貨建議系統 v2.19.0 - Streamlit應用程序
+庫存調貨建議系統 v2.20.0 - Streamlit應用程序
 支持二十七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 含模式教學分頁：27種調貨模式圖例化教學（繁體中文）
-AI advisory/audit/report summary（可選）
 """
 
 import streamlit as st
 import pandas as pd
 import os
-import hashlib
-import json
 from datetime import datetime
 import logging
 
@@ -22,18 +19,16 @@ from ui.display import (
     render_upload_requirements,
     render_data_preview,
     render_kpi_cards,
-    render_results_table,
+    render_results_by_priority,
     render_statistics,
     render_download_button,
-    render_ai_audit_report,
+    render_ai_executive_summary_button,
 )
 from ui.tutorial import render_tutorial_page
 from data_processor import DataProcessor
 from business_logic import TransferLogic
 from excel_generator import ExcelGenerator
 from services.target_utils import find_f_mode_nd_target_conflicts
-from services.ai_client import get_ai_status
-from services.ai_auditor import audit_recommendations
 
 
 @st.cache_data(show_spinner=False)
@@ -42,14 +37,6 @@ def _cached_preprocess(file_bytes: bytes) -> tuple:
     processor = DataProcessor()
     df, stats = processor.preprocess_data(io.BytesIO(file_bytes))
     return df, stats
-
-
-def _ai_report_hash() -> str:
-    audit = st.session_state.get('ai_audit_result')
-    if not audit:
-        return ''
-    raw = json.dumps({'audit': audit}, ensure_ascii=False, sort_keys=True, default=str)
-    return hashlib.md5(raw.encode()).hexdigest()[:8]
 
 
 logging.basicConfig(level=logging.INFO)
@@ -178,8 +165,7 @@ with tab_system:
             current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{uploaded_file.name}_{uploaded_file.size}"
             if st.session_state.get('_run_key') != current_run_key:
                 for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name',
-                          'ai_audit_result', 'ai_audit_key', 'ai_report_hash',
-                          '_ai_excel_data', '_ai_excel_filename']:
+                          'ai_executive_summary']:
                     st.session_state.pop(k, None)
                 for k in [k for k in st.session_state if k.startswith('_display_df_')]:
                     st.session_state.pop(k)
@@ -213,8 +199,6 @@ with tab_system:
             statistics = st.session_state.get('statistics', {})
             quality_passed = st.session_state.get('quality_passed')
 
-            ai_status = get_ai_status()
-
             if quality_passed is not None:
                 if quality_passed:
                     st.success("質量檢查通過!")
@@ -225,103 +209,36 @@ with tab_system:
                         for error in st.session_state.get('quality_errors', []):
                             st.error(error)
 
-            if quality_passed is not None and recommendations:
-                audit_cache_key = f"{current_run_key}_{mode_code}_{len(recommendations)}_{statistics.get('total_transfer_qty', 0)}_{len(st.session_state.get('quality_errors', []))}"
-                if st.session_state.get('ai_audit_key') != audit_cache_key:
-                    st.session_state.pop('ai_audit_result', None)
-                    st.session_state['ai_audit_key'] = audit_cache_key
-
-                if st.button("🤖 執行 AI 邏輯審計", use_container_width=True):
-                    with st.spinner("AI 審計中..."):
-                        audit = audit_recommendations(
-                            recommendations,
-                            statistics,
-                            quality_passed,
-                            st.session_state.get('quality_errors', []),
-                            st.session_state.get('active_mode_name', ''),
-                        )
-                        st.session_state['ai_audit_result'] = audit
-
-                render_ai_audit_report(st.session_state.get('ai_audit_result'))
-
             if recommendations:
                 st.markdown("---")
                 st.markdown("### 📈 分析結果")
 
                 render_kpi_cards(statistics)
 
-                render_results_table(recommendations, df, current_run_key, st.session_state.get('active_mode_name', ''))
+                render_results_by_priority(recommendations, df, current_run_key, st.session_state.get('active_mode_name', ''))
 
                 render_statistics(statistics)
+
+                render_ai_executive_summary_button(recommendations, statistics, st.session_state.get('active_mode_name', ''))
 
                 st.markdown("---")
                 st.success("✅ 分析完成!")
 
-                if st.session_state.get('excel_run_key') != f"{current_run_key}_{_ai_report_hash()}" or 'excel_data' not in st.session_state:
+                if st.session_state.get('excel_run_key') != current_run_key or 'excel_data' not in st.session_state:
                     with st.spinner("生成 Excel 文件..."):
                         excel_generator = ExcelGenerator()
-                        audit = st.session_state.get('ai_audit_result')
-                        ai_report = {
-                            'audit': audit,
-                            'model': ai_status.get('model', ''),
-                        }
-                        has_ai_content = bool(audit and 'error' not in audit)
                         st.session_state['excel_data'] = excel_generator.generate_excel_file(
                             recommendations,
                             statistics,
                             mode=st.session_state.get('active_mode_name', ''),
-                            ai_report=ai_report if has_ai_content else None,
                         )
                         st.session_state['excel_filename'] = excel_generator.output_filename
-                        st.session_state['excel_run_key'] = f"{current_run_key}_{_ai_report_hash()}"
+                        st.session_state['excel_run_key'] = current_run_key
 
                 _excel_bytes = st.session_state.get('excel_data', b'')
                 _excel_filename = st.session_state.get('excel_filename', '調貨建議.xlsx')
 
-                col_dl1, col_dl2 = st.columns(2)
-                with col_dl1:
-                    render_download_button(_excel_bytes, _excel_filename, current_run_key)
-                with col_dl2:
-                    _ai_excel_data = st.session_state.get('_ai_excel_data')
-                    if _ai_excel_data:
-                        _ai_excel_name = st.session_state.get('_ai_excel_filename', '調貨建議_含AI摘要.xlsx')
-                        st.download_button(
-                            "📥 下載（含 AI 摘要）",
-                            data=_ai_excel_data,
-                            file_name=_ai_excel_name,
-                            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                            type="primary",
-                            use_container_width=True,
-                            key=f"dl_ai_{current_run_key}",
-                        )
-                    else:
-                        if st.button("🤖 下載含 AI 摘要的 Excel", use_container_width=True,
-                                     help="自動執行 AI 邏輯審計後，產生包含 AI 分析摘要 sheet 的 Excel"):
-                            with st.spinner("AI 審計中..."):
-                                if not st.session_state.get('ai_audit_result') or 'error' in st.session_state.get('ai_audit_result', {}):
-                                    audit = audit_recommendations(
-                                        recommendations, statistics,
-                                        st.session_state.get('quality_passed'),
-                                        st.session_state.get('quality_errors', []),
-                                        st.session_state.get('active_mode_name', ''),
-                                    )
-                                    st.session_state['ai_audit_result'] = audit
-                            with st.spinner("生成含 AI 摘要的 Excel..."):
-                                excel_gen = ExcelGenerator()
-                                audit = st.session_state.get('ai_audit_result')
-                                ai_report = {
-                                    'audit': audit,
-                                    'model': ai_status.get('model', ''),
-                                }
-                                has_ai = bool(audit and 'error' not in audit)
-                                ai_bytes = excel_gen.generate_excel_file(
-                                    recommendations, statistics,
-                                    mode=st.session_state.get('active_mode_name', ''),
-                                    ai_report=ai_report if has_ai else None,
-                                )
-                                st.session_state['_ai_excel_data'] = ai_bytes
-                                st.session_state['_ai_excel_filename'] = excel_gen.output_filename
-                            st.rerun()
+                render_download_button(_excel_bytes, _excel_filename, current_run_key)
 
                 progress_bar.progress(100, text="處理完畢!")
             else:
