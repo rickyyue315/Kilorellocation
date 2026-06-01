@@ -361,12 +361,12 @@ def render_ai_audit_report(audit: dict):
         st.info("AI 審計暫時不可用")
         return
 
-    risk_level = audit.get('risk_level', 'low')
-    risk_emoji = {'high': '🔴', 'medium': '🟡', 'low': '🟢'}
+    risk_level = audit.get('risk_level', '低風險')
+    risk_emoji = {'高風險': '🔴', '中風險': '🟡', '低風險': '🟢'}
     emoji = risk_emoji.get(risk_level, '🟢')
 
     st.markdown("#### 🤖 AI 邏輯審計")
-    st.markdown(f"**風險等級：** {emoji} **{risk_level.upper()}**")
+    st.markdown(f"**風險等級：** {emoji} **{risk_level}**")
 
     summary = audit.get('summary', '')
     if summary:
@@ -376,11 +376,11 @@ def render_ai_audit_report(audit: dict):
     if warnings:
         with st.expander(f"⚠️ 風險提示（{len(warnings)} 項）", expanded=False):
             for w in warnings:
-                severity = w.get('severity', 'low')
+                severity = w.get('severity', '低')
                 title = w.get('title', '')
                 detail = w.get('detail', '')
                 suggested = w.get('suggested_check', '')
-                st.markdown(f"**{severity.upper()}** - {title}")
+                st.markdown(f"**{severity}** - {title}")
                 if detail:
                     st.caption(detail)
                 if suggested:

@@ -79,23 +79,23 @@ class TestParseAuditResponse:
 
     def test_parse_pure_json(self):
         text = json.dumps({
-            "risk_level": "medium",
+            "risk_level": "中風險",
             "summary": "Some risks detected.",
             "warnings": [
-                {"severity": "medium", "title": "High concentration", "detail": "One source dominates", "suggested_check": "Verify distribution"}
+                {"severity": "中", "title": "High concentration", "detail": "One source dominates", "suggested_check": "Verify distribution"}
             ],
             "positive_checks": ["All items have valid MOQ"],
         })
         result = self._parser()(text)
-        assert result['risk_level'] == 'medium'
+        assert result['risk_level'] == '中風險'
         assert result['summary'] == 'Some risks detected.'
         assert len(result['warnings']) == 1
         assert len(result['positive_checks']) == 1
 
     def test_parse_fenced_json(self):
-        text = '```json\n{"risk_level": "low", "summary": "All good", "warnings": [], "positive_checks": ["Clean data"]}\n```'
+        text = '```json\n{"risk_level": "低風險", "summary": "All good", "warnings": [], "positive_checks": ["Clean data"]}\n```'
         result = self._parser()(text)
-        assert result['risk_level'] == 'low'
+        assert result['risk_level'] == '低風險'
         assert result['summary'] == 'All good'
 
     def test_invalid_json_fallback(self):
@@ -106,14 +106,14 @@ class TestParseAuditResponse:
     def test_invalid_risk_level_falls_back_to_low(self):
         text = '{"risk_level": "extreme", "summary": "", "warnings": [], "positive_checks": []}'
         result = self._parser()(text)
-        assert result['risk_level'] == 'low'
+        assert result['risk_level'] == '低風險'
 
 
 class TestAuditDoesNotMutate:
     def test_original_recommendations_unchanged(self):
         rc = _make_recommendation()
         recs = [rc]
-        with patch('services.ai_auditor.chat_completion', return_value='{"risk_level":"low","summary":"","warnings":[],"positive_checks":[]}'):
+        with patch('services.ai_auditor.chat_completion', return_value='{"risk_level":"低風險","summary":"","warnings":[],"positive_checks":[]}'):
             from services.ai_auditor import audit_recommendations
             audit_recommendations(recs, _make_statistics(), True, [], "A")
             assert recs[0]['Transfer Qty'] == 5

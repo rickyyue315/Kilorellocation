@@ -8,8 +8,8 @@ from services.ai_client import chat_completion
 
 logger = logging.getLogger(__name__)
 
-_VALID_RISK_LEVELS = frozenset({'low', 'medium', 'high'})
-_VALID_SEVERITY = frozenset({'low', 'medium', 'high'})
+_VALID_RISK_LEVELS = frozenset({'低風險', '中風險', '高風險'})
+_VALID_SEVERITY = frozenset({'低', '中', '高'})
 _MAX_WARNINGS = 8
 _MAX_ERROR_ITEM_CHARS = 240
 _MAX_SAMPLE_ROWS = 10
@@ -87,13 +87,13 @@ def build_auditor_messages(payload: dict) -> list:
             'Review the provided transfer recommendations payload and identify potential risks. '
             'Respond with ONLY a single JSON object. Do NOT add any markdown, explanation, or other text before or after the JSON. '
             'JSON keys: risk_level, summary, warnings, positive_checks. '
-            'risk_level MUST be one of "low", "medium", "high". '
+            'risk_level MUST be one of "低風險", "中風險", "高風險". '
             'summary is a brief risk overview (max 500 chars). '
             'warnings is a list of objects: {severity, title, detail, suggested_check}. '
-            'severity must be "low", "medium", or "high". Max 8 warnings. '
+            'severity must be "低", "中", or "高". Max 8 warnings. '
             'positive_checks is a list of strings noting good aspects. '
             'Answer ALL text content in Traditional Chinese (繁體中文). '
-            'Example valid output: {"risk_level":"low","summary":"...","warnings":[],"positive_checks":["..."]}'
+            'Example valid output: {"risk_level":"低風險","summary":"...","warnings":[],"positive_checks":["..."]}'
         ),
     }
     user = {
@@ -157,9 +157,9 @@ def parse_audit_response(text: str) -> dict:
 
 
 def _validate_audit_result(raw: dict) -> dict:
-    risk_level = raw.get('risk_level', 'low')
+    risk_level = raw.get('risk_level', '低風險')
     if risk_level not in _VALID_RISK_LEVELS:
-        risk_level = 'low'
+        risk_level = '低風險'
 
     summary = str(raw.get('summary', ''))[:500]
 
@@ -170,9 +170,9 @@ def _validate_audit_result(raw: dict) -> dict:
     for w in warnings[:_MAX_WARNINGS]:
         if not isinstance(w, dict):
             continue
-        severity = w.get('severity', 'low')
+        severity = w.get('severity', '低')
         if severity not in _VALID_SEVERITY:
-            severity = 'low'
+            severity = '低'
         validated_warnings.append({
             'severity': severity,
             'title': str(w.get('title', ''))[:160],

@@ -431,10 +431,10 @@ class ExcelGenerator:
             row += 1
             worksheet.merge_range(row, 0, row, 4, 'AI 邏輯審計', header_format)
             row += 1
-            risk_level = audit.get('risk_level', 'low')
-            risk_fmt = {'low': risk_format_low, 'medium': risk_format_medium, 'high': risk_format_high}.get(risk_level, risk_format_low)
+            risk_level = audit.get('risk_level', '低風險')
+            risk_fmt = {'低風險': risk_format_low, '中風險': risk_format_medium, '高風險': risk_format_high}.get(risk_level, risk_format_low)
             worksheet.write(row, 0, '風險等級', data_format)
-            worksheet.write(row, 1, risk_level.upper(), risk_fmt)
+            worksheet.write(row, 1, risk_level, risk_fmt)
             row += 1
             summary = audit.get('summary', '')
             if summary:
