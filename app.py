@@ -213,7 +213,8 @@ with tab_system:
             current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{uploaded_file.name}_{uploaded_file.size}"
             if st.session_state.get('_run_key') != current_run_key:
                 for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name',
-                          'ai_audit_result', 'ai_audit_key', 'ai_report_hash']:
+                          'ai_audit_result', 'ai_audit_key', 'ai_report_hash',
+                          '_ai_excel_data', '_ai_excel_filename']:
                     st.session_state.pop(k, None)
                 for k in [k for k in st.session_state if k.startswith('_display_df_')]:
                     st.session_state.pop(k)
@@ -313,7 +314,56 @@ with tab_system:
                 _excel_bytes = st.session_state.get('excel_data', b'')
                 _excel_filename = st.session_state.get('excel_filename', '調貨建議.xlsx')
 
-                render_download_button(_excel_bytes, _excel_filename, current_run_key)
+                col_dl1, col_dl2 = st.columns(2)
+                with col_dl1:
+                    render_download_button(_excel_bytes, _excel_filename, current_run_key)
+                with col_dl2:
+                    _ai_excel_data = st.session_state.get('_ai_excel_data')
+                    if _ai_excel_data:
+                        _ai_excel_name = st.session_state.get('_ai_excel_filename', '調貨建議_含AI摘要.xlsx')
+                        st.download_button(
+                            "📥 下載（含 AI 摘要）",
+                            data=_ai_excel_data,
+                            file_name=_ai_excel_name,
+                            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                            type="primary",
+                            use_container_width=True,
+                            key=f"dl_ai_{current_run_key}",
+                        )
+                    else:
+                        if st.button("🤖 下載含 AI 摘要的 Excel", use_container_width=True,
+                                     help="自動執行 AI 模式建議與邏輯審計後，產生包含 AI 分析摘要 sheet 的 Excel"):
+                            with st.spinner("AI 分析中..."):
+                                if not st.session_state.get('ai_advisor_result') or 'error' in st.session_state.get('ai_advisor_result', {}):
+                                    advisor = recommend_mode(df, processing_stats)
+                                    st.session_state['ai_advisor_result'] = advisor
+                                if not st.session_state.get('ai_audit_result') or 'error' in st.session_state.get('ai_audit_result', {}):
+                                    audit = audit_recommendations(
+                                        recommendations, statistics,
+                                        st.session_state.get('quality_passed'),
+                                        st.session_state.get('quality_errors', []),
+                                        st.session_state.get('active_mode_name', ''),
+                                    )
+                                    st.session_state['ai_audit_result'] = audit
+                            with st.spinner("生成含 AI 摘要的 Excel..."):
+                                excel_gen = ExcelGenerator()
+                                ai_report = {
+                                    'advisor': st.session_state.get('ai_advisor_result'),
+                                    'audit': st.session_state.get('ai_audit_result'),
+                                    'model': ai_status.get('model', ''),
+                                }
+                                has_ai = bool(
+                                    (ai_report.get('advisor') and 'error' not in ai_report['advisor'])
+                                    or (ai_report.get('audit') and 'error' not in ai_report['audit'])
+                                )
+                                ai_bytes = excel_gen.generate_excel_file(
+                                    recommendations, statistics,
+                                    mode=st.session_state.get('active_mode_name', ''),
+                                    ai_report=ai_report if has_ai else None,
+                                )
+                                st.session_state['_ai_excel_data'] = ai_bytes
+                                st.session_state['_ai_excel_filename'] = excel_gen.output_filename
+                            st.rerun()
 
                 progress_bar.progress(100, text="處理完畢!")
             else:
