@@ -43,7 +43,11 @@ def _get_env_bool_override(name: str, config_value: bool) -> bool:
     env_val = get_secret_or_env(name, '')
     if not env_val:
         return config_value
-    return env_val.strip().lower() in ('1', 'true', 'yes', 'y', 'on')
+    if isinstance(env_val, bool):
+        return env_val
+    if isinstance(env_val, str):
+        return env_val.strip().lower() in ('1', 'true', 'yes', 'y', 'on')
+    return config_value
 
 
 def is_ai_enabled() -> bool:
