@@ -1,5 +1,37 @@
 ## 二十七種調貨模式詳解
 
+### 全部模式順序列表
+
+| # | 代碼 | 名稱 | 英文名稱 |
+|---|------|------|---------|
+| 1 | A | 保守轉貨 | Conservative Transfer |
+| 2 | B | 加強轉貨 | Enhanced Transfer |
+| 3 | B2 | 附加B(特別模式) | Enhanced Transfer Plus |
+| 4 | B2a | 附加B2a(特別模式-T遊客鋪不出貨) | Enhanced Transfer Plus - Tourist No Source |
+| 5 | B2L | 附加B2L(特別模式-Type=L保留2件) | Enhanced Transfer Plus - Type L Retain 2 |
+| 6 | B2La | 附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨) | Enhanced Transfer Plus - Type L Retain 2 + Tourist No Source |
+| 7 | B3 | 附加B3(跨OM特別模式) | Enhanced Transfer Plus - Cross OM |
+| 8 | B3a | 附加B3a(跨OM特別模式-T遊客鋪不出貨) | Enhanced Transfer Plus Cross OM - Tourist No Source |
+| 9 | B3L | 附加B3L(跨OM特別模式-Type=L保留2件) | Enhanced Transfer Plus Cross OM - Type L Retain 2 |
+| 10 | B3La | 附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨) | Enhanced Transfer Plus Cross OM - Type L Retain 2 + Tourist No Source |
+| 11 | C | 重點補0 | Priority Zero Stock Replenishment |
+| 12 | C1 | 重點補0-只補0/1 | Priority Zero Stock Replenishment - 0/1 Only |
+| 13 | C2 | 附加C2(跨OM重點補0) | Priority Zero Stock Replenishment with Cross-OM |
+| 14 | D | 清貨轉貨 | Clearance Transfer |
+| 15 | D2 | 清貨轉貨(ND限定) | Clearance Transfer - ND Only |
+| 16 | E1 | 強制轉出(同OM) | Forced Transfer - Same OM Only |
+| 17 | E1b | 強制轉出(優先類型接收) | Forced Transfer - Priority Type |
+| 18 | E2 | 強制轉出(跨OM) | Forced Transfer - Cross OM |
+| 19 | F | 目標優化 | Target Optimization |
+| 20 | F2 | F指定模式 | Target-Only Optimization |
+| 21 | F3 | 目標性補0 | Targeted Zero-Fill |
+| 22 | ND1 | ND同OM轉貨 | ND Transfer - Same OM |
+| 23 | ND2 | ND混合OM轉貨 | ND Transfer - Cross OM |
+| 24 | ND3 | ND限同OM轉貨(補0) | ND Same-OM Zero-Fill |
+| 25 | 精簡SKU(限同OM) | 精簡SKU(限同OM) | Simplified SKU - Same OM |
+| 26 | 精簡SKU(跨OM) | 精簡SKU(跨OM) | Simplified SKU - Cross OM |
+| 27 | 精簡SKU(退D001) | 精簡SKU(退D001) | Simplified SKU - Return to D001 |
+
 ---
 
 ## 通用業務規則 (適用於所有模式)
@@ -779,18 +811,37 @@ statistics = {
 
 ---
 
-## 關鍵差異對比
+## 全部 27 種模式關鍵差異對比
 
-| 特性 | 模式 A | 模式 B | 模式 B2 | 模式 B3 | 模式 C | 模式 C1 | 模式 C2 | 模式 D | 模式 E1 | 模式 E1b | 模式 E2 | 模式 F | 模式 F2 | 精簡SKU(同OM) | 精簡SKU(跨OM) | 精簡SKU(退D001) |
-|------|--------|--------|---------|---------|--------|---------|---------|--------|---------|----------|---------|--------|---------|--------------|--------------|----------------|
-| 轉出比例上限 | 20% | 50% | 50%(RF) / 全轉出(Type=L且銷量≤2) | 50%(RF) / 全轉出(Type=L且銷量≤2) | 30% | 30% | 30% | 無限制 | 無限制(全數) | 無限制(全數) | 無限制(全數) | 視Target/補0需求 | 視Target需求 | 超出Cap部分 | 超出Cap部分 | 超出Cap部分 |
-| 轉出數量上限 | 無限制 | 無限制 | Type=L可全轉出 | Type=L可全轉出 | 最多3件 | 最多3件 | 最多3件 | 全部庫存 | 全部庫存 | 全部庫存 | 全部庫存 | 依Target/補0需求 | 依Target需求 | 依Cap超出量 | 依Cap超出量 | 依Cap超出量(全退D001) |
-| 安全庫存保護 | 嚴格保護 | 可下探 | 可下探 | 可下探 | 可下探 | 可下探 | 可下探 | 不適用(ND) | 無保護 | 無保護 | 無保護 | 依目標/補0 | 依目標 | Cap=Max(Safety×2, 過去2個月銷量×2) | Cap=Max(Safety×2, 過去2個月銷量×2) | Cap=Max(Safety×2, 過去2個月銷量×2) |
-| 轉出類型 | RF過剩轉出 | RF過剩+RF加強轉出 | ND轉出/Local全轉出/RF過剩/加強 | ND轉出/Local全轉出/RF過剩/加強 | RF過剩+RF加強轉出 | RF過剩+RF加強轉出 | RF過剩+RF加強轉出 | ND清貨轉出 | E模式強制轉出 | E模式強制轉出 | E模式強制轉出 | F模式ND/RF轉出 | F模式ND/RF轉出 | 精簡SKU ND/RF轉出 | 精簡SKU ND/RF轉出 | 精簡SKU ND/RF轉出 |
-| 接收上限 | Safety Stock | Safety Stock | Safety Stock × 2 | Safety Stock × 2 | Safety Stock | Safety Stock | Safety Stock | Safety Stock | Safety Stock × 2 | Safety Stock × 2 | Safety Stock × 2 | 依Target/補0 | 依Target | Cap=Max(Safety×2, 過去2個月銷量×2) | Cap=Max(Safety×2, 過去2個月銷量×2) | 不配對(全退D001) |
-| 特殊功能 | 無 | 無 | Type=L規則+接收優先級 | Type=L規則+跨OM配對 | 累計接收追蹤 | 僅補0/1+不回落 | 跨OM+HD/Windy限制 | 避免1件餘貨 | 標記驅動(僅同OM) | 標記驅動+優先類型 | 標記驅動+跨OM | Target優先接收(ND/RF均可) | Target-only接收(ND/RF均可) | 超Cap轉出+退回D001 | 超Cap轉出+跨OM+退回D001 | 全數退D001不配對 |
-| 主要目標 | 平衡庫存 | 最大化調貨 | 特殊Type店鋪處理 | 跨OM特殊Type處理 | 重點補貨 | 精準補零庫存 | 跨OM重點補貨 | 清貨處理 | 強制轉移(同OM) | 強制轉移(同OM+優先) | 強制轉移(跨OM) | 目標導向補貨 | 目標導向集中補貨 | SKU精簡(同OM) | SKU精簡(跨OM) | SKU精簡(全退D001) |
-| 配對策略 | 標準配對 | 標準配對 | 標準配對 | 跨OM配對(HD/Windy) | 標準配對 | 標準配對 | 跨OM配對(HD/Windy) | 標準配對 | 僅同OM | 僅同OM+優先類型 | 優先同OM,支持跨OM | Target+跨OM(HD除外) | Target-only+跨OM(HD除外) | 僅同OM | 跨OM(HD/Windy) | 不配對 |
+| # | 代碼 | 名稱 | 跨OM | 轉出比例上限 | 轉出數量上限 | 安全庫存保護 | 轉出類型 | 接收上限 | 特殊功能 | 主要目標 | 配對策略 |
+|---|------|------|------|------------|------------|------------|---------|---------|---------|---------|---------|
+| 1 | A | 保守轉貨 | ❌ | 20% | 無限制 | 嚴格保護 | RF過剩轉出 | Safety Stock | 單件自動上調至2件 | 平衡庫存 | 標準配對 |
+| 2 | B | 加強轉貨 | ❌ | 50% | 無限制 | 可下探 | RF過剩+RF加強轉出 | Safety Stock | 無 | 最大化調貨 | 標準配對 |
+| 3 | B2 | 附加B(特別模式) | ❌ | 50%(RF)/全轉出(L≤2) | Type=L可全轉出 | 可下探 | ND/Local全轉出/RF過剩/加強 | Safety×2 | Type=L規則+接收優先級+Mix保護 | 特殊Type店鋪處理 | 標準配對 |
+| 4 | B2a | 附加B2a(T不出貨) | ❌ | 同B2 | 同B2 | 可下探 | 同B2 | Safety×2 | B2+Type=T不出貨+Mix保護 | 特殊Type(排除T) | 標準配對 |
+| 5 | B2L | 附加B2L(L保留2件) | ❌ | 同B2 | Type=L保留2件 | 可下探 | 同B2 | Safety×2 | Type=L保留2件+Mix保護 | 特殊Type(L保留2件) | 標準配對 |
+| 6 | B2La | 附加B2La(L保留2+T不出貨) | ❌ | 同B2L | 同B2L | 可下探 | 同B2 | Safety×2 | B2L+Type=T不出貨+Mix保護 | 特殊Type(L保留2+排除T) | 標準配對 |
+| 7 | B3 | 附加B3(跨OM特別模式) | ✅ | 同B2 | 同B2 | 可下探 | 同B2 | Safety×2 | Type=L規則+跨OM+Mix保護+HD/Windy限制 | 跨OM特殊Type處理 | 跨OM(HD/Windy) |
+| 8 | B3a | 附加B3a(跨OM+T不出貨) | ✅ | 同B3 | 同B3 | 可下探 | 同B3 | Safety×2 | B3+Type=T不出貨+Mix保護 | 跨OM特殊Type(排除T) | 跨OM(HD/Windy) |
+| 9 | B3L | 附加B3L(跨OM+L保留2件) | ✅ | 同B3 | Type=L保留2件 | 可下探 | 同B3 | Safety×2 | B3+Type=L保留2件+Mix保護 | 跨OM特殊Type(L保留2件) | 跨OM(HD/Windy) |
+| 10 | B3La | 附加B3La(跨OM+L保留2+T不出貨) | ✅ | 同B3L | 同B3L | 可下探 | 同B3 | Safety×2 | B3L+Type=T不出貨+Mix保護 | 跨OM(L保留2+排除T) | 跨OM(HD/Windy) |
+| 11 | C | 重點補0 | ❌ | 30% | 最多3件 | 可下探 | RF過剩+RF加強轉出 | Safety Stock | 累計接收追蹤 | 重點補貨 | 標準配對 |
+| 12 | C1 | 重點補0-只補0/1 | ❌ | 30% | 最多3件 | 可下探 | RF過剩+RF加強轉出 | Safety Stock | 僅補0/1+不回落 | 精準補零庫存 | 標準配對 |
+| 13 | C2 | 附加C2(跨OM重點補0) | ✅ | 30% | 最多3件 | 可下探 | RF過剩+RF加強轉出 | Safety Stock | 跨OM+HD/Windy限制 | 跨OM重點補貨 | 跨OM(HD/Windy) |
+| 14 | D | 清貨轉貨 | ❌ | 無限制 | 全部庫存 | 不適用(ND) | ND清貨轉出 | Safety Stock | 避免1件餘貨 | 清貨處理 | 標準配對 |
+| 15 | D2 | 清貨轉貨(ND限定) | ❌ | 無限制 | 全部庫存 | 不適用(ND) | ND清貨轉出 | Safety Stock | 僅ND清貨+避免1件餘貨 | 僅ND清貨 | 標準配對 |
+| 16 | E1 | 強制轉出(同OM) | ❌ | 無限制(全數) | 全部庫存 | 無保護 | E模式強制轉出 | Safety×2 | 標記驅動(僅同OM) | 強制轉移(同OM) | 僅同OM |
+| 17 | E1b | 強制轉出(優先類型) | ❌ | 無限制(全數) | 全部庫存 | 無保護 | E模式強制轉出 | Safety×2 | 標記驅動+優先Type=T/M | 強制轉移(同OM+優先) | 僅同OM+優先類型 |
+| 18 | E2 | 強制轉出(跨OM) | ✅ | 無限制(全數) | 全部庫存 | 無保護 | E模式強制轉出 | Safety×2 | 標記驅動+跨OM+C模式回退 | 強制轉移(跨OM) | 優先同OM,支持跨OM |
+| 19 | F | 目標優化 | ✅ | 視Target/補0需求 | 依Target/補0需求 | 依目標/補0 | F模式ND/RF轉出 | 依Target/補0 | Target優先接收(ND/RF均可) | 目標導向補貨 | Target+跨OM(HD除外) |
+| 20 | F2 | F指定模式 | ✅ | 視Target需求 | 依Target需求 | 依目標 | F模式ND/RF轉出 | 依Target | Target-only+Windy目標優先 | 目標導向集中補貨 | Target-only+跨OM(HD除外) |
+| 21 | F3 | 目標性補0 | ✅ | 視Target需求 | 依Target(RF保留2件) | 依目標(RF保留2件) | F模式ND轉出+F3模式RF轉出(保留2件) | 依Target | RF保留2件+最高庫存優先+跨OM不降級 | 目標導向補貨(RF保留2件) | Target-only+跨OM(RF不降級) |
+| 22 | ND1 | ND同OM轉貨 | ❌ | 無限制 | 全部庫存 | 不適用(ND) | ND智能轉出 | 2×銷量 | ND互轉+智能排序 | ND店舖間調貨 | 僅同OM |
+| 23 | ND2 | ND混合OM轉貨 | ✅ | 無限制 | 全部庫存 | 不適用(ND) | ND智能轉出 | 2×銷量 | ND互轉+跨OM+Windy/HD限制 | ND跨OM調貨 | 跨OM(Windy/HD) |
+| 24 | ND3 | ND限同OM轉貨(補0) | ❌ | 無限制 | Net Stock-3(保留3件) | 不適用(ND) | ND3智能轉出(保留3件) | max(Safety×0.5, 3) | ND補0+保留3件 | ND精準補零庫存 | 僅同OM |
+| 25 | 精簡SKU(限同OM) | 精簡SKU(限同OM) | ❌ | 超出Cap部分 | 依Cap超出量 | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 同左上限 | 超Cap轉出+退回D001 | SKU精簡(同OM) | 僅同OM |
+| 26 | 精簡SKU(跨OM) | 精簡SKU(跨OM) | ✅ | 超出Cap部分 | 依Cap超出量 | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 同左上限 | 超Cap轉出+跨OM+退回D001 | SKU精簡(跨OM) | 跨OM(HD/Windy) |
+| 27 | 精簡SKU(退D001) | 精簡SKU(退D001) | ✅ | 超出Cap部分 | 依Cap超出量(全退D001) | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 不配對(全退D001) | 全數退D001不配對 | SKU精簡(全退D001) | 不配對 |
 
 ### F2 vs F3 對比
 
@@ -811,7 +862,13 @@ statistics = {
 - **模式 A**：適合追求穩定運營，不願承擔庫存風險的情況
 - **模式 B**：適合需要積極處理滯銷庫存，最大化調貨效率的情況
 - **模式 B2**：適合有Type=L特殊店鋪需優先清出，且接收端需依遊客區/混合型店舖優先排序的情況
+- **模式 B2a**：適合B2場景但Type=T（遊客鋪）不可作為出貨來源的情況
+- **模式 B2L**：適合B2場景但Type=L低銷量店鋪需保留2件的情況
+- **模式 B2La**：適合B2L場景且Type=T（遊客鋪）不可作為出貨來源的情況
 - **模式 B3**：適合B2場景但需要跨OM配對的情況
+- **模式 B3a**：適合B3場景但Type=T（遊客鋪）不可作為出貨來源的情況
+- **模式 B3L**：適合B3場景但Type=L低銷量店鋪需保留2件的情況
+- **模式 B3La**：適合B3L場景且Type=T（遊客鋪）不可作為出貨來源的情況
 - **模式 C**：適合針對性補充低庫存店鋪，確保最低服務水平的場景（同 OM 內）
 - **模式 C1**：適合僅需精準補充零庫存或1件庫存店舖的場景，不會觸發一般缺貨補貨，純粹聚焦零庫存問題
 - **模式 C2**：適合需要跨 OM 重點補0的場景，全局性零庫存補充策略
@@ -834,6 +891,9 @@ statistics = {
 - **模式 F**：適合有明確接收目標量的情況，Target 數量直接作為接收量（不論 ND/RF，不考慮在途），未標Target的RF低庫存店按補0邏輯
 - **模式 F2**：適合需要集中補貨到指定Target店舖（不論 ND/RF），非Target RF店舖完全不接收
 - **模式 F3**：適合需要集中補貨到指定Target店舖，同時確保RF轉出店保留最低庫存（不低於2件），且RF跨OM同OM同等優先
+- **模式 ND1**：適合ND店舖間互相調貨（僅同OM），按銷量智能排序轉出，接收上限2×銷量
+- **模式 ND2**：適合ND店舖間互相調貨（可跨OM），Windy只轉Windy，HD不能轉HA/HB/HC
+- **模式 ND3**：適合僅需精準補充零庫存ND店舖的場景，轉出店保留3件庫存，僅同OM配對
 - **精簡SKU(限同OM)**：適合同OM內SKU精簡場景，RF超出Cap(Max(Safety×2, 過去2個月銷量×2))部分轉出，ND全轉出，剩餘退回D001
 - **精簡SKU(跨OM)**：適合跨OM SKU精簡場景，規則同精簡SKU(限同OM)但允許跨OM配對（Windy/HD限制適用）
 - **精簡SKU(退D001)**：適合SKU精簡但無需RF店舖接收的場景，所有轉出數量直接退回D001，不進行RF接收配對，無數量限制
@@ -1240,19 +1300,46 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 
 ---
 
-這是系統中二十六種調貨模式的完整邏輯資料結構和運作機制。每種模式都有其特定的應用場景和風險控制策略。
+這是系統中二十七種調貨模式的完整邏輯資料結構和運作機制。每種模式都有其特定的應用場景和風險控制策略。
 
-========================================
-模式26：精簡SKU(退D001)
-========================================
+---
 
-【規則】
+## 模式精簡SKU(退D001)：精簡SKU全數退回D001 (Simplified SKU - Return to D001)
+
+**核心特徵：**
 - RF店舖存貨上限 = Max(Safety×2, 過去2個月銷量×2)，超出部分可轉出
 - ND店舖全數可轉出
 - 所有轉出的數量一律回退D001
 - RF僅1件不回退D001（避免浪費人力），ND不受此限
-- 與精簡SKU模式共用相同的來源識別逻輯
+- 與精簡SKU模式共用相同的來源識別邏輯
 
-【輸出】
+**轉出規則：**
+
+#### 優先級1：ND類型轉出
+- **條件**：RP Type 為 "ND" 且有庫存
+- **可轉數量**：全部 SaSa Net Stock
+- **轉出類型**：`精簡SKU ND轉出`
+
+#### 優先級2：RF類型轉出
+- **條件1**：RP Type 為 "RF"
+- **條件2**：`(SaSa Net Stock + Pending Received) > Max(Safety Stock × 2, Last 2 Month Sold Qty × 2)`
+- **條件3**：該店鋪不是最高銷量店鋪（保護最高動銷店）
+- **可轉數量**：`min(total_available - cap, SaSa Net Stock)`
+- **例外**：RF 僅 1 件不回退 D001（避免浪費人力）
+- **轉出類型**：`精簡SKU RF轉出`
+
+**退回規則：**
+- 所有轉出數量一律退回 D001（無數量限制）
+- 不進行 RF 接收配對
+
+**配對規則：**
+- 允許跨 OM 配對
+- **Windy 限制**：Windy 轉出只能到 Windy 店舖
+- **HD 限制**：HD 店舖不能轉到 HA/HB/HC
+
+**轉出類型：** 精簡SKU ND轉出、精簡SKU RF轉出
+**接收類型：** 退回D001
+
+**輸出：**
 - 報告新增「D001 Receive Qty」欄位（僅此模式顯示）
 - 每一行代表一間店舖→D001的回退建議

@@ -1,5 +1,5 @@
 """
-教學分頁 — 26 種調貨模式圖例教學
+教學分頁 — 27 種調貨模式圖例教學
 """
 
 import streamlit as st
@@ -1063,7 +1063,6 @@ def _render_decision_guide():
 | ND互轉僅同OM | ND1 |
 | ND互轉可跨OM | ND2 |
 | ND店舖補零庫存+保留3件 | ND3 |
-| ND互轉可跨OM | ND2 |
 | SKU精簡僅同OM | 精簡SKU(限同OM) |
 | SKU精簡可跨OM | 精簡SKU(跨OM) |
 | SKU精簡全退D001不配對 | 精簡SKU(退D001) |

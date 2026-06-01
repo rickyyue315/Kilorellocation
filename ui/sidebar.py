@@ -33,17 +33,18 @@ def render_sidebar() -> Dict:
 
         with st.expander("💡 核心功能", expanded=False):
             st.markdown("""
-            **二十四模式智能調貨系統:**
+            **二十七模式智能調貨系統:**
             - ✅ A模式(保守轉貨) / B模式(加強轉貨)
             - ✅ B2模式(附加B特別模式) / B2a模式(B2+T遊客鋪不出貨)
             - ✅ B2L模式(附加B2L:Type=L保留2件) / B2La模式(B2L+T遊客鋪不出貨)
             - ✅ B3模式(附加B跨OM特別模式) / B3a模式(B3+T遊客鋪不出貨)
             - ✅ B3L模式(附加B3L跨OM:Type=L保留2件) / B3La模式(B3L+T遊客鋪不出貨)
-            - ✅ C模式(重點補0) / C2模式(附加C跨OM重點補0)
+            - ✅ C模式(重點補0) / C1模式(重點補0-只補0/1) / C2模式(附加C跨OM重點補0)
             - ✅ D模式(清貨轉貨) / D2模式(清貨轉貨ND限定)
-            - ✅ E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM) / F模式(目標優化) / F2模式(F指定模式) / F3模式(目標性補0)
-            - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨)
-            - ✅ 精簡SKU(限同OM) / 精簡SKU(跨OM)
+            - ✅ E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM)
+            - ✅ F模式(目標優化) / F2模式(F指定模式) / F3模式(目標性補0)
+            - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨) / ND3模式(ND限同OM轉貨-補0)
+            - ✅ 精簡SKU(限同OM) / 精簡SKU(跨OM) / 精簡SKU(退D001)
             
             **智能識別與匹配:**
             - ✅ ND/RF類型智慧識別
@@ -81,7 +82,7 @@ def render_sidebar() -> Dict:
                - 確保包含所有必需欄位
             
              2. **選擇轉貨模式**
-                   - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C2/D/D2/E1/E1b/E2/F/F2/F3/ND1/ND2/精簡SKU(限同OM)/精簡SKU(跨OM))
+                   - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C1/C2/D/D2/E1/E1b/E2/F/F2/F3/ND1/ND2/ND3/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001))
                - 查看模式說明了解各模式特點
                       - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
             
@@ -213,6 +214,13 @@ def render_sidebar() -> Dict:
             - 當(SaSa Net Stock+Pending Received)≤1時
             - 補充至該店舖的Safety或MOQ+1的數量(取最低值)
             
+            **C1模式(重點補0-只補0/1)**
+            - 參照C模式，但**僅處理total_available≤1的店舖**
+            - 不回落到一般缺貨補貨（緊急缺貨、潛在缺貨）
+            - 轉出門檻：淨庫存必須>2才可轉出
+            - 轉出量下限：至少2件才參與配對
+            - 優先使用可轉量較大的來源（減少拆單）
+            
             **C2模式(附加C跨OM重點補0)**
             - 參照C模式的轉出/接收邏輯
             - 允許跨OM配對
@@ -288,6 +296,14 @@ def render_sidebar() -> Dict:
             - HD不能轉到HA/HB/HC
             - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
 
+            **ND3模式(ND限同OM轉貨-補0)**
+            - ND同OM轉貨，參考C1模式，僅針對零庫存ND店舖補貨
+            - 轉出保留3件庫存（Net Stock>3才可轉出，轉出量=Net Stock-3）
+            - 僅同OM配對，不跨OM
+            - 不回落一般缺貨補貨（僅補零庫存ND店）
+            - 接收目標：max(Safety Stock×0.5, 3)
+            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
+
             **精簡SKU(限同OM)模式**
             - RF店舖存貨上限=Max(Safety×2, 過去2個月銷量×2)，超出部分轉出
             - ND店舖全數可轉出
@@ -300,6 +316,13 @@ def render_sidebar() -> Dict:
             - Windy轉出只能到Windy店舖
             - HD不能轉到HA/HB/HC
             - 剩餘無法配對的數量一律退回D001
+            
+            **精簡SKU(退D001)模式**
+            - RF店舖存貨上限=Max(Safety×2, 過去2個月銷量×2)，超出部分可轉出
+            - ND店舖全數可轉出
+            - 所有轉出數量一律退回D001，不進行RF接收配對
+            - RF僅1件不回退D001（避免浪費人力），ND不受此限
+            - 允許跨OM配對（Windy/HD限制適用）
             
             ### 轉出類型判斷
             
@@ -315,12 +338,14 @@ def render_sidebar() -> Dict:
             
             **特殊條件:**
             - C/C2模式：當(SaSa Net Stock+Pending Received)≤1時,補充至Safety或MOQ+1(取最低值)
+            - C1模式：僅處理total_available≤1的店舖，不回落一般缺貨補貨
             - D/D2模式：避免1件餘貨規則(D2僅ND清貨轉出，RF不轉出)
             - E1模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM)
             - E1b模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM，優先Type=T/M)
             - E2模式：所有RF店舖可接收,上限為Safety Stock的2倍(可跨OM)
             - B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式：接收上限為Safety Stock的2倍,並累計追蹤接收量
             - ND1/ND2模式：可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
+            - ND3模式：僅零庫存ND店舖可接收，目標=max(Safety×0.5, 3)，轉出店保留3件
             - 接收優先級(B2/B2a/B2L/B2La/B3/B3a/B3L/B3La):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
             """)
 
