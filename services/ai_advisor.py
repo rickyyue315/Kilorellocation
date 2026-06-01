@@ -134,6 +134,7 @@ def build_advisor_messages(summary: dict, mode_options: list) -> list:
             'confidence MUST be one of "low", "medium", "high". '
             'reasons is a list of 1-5 strings (max 160 chars each). '
             'warnings is a list of 0-5 strings (max 160 chars each). '
+            'Answer ALL text content in Traditional Chinese (繁體中文). '
             'Do NOT output anything other than the JSON object.'
         ),
     }

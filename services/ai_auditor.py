@@ -91,6 +91,7 @@ def build_auditor_messages(payload: dict) -> list:
             'warnings is a list of objects: {severity, title, detail, suggested_check}. '
             'severity must be "low", "medium", or "high". Max 8 warnings. '
             'positive_checks is a list of strings noting good aspects. '
+            'Answer ALL text content in Traditional Chinese (繁體中文). '
             'Do NOT output anything other than the JSON object.'
         ),
     }

@@ -446,7 +446,7 @@ class ExcelGenerator:
                 row += 1
                 worksheet.merge_range(row, 0, row, 4, '風險提示', header_format)
                 row += 1
-                for ci, col_name in enumerate(['Severity', 'Title', 'Detail', 'Suggested Check']):
+                for ci, col_name in enumerate(['嚴重程度', '標題', '詳細內容', '建議檢查']):
                     worksheet.write(row, ci, col_name, header_format)
                 row += 1
                 for w in warnings:

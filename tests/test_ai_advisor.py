@@ -136,7 +136,7 @@ class TestParseAdvisorResponse:
 
 class TestRecommendModeFallback:
     def test_chat_empty_response_returns_error(self):
-        with patch('services.ai_client.chat_completion', return_value=''):
+        with patch('services.ai_advisor.chat_completion', return_value=''):
             from services.ai_advisor import recommend_mode
             result = recommend_mode(_make_minimal_df())
             assert 'error' in result
