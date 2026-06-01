@@ -64,6 +64,8 @@ class NDModeStrategy(BaseMatchStrategy):
                 transfer_qty = min(source['transferable_qty'], dest['needed_qty'], max_receive - current_received)
                 if transfer_qty <= 0:
                     continue
+                if mode == "ND限同OM轉貨(補0)" and transfer_qty == 1:
+                    continue
 
                 notes = self._create_note(source, dest, current_received, transfer_qty, mode) if self._create_note else ""
                 recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received)
