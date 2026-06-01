@@ -54,7 +54,7 @@ class TestMockHTTPException:
     def test_returns_empty_on_http_error(self):
         with patch('services.ai_client.is_ai_enabled', return_value=True), \
              patch('services.ai_client._get_api_key', return_value='sk-test'), \
-             patch('services.ai_client._OUTSIDE_STREAMLIT_CACHE', {}), \
+             patch('services.ai_client._get_cache', return_value={}), \
              patch('httpx.Client') as mock_client_cls:
             mock_client = MagicMock()
             mock_client.post.side_effect = Exception("Connection error")
@@ -96,18 +96,16 @@ class TestCacheHit:
 
 
 class TestGetSecretOrEnv:
-    def test_does_not_crash_on_missing_streamlit(self):
-        with patch('services.ai_client._in_streamlit', return_value=False):
-            from services.ai_client import get_secret_or_env
-            result = get_secret_or_env('NONEXISTENT_KEY')
-            assert result == ''
+    def test_safe_call_with_nonexistent_key_returns_empty(self):
+        from services.ai_client import get_secret_or_env
+        result = get_secret_or_env('__DOES_NOT_EXIST_ANYWHERE__')
+        assert result == ''
 
     def test_falls_back_to_environ(self, monkeypatch):
-        monkeypatch.setenv('TEST_SECRET_KEY', 'env_value')
-        with patch('services.ai_client._in_streamlit', return_value=False):
-            from services.ai_client import get_secret_or_env
-            result = get_secret_or_env('TEST_SECRET_KEY')
-            assert result == 'env_value'
+        monkeypatch.setenv('TEST_SECRET_FALLBACK', 'env_value')
+        from services.ai_client import get_secret_or_env
+        result = get_secret_or_env('TEST_SECRET_FALLBACK')
+        assert result == 'env_value'
 
 
 class TestGetAIStatus:

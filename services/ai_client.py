@@ -14,21 +14,12 @@ _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 _OUTSIDE_STREAMLIT_CACHE: dict = {}
 
 
-def _in_streamlit() -> bool:
+def get_secret_or_env(name: str, default: str = '') -> str:
     try:
         import streamlit as st
-        return st._is_running
+        return st.secrets.get(name, os.getenv(name, default))
     except Exception:
-        return False
-
-
-def get_secret_or_env(name: str, default: str = '') -> str:
-    if _in_streamlit():
-        try:
-            import streamlit as st
-            return st.secrets.get(name, os.getenv(name, default))
-        except Exception:
-            pass
+        pass
     return os.getenv(name, default)
 
 
@@ -76,12 +67,11 @@ def _make_cache_key(messages: list, model: str, temperature: float, max_tokens: 
 
 
 def _get_cache() -> dict:
-    if _in_streamlit():
-        try:
-            import streamlit as st
-            return st.session_state.setdefault('_ai_cache', {})
-        except Exception:
-            pass
+    try:
+        import streamlit as st
+        return st.session_state.setdefault('_ai_cache', {})
+    except Exception:
+        pass
     return _OUTSIDE_STREAMLIT_CACHE
 
 
