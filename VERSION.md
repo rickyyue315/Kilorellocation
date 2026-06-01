@@ -1,5 +1,59 @@
 # 版本更新記錄
 
+## v2.18.0 (2026-06-01)
+
+### 新增 AI 顧問／審計／報表摘要（可選功能）
+
+#### AI 功能說明
+- **AI 模式建議（Advisor）**：上傳資料後，基於 aggregate summary 推薦合適的調貨模式；不自動切換使用者選擇。
+- **AI 邏輯審計（Auditor）**：產生調貨建議後，基於 capped payload 提供風險提示與正面檢查；不修改建議結果。
+- **Excel AI 分析摘要**：在有 AI report 時，Excel 新增 `AI分析摘要` sheet（顧問建議、審計結果、風險等級、驗證檢查）。
+- 所有 AI 功能預設**關閉**（`AI_ENABLED=false`），不影響既有調貨流程。
+- 使用 OpenRouter API，模型可透過環境變數／Zeabur secrets 配置。
+
+#### 程式碼新增
+- `services/ai_client.py` — OpenRouter REST API 封裝、session cache、錯誤降級
+- `services/ai_advisor.py` — 模式推薦（build_df_summary、build_mode_options、parse_advisor_response）
+- `services/ai_auditor.py` — 邏輯審計（build_audit_payload、parse_audit_response）
+- `ui/display.py` — `render_ai_status_badge`、`render_ai_advisor_card`、`render_ai_audit_report`
+- `config.py` — AI config 常數（AI_ENABLED、AI_DEFAULT_MODEL 等）+ `_get_env_bool` helper
+- `requirements.txt` — 新增 `httpx>=0.27.0`
+
+#### Excel 更新
+- `excel_generator.py` — `generate_excel_file()` 新增 `ai_report` 參數；`create_ai_analysis_sheet()` 條件式建立 AI 分析摘要 sheet
+
+#### 測試新增
+- `tests/test_ai_client.py` — 8 項 AI client 測試
+- `tests/test_ai_advisor.py` — 15 項 advisor 測試
+- `tests/test_ai_auditor.py` — 10 項 auditor 測試
+- `tests/test_excel_generator.py` — 新增 6 項 AI sheet 測試
+
+#### Zeabur Secrets 設定
+```text
+OPENROUTER_API_KEY=sk-or-v1-xxxxx
+AI_ENABLED=true
+AI_MODEL=deepseek/deepseek-v4-flash
+AI_MODEL_ADVISOR=deepseek/deepseek-v4-flash
+AI_MODEL_AUDITOR=deepseek/deepseek-v4-flash
+AI_REQUEST_TIMEOUT=30
+OPENROUTER_SITE_URL=https://<your-zeabur-domain>
+OPENROUTER_APP_TITLE=KiLo Reallocation
+```
+
+#### 文件同步
+- `README.md` — AI 功能說明、環境變數、Zeabur secrets、disclaimer
+- `VERSION.md` — 本版本記錄
+- `config.py` — 版本號 bump 至 v2.18.0
+- `app.py` — docstring 版本更新、AI 功能描述
+
+#### 核心原則
+- AI 不修改 `business_logic.py` 的 deterministic 調貨結果
+- AI disabled / no key / API failure / JSON parse failure 時核心流程完全可用
+- 不上傳全量 DataFrame，只傳 aggregate summary / capped samples
+- 不記錄 API key、不在 UI 或 log 暴露 prompt 全量內容
+
+---
+
 ## v2.17.0 (2026-06-01)
 
 ### 新增 F3 模式（目標性補0）

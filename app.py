@@ -1,7 +1,8 @@
 """
-庫存調貨建議系統 v2.17.0 - Streamlit應用程序
+庫存調貨建議系統 v2.18.0 - Streamlit應用程序
 支持二十六模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 含模式教學分頁：26種調貨模式圖例化教學（繁體中文）
+AI advisory/audit/report summary（可選）
 """
 
 import streamlit as st
@@ -22,12 +23,18 @@ from ui.display import (
     render_results_table,
     render_statistics,
     render_download_button,
+    render_ai_status_badge,
+    render_ai_advisor_card,
+    render_ai_audit_report,
 )
 from ui.tutorial import render_tutorial_page
 from data_processor import DataProcessor
 from business_logic import TransferLogic
 from excel_generator import ExcelGenerator
 from services.target_utils import find_f_mode_nd_target_conflicts
+from services.aim_client import get_ai_status
+from services.ai_advisor import recommend_mode
+from services.ai_auditor import audit_recommendations
 
 
 @st.cache_data(show_spinner=False)
@@ -157,13 +164,45 @@ with tab_system:
             render_data_preview(df, processing_stats)
 
             st.markdown("---")
+
+            ai_status = get_ai_status()
+            col_advisor_header, _ = st.columns([3, 1])
+            with col_advisor_header:
+                st.markdown("### 🤖 AI 模式建議")
+            if not ai_status.get('enabled'):
+                render_ai_status_badge(ai_status)
+            else:
+                data_signature = f"{uploaded_file.name}_{uploaded_file.size}_{processing_stats['processed_stats']['total_rows']}_{sorted(df.columns)}"
+                if st.session_state.get('ai_advisor_key') != data_signature:
+                    st.session_state.pop('ai_advisor_result', None)
+                    st.session_state['ai_advisor_key'] = data_signature
+
+                col_btn, col_info = st.columns([2, 3])
+                with col_btn:
+                    if st.button("🤖 產生 AI 模式建議", use_container_width=True):
+                        with st.spinner("AI 分析中..."):
+                            result = recommend_mode(df, processing_stats)
+                            st.session_state['ai_advisor_result'] = result
+                with col_info:
+                    if st.session_state.get('ai_advisor_result'):
+                        ai_model = ai_status.get('model', '')
+                        if ai_model:
+                            st.caption(f"模型：{ai_model}")
+
+                render_ai_advisor_card(
+                    st.session_state.get('ai_advisor_result'),
+                    mode_code,
+                )
+
+            st.markdown("---")
             st.markdown("### 🚀 分析與建議")
 
             st.info(f"當前模式:**{transfer_mode}**")
 
             current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{uploaded_file.name}_{uploaded_file.size}"
             if st.session_state.get('_run_key') != current_run_key:
-                for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name']:
+                for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name',
+                          'ai_audit_result', 'ai_audit_key', 'ai_report_hash']:
                     st.session_state.pop(k, None)
                 for k in [k for k in st.session_state if k.startswith('_display_df_')]:
                     st.session_state.pop(k)
@@ -207,6 +246,25 @@ with tab_system:
                         for error in st.session_state.get('quality_errors', []):
                             st.error(error)
 
+            if quality_passed is not None and recommendations:
+                audit_cache_key = f"{current_run_key}_{mode_code}_{len(recommendations)}_{statistics.get('total_transfer_qty', 0)}_{len(st.session_state.get('quality_errors', []))}"
+                if st.session_state.get('ai_audit_key') != audit_cache_key:
+                    st.session_state.pop('ai_audit_result', None)
+                    st.session_state['ai_audit_key'] = audit_cache_key
+
+                if st.button("🤖 執行 AI 邏輯審計", use_container_width=True):
+                    with st.spinner("AI 審計中..."):
+                        audit = audit_recommendations(
+                            recommendations,
+                            statistics,
+                            quality_passed,
+                            st.session_state.get('quality_errors', []),
+                            st.session_state.get('active_mode_name', ''),
+                        )
+                        st.session_state['ai_audit_result'] = audit
+
+                render_ai_audit_report(st.session_state.get('ai_audit_result'))
+
             if recommendations:
                 st.markdown("---")
                 st.markdown("### 📈 分析結果")
@@ -223,7 +281,21 @@ with tab_system:
                 if st.session_state.get('excel_run_key') != current_run_key or 'excel_data' not in st.session_state:
                     with st.spinner("生成 Excel 文件..."):
                         excel_generator = ExcelGenerator()
-                        st.session_state['excel_data'] = excel_generator.generate_excel_file(recommendations, statistics, mode=st.session_state.get('active_mode_name', ''))
+                        ai_report = {
+                            'advisor': st.session_state.get('ai_advisor_result'),
+                            'audit': st.session_state.get('ai_audit_result'),
+                            'model': ai_status.get('model', ''),
+                        }
+                        has_ai_content = bool(
+                            (ai_report.get('advisor') and 'error' not in ai_report['advisor'])
+                            or (ai_report.get('audit') and 'error' not in ai_report['audit'])
+                        )
+                        st.session_state['excel_data'] = excel_generator.generate_excel_file(
+                            recommendations,
+                            statistics,
+                            mode=st.session_state.get('active_mode_name', ''),
+                            ai_report=ai_report if has_ai_content else None,
+                        )
                         st.session_state['excel_filename'] = excel_generator.output_filename
                         st.session_state['excel_run_key'] = current_run_key
 

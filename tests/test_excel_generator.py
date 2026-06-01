@@ -139,3 +139,84 @@ class TestGenerateExcelFile:
         recs = [_make_recommendation()]
         result = generator.generate_excel_file(recs, {})
         assert isinstance(result, bytes)
+
+
+class TestGenerateExcelFileWithAIReport:
+    def test_no_ai_report_still_has_two_sheets(self, generator):
+        recs = [_make_recommendation()]
+        stats = _make_statistics()
+        result = generator.generate_excel_file(recs, stats, ai_report=None)
+        xl = pd.ExcelFile(io.BytesIO(result))
+        sheet_names = xl.sheet_names
+        assert "調貨建議 (Transfer Recommendations)" in sheet_names
+        assert "統計摘要 (Summary Dashboard)" in sheet_names
+        assert len(sheet_names) == 2
+
+    def test_with_ai_report_adds_ai_sheet(self, generator):
+        recs = [_make_recommendation()]
+        stats = _make_statistics()
+        ai_report = {
+            'advisor': {
+                'mode_code': 'F2', 'mode_name': 'F指定模式',
+                'confidence': 'medium', 'reasons': ['Reason 1'], 'warnings': [],
+            },
+            'audit': {
+                'risk_level': 'low', 'summary': 'All good',
+                'warnings': [],
+                'positive_checks': ['Check 1'],
+            },
+            'model': 'test-model',
+        }
+        result = generator.generate_excel_file(recs, stats, ai_report=ai_report)
+        xl = pd.ExcelFile(io.BytesIO(result))
+        sheet_names = xl.sheet_names
+        assert "AI分析摘要" in sheet_names
+        assert len(sheet_names) == 3
+
+    def test_ai_warnings_readable(self, generator):
+        recs = [_make_recommendation()]
+        stats = _make_statistics()
+        ai_report = {
+            'advisor': {},
+            'audit': {
+                'risk_level': 'high', 'summary': 'Many risks',
+                'warnings': [
+                    {'severity': 'high', 'title': 'Test Warning', 'detail': 'Detail text', 'suggested_check': 'Verify'},
+                ],
+                'positive_checks': [],
+            },
+            'model': 'test',
+        }
+        result = generator.generate_excel_file(recs, stats, ai_report=ai_report)
+        xl = pd.ExcelFile(io.BytesIO(result))
+        assert "AI分析摘要" in xl.sheet_names
+
+    def test_empty_ai_report_no_crash(self, generator):
+        recs = [_make_recommendation()]
+        result = generator.generate_excel_file(recs, {}, ai_report={})
+        xl = pd.ExcelFile(io.BytesIO(result))
+        assert len(xl.sheet_names) == 2
+
+    def test_ai_report_with_only_advisor(self, generator):
+        recs = [_make_recommendation()]
+        stats = _make_statistics()
+        ai_report = {
+            'advisor': {'mode_code': 'A', 'mode_name': '保守轉貨', 'confidence': 'low', 'reasons': [], 'warnings': []},
+            'audit': None,
+            'model': '',
+        }
+        result = generator.generate_excel_file(recs, stats, ai_report=ai_report)
+        xl = pd.ExcelFile(io.BytesIO(result))
+        assert "AI分析摘要" in xl.sheet_names
+
+    def test_ai_report_with_only_auditor(self, generator):
+        recs = [_make_recommendation()]
+        stats = _make_statistics()
+        ai_report = {
+            'advisor': None,
+            'audit': {'risk_level': 'low', 'summary': 'OK', 'warnings': [], 'positive_checks': []},
+            'model': '',
+        }
+        result = generator.generate_excel_file(recs, stats, ai_report=ai_report)
+        xl = pd.ExcelFile(io.BytesIO(result))
+        assert "AI分析摘要" in xl.sheet_names

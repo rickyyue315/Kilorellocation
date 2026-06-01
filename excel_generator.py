@@ -331,7 +331,8 @@ class ExcelGenerator:
     
     def generate_excel_file(self, recommendations: List[Dict], statistics: Dict,
                            output_path: Optional[str] = None,
-                           mode: str = None) -> bytes:
+                           mode: str = None,
+                           ai_report: Optional[Dict] = None) -> bytes:
         """
         生成完整的Excel文件，返回 bytes（記憶體操作，無磁碟 I/O）
         
@@ -339,23 +340,136 @@ class ExcelGenerator:
             recommendations: 調貨建議列表
             statistics: 統計信息字典
             output_path: 保留參數（已棄用，不再使用）
-            
+            mode: 調貨模式名稱
+            ai_report: optional AI advisory/audit report dict
+        
         Returns:
             Excel 文件的 bytes 內容
         """
         logger.info("開始生成Excel文件（BytesIO模式）")
         
-        # 生成文件名（供外部引用 output_filename 屬性使用）
         self.generate_filename()
         
-        # 使用 BytesIO 完全在記憶體中生成，避免磁碟並發安全問題
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
-            # 創建調貨建議工作表
             self.create_transfer_recommendations_sheet(writer, recommendations, mode)
-            
-            # 創建統計摘要工作表
             self.create_summary_dashboard_sheet(writer, statistics)
-        
+            if ai_report and ai_report.get('advisor') or ai_report and ai_report.get('audit'):
+                self.create_ai_analysis_sheet(writer, ai_report)
+
         logger.info("Excel文件生成完成（BytesIO）")
         return buf.getvalue()
+
+    def create_ai_analysis_sheet(self, writer, ai_report: Dict):
+        workbook = writer.book
+        worksheet = workbook.add_worksheet('AI分析摘要')
+
+        title_format = workbook.add_format({
+            'bold': True, 'font_size': 16, 'align': 'center',
+            'valign': 'vcenter', 'font_name': 'Arial',
+        })
+        header_format = workbook.add_format({
+            'bold': True, 'bg_color': '#D7E4BC', 'border': 1,
+            'font_name': 'Arial', 'font_size': 10,
+        })
+        data_format = workbook.add_format({
+            'border': 1, 'text_wrap': True, 'valign': 'top',
+            'font_name': 'Arial', 'font_size': 10,
+        })
+        risk_format_low = workbook.add_format({
+            'bold': True, 'bg_color': '#D7E4BC', 'align': 'center',
+            'border': 1, 'font_name': 'Arial', 'font_size': 14,
+        })
+        risk_format_medium = workbook.add_format({
+            'bold': True, 'bg_color': '#FFF2CC', 'align': 'center',
+            'border': 1, 'font_name': 'Arial', 'font_size': 14,
+        })
+        risk_format_high = workbook.add_format({
+            'bold': True, 'bg_color': '#F4CCCC', 'align': 'center',
+            'border': 1, 'font_name': 'Arial', 'font_size': 14,
+        })
+
+        row = 0
+        worksheet.merge_range(row, 0, row, 4, 'AI分析摘要', title_format)
+        row += 2
+
+        generation_time = datetime.now(ZoneInfo("Asia/Hong_Kong")).strftime("%Y-%m-%d %H:%M:%S")
+        worksheet.write(row, 0, '生成時間', header_format)
+        worksheet.write(row, 1, generation_time, data_format)
+        row += 1
+
+        model_info = ai_report.get('model', '') if isinstance(ai_report, dict) else ''
+        if model_info:
+            worksheet.write(row, 0, 'AI 模型', header_format)
+            worksheet.write(row, 1, model_info, data_format)
+            row += 1
+
+        advisor = ai_report.get('advisor') if isinstance(ai_report, dict) else None
+        if advisor and isinstance(advisor, dict) and 'mode_code' in advisor:
+            row += 1
+            worksheet.merge_range(row, 0, row, 4, 'AI 模式建議', header_format)
+            row += 1
+            worksheet.write(row, 0, '建議模式', data_format)
+            worksheet.write(row, 1, f"{advisor.get('mode_code', '')}: {advisor.get('mode_name', '')}", data_format)
+            row += 1
+            worksheet.write(row, 0, '信心', data_format)
+            worksheet.write(row, 1, advisor.get('confidence', ''), data_format)
+            row += 1
+            reasons = advisor.get('reasons', [])
+            if reasons:
+                worksheet.write(row, 0, '原因', data_format)
+                worksheet.write(row, 1, '\n'.join(reasons), data_format)
+                row += 1
+            warn_adv = advisor.get('warnings', [])
+            if warn_adv:
+                worksheet.write(row, 0, '注意事項', data_format)
+                worksheet.write(row, 1, '\n'.join(warn_adv), data_format)
+                row += 1
+
+        audit = ai_report.get('audit') if isinstance(ai_report, dict) else None
+        if audit and isinstance(audit, dict) and 'risk_level' in audit:
+            row += 1
+            worksheet.merge_range(row, 0, row, 4, 'AI 邏輯審計', header_format)
+            row += 1
+            risk_level = audit.get('risk_level', 'low')
+            risk_fmt = {'low': risk_format_low, 'medium': risk_format_medium, 'high': risk_format_high}.get(risk_level, risk_format_low)
+            worksheet.write(row, 0, '風險等級', data_format)
+            worksheet.write(row, 1, risk_level.upper(), risk_fmt)
+            row += 1
+            summary = audit.get('summary', '')
+            if summary:
+                worksheet.write(row, 0, '摘要', data_format)
+                worksheet.write(row, 1, summary, data_format)
+                row += 1
+            warnings = audit.get('warnings', [])
+            if warnings:
+                row += 1
+                worksheet.merge_range(row, 0, row, 4, '風險提示', header_format)
+                row += 1
+                for ci, col_name in enumerate(['Severity', 'Title', 'Detail', 'Suggested Check']):
+                    worksheet.write(row, ci, col_name, header_format)
+                row += 1
+                for w in warnings:
+                    worksheet.write(row, 0, w.get('severity', ''), data_format)
+                    worksheet.write(row, 1, w.get('title', ''), data_format)
+                    worksheet.write(row, 2, w.get('detail', ''), data_format)
+                    worksheet.write(row, 3, w.get('suggested_check', ''), data_format)
+                    row += 1
+            positive = audit.get('positive_checks', [])
+            if positive:
+                row += 1
+                worksheet.merge_range(row, 0, row, 4, '正面檢查', header_format)
+                row += 1
+                for p in positive:
+                    worksheet.write(row, 0, '-', data_format)
+                    worksheet.merge_range(row, 1, row, 4, p, data_format)
+                    row += 1
+
+        row += 2
+        worksheet.merge_range(row, 0, row, 4, 'AI內容僅供參考，不取代系統規則及人工覆核。', header_format)
+
+        worksheet.set_column('A:A', 14)
+        worksheet.set_column('B:B', 50)
+        worksheet.set_column('C:C', 40)
+        worksheet.set_column('D:D', 40)
+        worksheet.set_column('E:E', 20)

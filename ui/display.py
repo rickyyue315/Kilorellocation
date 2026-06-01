@@ -1,5 +1,5 @@
 """
-結果展示 UI — 欄位說明、資料查覽、KPI、結果表格、統計、下載按鈕
+結果展示 UI — 欄位說明、資料查覽、KPI、結果表格、統計、下載按鈕、AI顧問
 """
 
 import streamlit as st
@@ -302,3 +302,87 @@ def render_download_button(excel_data: bytes, excel_filename: str, current_run_k
         on_click="ignore",
         key=f"download_excel_{current_run_key}",
     )
+
+
+def render_ai_status_badge(status: dict):
+    if not status.get('enabled'):
+        st.caption("AI 功能未啟用")
+
+
+def render_ai_advisor_card(result: dict, current_mode_code: str):
+    if not result:
+        return
+    if 'error' in result:
+        st.info("AI 模式建議暫時不可用")
+        return
+
+    mode_code = result.get('mode_code', '')
+    mode_name = result.get('mode_name', '')
+    confidence = result.get('confidence', 'low')
+
+    conf_emoji = {'high': '🟢', 'medium': '🟡', 'low': '🔴'}
+    emoji = conf_emoji.get(confidence, '🔴')
+
+    st.markdown("#### 🤖 AI 模式建議")
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown(f"**建議模式：** `{mode_code}`: {mode_name}")
+        reasons = result.get('reasons', [])
+        if reasons:
+            st.markdown("**原因：**")
+            for r in reasons:
+                st.markdown(f"- {r}")
+    with col2:
+        st.markdown(f"{emoji} **信心：{confidence}**")
+
+    warnings = result.get('warnings', [])
+    if warnings:
+        st.warning("**注意事項：**\n" + "\n".join(f"- {w}" for w in warnings))
+
+    if current_mode_code and mode_code != current_mode_code:
+        st.info(f"目前選擇為 `{current_mode_code}`，如需採用 AI 建議，請在左側手動切換。")
+
+    st.caption("*AI 僅供參考，請仍以業務判斷選擇模式。*")
+
+
+def render_ai_audit_report(audit: dict):
+    if not audit:
+        return
+    if 'error' in audit:
+        st.info("AI 審計暫時不可用")
+        return
+
+    risk_level = audit.get('risk_level', 'low')
+    risk_emoji = {'high': '🔴', 'medium': '🟡', 'low': '🟢'}
+    emoji = risk_emoji.get(risk_level, '🟢')
+
+    st.markdown("#### 🤖 AI 邏輯審計")
+    st.markdown(f"**風險等級：** {emoji} **{risk_level.upper()}**")
+
+    summary = audit.get('summary', '')
+    if summary:
+        st.info(summary)
+
+    warnings = audit.get('warnings', [])
+    if warnings:
+        with st.expander(f"⚠️ 風險提示（{len(warnings)} 項）", expanded=False):
+            for w in warnings:
+                severity = w.get('severity', 'low')
+                title = w.get('title', '')
+                detail = w.get('detail', '')
+                suggested = w.get('suggested_check', '')
+                st.markdown(f"**{severity.upper()}** - {title}")
+                if detail:
+                    st.caption(detail)
+                if suggested:
+                    st.caption(f"建議檢查：{suggested}")
+                st.markdown("---")
+
+    positive = audit.get('positive_checks', [])
+    if positive:
+        with st.expander("✅ 正面檢查", expanded=False):
+            for p in positive:
+                st.markdown(f"- {p}")
+
+    st.caption("*AI 審計僅供參考，不會修改調貨建議；正式出貨前仍需按內部流程覆核。*")
