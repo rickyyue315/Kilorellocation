@@ -224,16 +224,19 @@ with tab_system:
                 st.markdown("---")
                 st.success("✅ 分析完成!")
 
-                if st.session_state.get('excel_run_key') != current_run_key or 'excel_data' not in st.session_state:
+                _ai_summary = st.session_state.get('ai_executive_summary', '')
+                _excel_cache_key = f"{current_run_key}_{hash(_ai_summary)}" if _ai_summary else current_run_key
+                if st.session_state.get('excel_run_key') != _excel_cache_key or 'excel_data' not in st.session_state:
                     with st.spinner("生成 Excel 文件..."):
                         excel_generator = ExcelGenerator()
                         st.session_state['excel_data'] = excel_generator.generate_excel_file(
                             recommendations,
                             statistics,
                             mode=st.session_state.get('active_mode_name', ''),
+                            ai_summary=_ai_summary or None,
                         )
                         st.session_state['excel_filename'] = excel_generator.output_filename
-                        st.session_state['excel_run_key'] = current_run_key
+                        st.session_state['excel_run_key'] = _excel_cache_key
 
                 _excel_bytes = st.session_state.get('excel_data', b'')
                 _excel_filename = st.session_state.get('excel_filename', '調貨建議.xlsx')

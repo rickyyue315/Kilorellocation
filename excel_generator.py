@@ -331,7 +331,8 @@ class ExcelGenerator:
     
     def generate_excel_file(self, recommendations: List[Dict], statistics: Dict,
                            output_path: Optional[str] = None,
-                           mode: str = None) -> bytes:
+                           mode: str = None,
+                           ai_summary: Optional[str] = None) -> bytes:
         """
         生成完整的Excel文件，返回 bytes（記憶體操作，無磁碟 I/O）
         
@@ -340,6 +341,7 @@ class ExcelGenerator:
             statistics: 統計信息字典
             output_path: 保留參數（已棄用，不再使用）
             mode: 調貨模式名稱
+            ai_summary: optional AI executive summary text
         
         Returns:
             Excel 文件的 bytes 內容
@@ -353,6 +355,46 @@ class ExcelGenerator:
         with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
             self.create_transfer_recommendations_sheet(writer, recommendations, mode)
             self.create_summary_dashboard_sheet(writer, statistics)
+            if ai_summary:
+                self.create_smart_summary_sheet(writer, ai_summary)
 
         logger.info("Excel文件生成完成（BytesIO）")
         return buf.getvalue()
+
+    def create_smart_summary_sheet(self, writer, ai_summary: str):
+        workbook = writer.book
+        worksheet = workbook.add_worksheet('智能摘要')
+
+        title_fmt = workbook.add_format({
+            'bold': True, 'font_size': 14, 'align': 'left',
+            'valign': 'vcenter', 'font_name': 'Arial',
+        })
+        label_fmt = workbook.add_format({
+            'bold': True, 'font_size': 10, 'font_name': 'Arial',
+        })
+        text_fmt = workbook.add_format({
+            'font_size': 10, 'text_wrap': True, 'valign': 'top',
+            'font_name': 'Arial',
+        })
+        footer_fmt = workbook.add_format({
+            'italic': True, 'font_size': 9, 'color': '#888888',
+            'font_name': 'Arial',
+        })
+
+        row = 0
+        worksheet.write(row, 0, '智能摘要', title_fmt)
+        row += 2
+
+        gen_time = datetime.now(ZoneInfo("Asia/Hong_Kong")).strftime("%Y-%m-%d %H:%M:%S")
+        worksheet.write(row, 0, '生成時間', label_fmt)
+        worksheet.write(row, 1, gen_time, text_fmt)
+        row += 2
+
+        worksheet.write(row, 0, '摘要', label_fmt)
+        worksheet.write(row, 1, ai_summary, text_fmt)
+        row += 2
+
+        worksheet.write(row, 0, '此摘要由 AI 基於聚合統計數據生成，僅供參考，不取代系統規則及人工覆核。', footer_fmt)
+
+        worksheet.set_column('A:A', 14)
+        worksheet.set_column('B:B', 80)
