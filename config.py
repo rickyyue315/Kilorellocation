@@ -41,6 +41,7 @@ ZEABUR_RESULT_PREVIEW_LIMIT = _get_env_int('KILO_ZEABUR_RESULT_PREVIEW_LIMIT', 1
 # ── AI Integration ─────────────────────────────────────────────────
 
 AI_DEFAULT_MODEL = os.getenv('AI_MODEL', 'deepseek/deepseek-v4-flash')
+AI_FALLBACK_MODEL = os.getenv('AI_FALLBACK_MODEL', 'inclusionai/ling-2.6-flash')
 AI_MODEL_ADVISOR = os.getenv('AI_MODEL_ADVISOR', AI_DEFAULT_MODEL)
 AI_MODEL_AUDITOR = os.getenv('AI_MODEL_AUDITOR', AI_DEFAULT_MODEL)
 AI_MODEL_ENHANCER = os.getenv('AI_MODEL_ENHANCER', AI_DEFAULT_MODEL)

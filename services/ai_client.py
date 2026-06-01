@@ -102,6 +102,17 @@ def chat_completion(
     if cache_key in cache:
         return cache[cache_key]
 
+    content = _do_request(model_name, messages, temperature, max_tokens, api_key)
+
+    if not content and config.AI_FALLBACK_MODEL and config.AI_FALLBACK_MODEL != model_name:
+        logger.info("Primary model (%s) returned empty, trying fallback (%s)", model_name, config.AI_FALLBACK_MODEL)
+        content = _do_request(config.AI_FALLBACK_MODEL, messages, temperature, max_tokens, api_key)
+
+    if content:
+        cache[cache_key] = content
+    return content
+
+def _do_request(model_name: str, messages: list, temperature: float, max_tokens: int, api_key: str) -> str:
     headers = {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
@@ -120,28 +131,26 @@ def chat_completion(
         resp = client.post(_OPENROUTER_URL, json=body, headers=headers)
         client.close()
 
-        logger.info("OpenRouter HTTP %d", resp.status_code)
+        logger.info("OpenRouter HTTP %d (%s)", resp.status_code, model_name)
 
         if not resp.is_success:
-            logger.warning("OpenRouter HTTP %d: %s", resp.status_code, resp.text[:200])
+            logger.warning("OpenRouter HTTP %d (%s): %s", resp.status_code, model_name, resp.text[:200])
             return ''
 
         data = resp.json()
         choices = data.get('choices', [])
         if not choices:
-            logger.warning("OpenRouter response missing choices")
+            logger.warning("OpenRouter response missing choices (%s)", model_name)
             return ''
 
-        content = choices[0].get('message', {}).get('content', '')
-        cache[cache_key] = content
-        return content
+        return choices[0].get('message', {}).get('content', '')
 
     except httpx.TimeoutException:
-        logger.warning("OpenRouter request timed out after %ds", config.AI_REQUEST_TIMEOUT)
+        logger.warning("OpenRouter request timed out after %ds (%s)", config.AI_REQUEST_TIMEOUT, model_name)
         return ''
     except httpx.HTTPError as e:
-        logger.warning("OpenRouter HTTP error: %s", type(e).__name__)
+        logger.warning("OpenRouter HTTP error (%s): %s", model_name, type(e).__name__)
         return ''
     except Exception:
-        logger.warning("OpenRouter request failed", exc_info=True)
+        logger.warning("OpenRouter request failed (%s)", model_name, exc_info=True)
         return ''
