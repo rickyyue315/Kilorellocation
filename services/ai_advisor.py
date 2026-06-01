@@ -152,10 +152,40 @@ def build_advisor_messages(summary: dict, mode_options: list) -> list:
 def _extract_json(text: str) -> str:
     fence = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
     if fence:
-        return fence.group(1).strip()
-    first_brace = re.search(r'\{[\s\S]*\}', text)
-    if first_brace:
-        return first_brace.group(0)
+        inner = fence.group(1).strip()
+        brace = _find_balanced_json(inner)
+        if brace:
+            return brace
+
+    return _find_balanced_json(text) or ''
+
+
+def _find_balanced_json(text: str) -> str:
+    start = text.find('{')
+    if start == -1:
+        return ''
+    depth = 0
+    in_str = False
+    escape = False
+    for i in range(start, len(text)):
+        c = text[i]
+        if escape:
+            escape = False
+            continue
+        if c == '\\' and in_str:
+            escape = True
+            continue
+        if c == '"' and not escape:
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
     return ''
 
 

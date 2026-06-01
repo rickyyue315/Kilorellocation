@@ -85,14 +85,15 @@ def build_auditor_messages(payload: dict) -> list:
         'content': (
             'You are an inventory audit specialist. '
             'Review the provided transfer recommendations payload and identify potential risks. '
-            'Output ONLY valid JSON with keys: risk_level, summary, warnings, positive_checks. '
+            'Respond with ONLY a single JSON object. Do NOT add any markdown, explanation, or other text before or after the JSON. '
+            'JSON keys: risk_level, summary, warnings, positive_checks. '
             'risk_level MUST be one of "low", "medium", "high". '
             'summary is a brief risk overview (max 500 chars). '
             'warnings is a list of objects: {severity, title, detail, suggested_check}. '
             'severity must be "low", "medium", or "high". Max 8 warnings. '
             'positive_checks is a list of strings noting good aspects. '
             'Answer ALL text content in Traditional Chinese (繁體中文). '
-            'Do NOT output anything other than the JSON object.'
+            'Example valid output: {"risk_level":"low","summary":"...","warnings":[],"positive_checks":["..."]}'
         ),
     }
     user = {
@@ -105,10 +106,40 @@ def build_auditor_messages(payload: dict) -> list:
 def _extract_json(text: str) -> str:
     fence = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
     if fence:
-        return fence.group(1).strip()
-    first_brace = re.search(r'\{[\s\S]*\}', text)
-    if first_brace:
-        return first_brace.group(0)
+        inner = fence.group(1).strip()
+        brace = _find_balanced_json(inner)
+        if brace:
+            return brace
+
+    return _find_balanced_json(text) or ''
+
+
+def _find_balanced_json(text: str) -> str:
+    start = text.find('{')
+    if start == -1:
+        return ''
+    depth = 0
+    in_str = False
+    escape = False
+    for i in range(start, len(text)):
+        c = text[i]
+        if escape:
+            escape = False
+            continue
+        if c == '\\' and in_str:
+            escape = True
+            continue
+        if c == '"' and not escape:
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
     return ''
 
 
