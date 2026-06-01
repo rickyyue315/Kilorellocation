@@ -162,9 +162,9 @@
         font-weight: 700 !important;
     }
 
-    /* ═══════ 主按鈕 — 橙色漸層 ═══════ */
+    /* ═══════ 主按鈕 — 黃色漸層 ═══════ */
     .stButton > button {
-        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
+        background: linear-gradient(135deg, #FDE047 0%, #F59E0B 100%) !important;
         color: var(--bg-primary) !important;
         border: none !important;
         border-radius: 10px !important;
@@ -172,15 +172,15 @@
         font-weight: 700 !important;
         font-size: 17px !important;
         letter-spacing: 0.5px !important;
-        box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25) !important;
+        box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3) !important;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
         width: 100%;
     }
 
     .stButton > button:hover {
         transform: translateY(-2px) !important;
-        background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%) !important;
-        box-shadow: 0 8px 28px rgba(245, 158, 11, 0.4) !important;
+        background: linear-gradient(135deg, #FEF08A 0%, #FBBF24 100%) !important;
+        box-shadow: 0 8px 28px rgba(245, 158, 11, 0.45) !important;
     }
 
     .stButton > button:active {
