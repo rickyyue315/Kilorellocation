@@ -306,7 +306,15 @@ def render_download_button(excel_data: bytes, excel_filename: str, current_run_k
 
 def render_ai_status_badge(status: dict):
     if not status.get('enabled'):
-        st.caption("AI 功能未啟用")
+        reason = status.get('reason', '未知原因')
+        st.caption(f"AI 功能未啟用 — {reason}")
+        with st.expander("AI 診斷", expanded=False):
+            st.write({
+                'enabled': status.get('enabled'),
+                'has_api_key': status.get('has_api_key'),
+                'model': status.get('model') or '[未設定]',
+                'reason': reason,
+            })
 
 
 def render_ai_advisor_card(result: dict, current_mode_code: str):
