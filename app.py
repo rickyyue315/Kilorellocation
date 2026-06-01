@@ -8,6 +8,8 @@ AI advisory/audit/report summary（可選）
 import streamlit as st
 import pandas as pd
 import os
+import hashlib
+import json
 from datetime import datetime
 import logging
 
@@ -43,6 +45,15 @@ def _cached_preprocess(file_bytes: bytes) -> tuple:
     processor = DataProcessor()
     df, stats = processor.preprocess_data(io.BytesIO(file_bytes))
     return df, stats
+
+
+def _ai_report_hash() -> str:
+    advisor = st.session_state.get('ai_advisor_result')
+    audit = st.session_state.get('ai_audit_result')
+    if not advisor and not audit:
+        return ''
+    raw = json.dumps({'advisor': advisor, 'audit': audit}, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.md5(raw.encode()).hexdigest()[:8]
 
 
 logging.basicConfig(level=logging.INFO)
@@ -278,7 +289,7 @@ with tab_system:
                 st.markdown("---")
                 st.success("✅ 分析完成!")
 
-                if st.session_state.get('excel_run_key') != current_run_key or 'excel_data' not in st.session_state:
+                if st.session_state.get('excel_run_key') != f"{current_run_key}_{_ai_report_hash()}" or 'excel_data' not in st.session_state:
                     with st.spinner("生成 Excel 文件..."):
                         excel_generator = ExcelGenerator()
                         ai_report = {
@@ -297,7 +308,7 @@ with tab_system:
                             ai_report=ai_report if has_ai_content else None,
                         )
                         st.session_state['excel_filename'] = excel_generator.output_filename
-                        st.session_state['excel_run_key'] = current_run_key
+                        st.session_state['excel_run_key'] = f"{current_run_key}_{_ai_report_hash()}"
 
                 _excel_bytes = st.session_state.get('excel_data', b'')
                 _excel_filename = st.session_state.get('excel_filename', '調貨建議.xlsx')

@@ -113,7 +113,7 @@ class TestAuditDoesNotMutate:
     def test_original_recommendations_unchanged(self):
         rc = _make_recommendation()
         recs = [rc]
-        with patch('services.ai_client.chat_completion', return_value='{"risk_level":"low","summary":"","warnings":[],"positive_checks":[]}'):
+        with patch('services.ai_auditor.chat_completion', return_value='{"risk_level":"low","summary":"","warnings":[],"positive_checks":[]}'):
             from services.ai_auditor import audit_recommendations
             audit_recommendations(recs, _make_statistics(), True, [], "A")
             assert recs[0]['Transfer Qty'] == 5
@@ -122,7 +122,7 @@ class TestAuditDoesNotMutate:
 
 class TestAuditDisabled:
     def test_empty_response_no_crash(self):
-        with patch('services.ai_client.chat_completion', return_value=''):
+        with patch('services.ai_auditor.chat_completion', return_value=''):
             from services.ai_auditor import audit_recommendations
             result = audit_recommendations([_make_recommendation()], _make_statistics(), True, [], "A")
             assert 'error' in result
