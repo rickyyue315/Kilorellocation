@@ -146,10 +146,14 @@ def _find_balanced_json(text: str) -> str:
 def parse_audit_response(text: str) -> dict:
     if not text:
         return {'error': 'empty_response'}
+    extracted = _extract_json(text)
+    if not extracted:
+        logger.warning("Auditor JSON parse failed — no JSON object found in response: %r", text[:512])
+        return {'error': 'parse_failed'}
     try:
-        parsed = json.loads(_extract_json(text))
+        parsed = json.loads(extracted)
     except json.JSONDecodeError:
-        logger.warning("Auditor JSON parse failed")
+        logger.warning("Auditor JSON parse failed — invalid JSON: %r", extracted[:512])
         return {'error': 'parse_failed'}
     if not isinstance(parsed, dict):
         return {'error': 'invalid_type'}
