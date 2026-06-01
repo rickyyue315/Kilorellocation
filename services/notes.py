@@ -2,6 +2,8 @@
 Note generation service — pure formatting functions for transfer recommendation notes.
 """
 
+from config import ND3_KEEP_STOCK
+
 
 def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
     src_type = source['source_type']
@@ -12,6 +14,11 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
         if total_sales == 0:
             return f"【轉出分析: ND智能轉出，0銷量店舖優先轉出，轉出後剩餘{remaining}件】"
         return f"【轉出分析: ND智能轉出，過去2個月銷量{total_sales}件(按銷量升序排序)，轉出後剩餘{remaining}件】"
+    if src_type == 'ND3智能轉出(保留3件)':
+        total_sales = source.get('last_month_sold_qty', 0) + source.get('mtd_sold_qty', 0)
+        if total_sales == 0:
+            return f"【轉出分析: ND3智能轉出(保留3件)，0銷量店舖優先轉出，保留{ND3_KEEP_STOCK}件庫存，轉出後剩餘{remaining}件】"
+        return f"【轉出分析: ND3智能轉出(保留3件)，過去2個月銷量{total_sales}件(按銷量升序排序)，保留{ND3_KEEP_STOCK}件庫存，轉出後剩餘{remaining}件】"
     if src_type == 'ND轉出' and not mode_info['is_d_family']:
         return "【轉出分析: ND類型店鋪，無庫存限制，可全數轉出】"
     if src_type == 'F模式ND轉出':
@@ -65,6 +72,10 @@ def _note_dest_analysis(dest, current_received_qty, transfer_qty):
         total_sales = dest.get('total_sales', 0)
         max_receive = dest.get('max_receive_qty', total_sales * 2)
         return f"【接收分析: ND潛在缺貨接收，過去2個月銷量{total_sales}件，接收上限{max_receive}件(2×過去2個月銷量)，累計已接收{cumulative}件】"
+    if dest_type == 'ND3補0接收':
+        target_qty = dest.get('target_qty', 0)
+        safety_stock = dest.get('safety_stock', 0)
+        return f"【接收分析: ND3補0接收，以補0為目標，目標數量{target_qty}件(Safety Stock×0.5與3取高者)，零庫存ND店舖補貨，累計已接收{cumulative}件】"
     if dest_type == 'RF緊急缺貨補貨':
         return "【接收分析: RF緊急缺貨補貨，RF店鋪零庫存但有銷售記錄（ND模式優先滿足）】"
     if dest_type == '緊急缺貨補貨':
@@ -90,6 +101,8 @@ def create_recommendation_note(source, dest, current_received_qty, transfer_qty,
 
     if source['source_type'] == 'ND智能轉出':
         priority_desc = "ND智能轉出(按銷量排序優先級)"
+    elif source['source_type'] == 'ND3智能轉出(保留3件)':
+        priority_desc = f"ND3智能轉出(保留{ND3_KEEP_STOCK}件，按銷量排序)"
     elif source['priority'] == 1:
         priority_desc = "ND轉出(最高優先級)"
     else:

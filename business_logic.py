@@ -1,7 +1,7 @@
 """
-業務邏輯模組 v2.16.0
+業務邏輯模組 v2.17.0
 實現調貨規則、源/目的地識別和匹配算法
-支持二十五模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B特別模式-T遊客鋪不出貨)/B2L(附加B特別模式-Type=L保留2件)/B2La(附加B特別模式-Type=L保留2件-T遊客鋪不出貨)/B3(附加B跨OM特別模式)/B3a(附加B跨OM特別模式-T遊客鋪不出貨)/B3L(附加B跨OM特別模式-Type=L保留2件)/B3La(附加B跨OM特別模式-Type=L保留2件-T遊客鋪不出貨)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
+支持二十七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 """
 
 import pandas as pd
@@ -18,6 +18,7 @@ from config import (
     F_TARGET_MULTIPLIER, F_TARGET_FLOOR,
     SIMPLIFIED_SKU_RECEIVE_MULTIPLIER,
     ND_RECEIVE_MULTIPLIER,
+    ND3_KEEP_STOCK,
 )
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.target_utils import parse_target_series
@@ -111,7 +112,7 @@ def _compute_max_protected_sold(df) -> float:
 
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.16.0"""
+    """調貨業務邏輯類 v2.17.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False):
@@ -283,6 +284,30 @@ class TransferLogic:
             total_sales = last_month_sold + mtd_sold
 
             sources.append(_make_source(row, net_stock, 1, 'ND智能轉出',
+                                        total_sales_sort=total_sales))
+
+        sources.sort(key=lambda x: x.get('total_sales_sort', 0))
+        return sources
+
+    def _sources_nd3_mode(self, group_df: pd.DataFrame) -> List[Dict]:
+        sources: List[Dict] = []
+        nd_stores = group_df[group_df['RP Type'] == 'ND']
+        max_nd_sold = _compute_max_protected_sold(nd_stores)
+
+        for _, row in nd_stores.iterrows():
+            net_stock = int(row['SaSa Net Stock'])
+            if net_stock <= ND3_KEEP_STOCK:
+                continue
+            effective_sold = int(row['Effective Sold Qty'])
+            if effective_sold >= max_nd_sold:
+                continue
+
+            transferable_qty = net_stock - ND3_KEEP_STOCK
+            last_month_sold = int(row['Last Month Sold Qty'])
+            mtd_sold = int(row['MTD Sold Qty'])
+            total_sales = last_month_sold + mtd_sold
+
+            sources.append(_make_source(row, transferable_qty, 1, 'ND3智能轉出(保留3件)',
                                         total_sales_sort=total_sales))
 
         sources.sort(key=lambda x: x.get('total_sales_sort', 0))
@@ -599,6 +624,32 @@ class TransferLogic:
         destinations.sort(key=lambda x: (x['priority'], -x.get('total_sales', 0)))
         return destinations
 
+    def _dests_nd3_mode(self, group_df: pd.DataFrame) -> List[Dict]:
+        destinations: List[Dict] = []
+        nd_stores = group_df[group_df['RP Type'] == 'ND']
+
+        for _, row in nd_stores.iterrows():
+            net_stock = int(row['SaSa Net Stock'])
+            if net_stock > 0:
+                continue
+            safety_stock = int(row['Safety Stock']) if pd.notna(row.get('Safety Stock', 0)) else 0
+            total_available = net_stock + int(row['Pending Received'])
+            target_qty = max(int(safety_stock * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
+            needed_qty = target_qty - total_available
+            if needed_qty <= 0:
+                continue
+
+            last_month_sold = int(row['Last Month Sold Qty'])
+            mtd_sold = int(row['MTD Sold Qty'])
+            total_sales = last_month_sold + mtd_sold
+
+            destinations.append(_make_dest(row, needed_qty, 1, 'ND3補0接收', target_qty,
+                                           max_receive_qty=target_qty,
+                                           total_sales=total_sales))
+
+        destinations.sort(key=lambda x: (x['priority'], -x.get('total_sales', 0)))
+        return destinations
+
     def _dests_f_mode(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
         destinations: List[Dict] = []
         target_series = self._parse_target_series(group_df)
@@ -860,7 +911,7 @@ class TransferLogic:
         
         Args:
             df: 預處理後的DataFrame
-            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)、F模式(目標優化)或F2模式(F指定模式)
+            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)、F模式(目標優化)、F2模式(F指定模式)、F3模式(目標性補0)、ND1模式(ND同OM轉貨)、ND2模式(ND混合OM轉貨)、ND3模式(ND限同OM轉貨補0)、精簡SKU模式
             
         Returns:
             調貨建議列表

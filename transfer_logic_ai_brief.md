@@ -59,6 +59,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - F Mode Target Reception: Target priority (F/F2/F3 modes, ND/RF can receive)
 - ND Emergency Replenishment (ND1/ND2 mode)
 - ND Potential Replenishment (ND1/ND2 mode)
+- ND3 Zero-Fill Reception (ND3 mode)
 - 精簡SKU接收: RF stores, cap = Max(Safety×2, Last2Month×2)
 - 退回D001: leftover surplus return
 
@@ -71,12 +72,13 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - E Mode Forced Transfer (E1/E1b/E2 modes)
 - F Mode ND Transfer / F Mode RF Transfer / F3 Mode RF Transfer(Retain 2) (F/F3 mode)
 - ND Smart Transfer (ND1/ND2 mode)
+- ND3 Smart Transfer (Retain 3) (ND3 mode)
 - 精簡SKU ND轉出 / 精簡SKU RF轉出 (Simplified SKU modes)
 - 精簡SKU(退D001) 退回D001 (Simplified SKU Return to D001 mode)
 
 ---
 
-# Mode Overview (26 Modes: A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, ND1, ND2, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001))
+# Mode Overview (27 Modes: A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, ND1, ND2, ND3, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001))
 
 ## Mode A: Conservative
 - Source rules: RF only, Surplus Transfer
@@ -273,6 +275,21 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - HD source cannot transfer to HA/HB/HC
 - Goal: ND intelligent cross-OM rebalancing
 
+## Mode ND3: ND Same-OM Zero-Fill (補0)
+- Source rules:
+  - ND stores with SaSa Net Stock > 3 (retain 3)
+  - Transferable = SaSa Net Stock - 3
+  - Highest-sales ND store protected
+  - Sort by 2-month sales ascending (0 sales first)
+- Destination rules:
+  - ONLY ND stores with SaSa Net Stock == 0
+  - Target Qty = max(Safety Stock * 0.5, 3) (like C1)
+  - Sort by 2-month sales descending
+- Same OM only (Article + OM grouping)
+- Uses nd_mode strategy (same pairing logic as ND1)
+- Can configure max receive sites per source
+- Goal: precise zero-stock ND store replenishment with stock preservation
+
 ## Mode 精簡SKU(限同OM): Simplified SKU - Same OM
 - Source rules:
   1. ND: full transfer (all SaSa Net Stock)
@@ -304,7 +321,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 1. Start block: Input Excel -> Data validation -> Compute derived fields
 2. Common Rules block (ND only source, protect highest RF, no dual role)
-3. Split into modes A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, ND1, ND2, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001) (parallel columns)
+3. Split into modes A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, ND1, ND2, ND3, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001) (parallel columns)
 4. For each mode, show:
    - Source criteria
    - Transfer caps
@@ -330,7 +347,8 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - E2 cross-OM + ALL column force transfer
   - F Target priority (ND/RF can receive, Target Qty = needed_qty)
   - F2 Target-only reception (ND/RF can receive, Target Qty = needed_qty)
-  - ND1/ND2 ND mutual transfer (breaks ND-no-receive rule)
+   - ND1/ND2 ND mutual transfer (breaks ND-no-receive rule)
+   - ND3 ND same-OM zero-fill (retain 3, only 0-stock ND dest, like C1)
    - 精簡SKU(限同OM) surplus beyond Cap + D001 fallback
    - 精簡SKU(跨OM) cross-OM + HD/Windy + D001 fallback
    - 精簡SKU(退D001) all surplus directly returns to D001, no RF receive pairing

@@ -4,7 +4,7 @@
 
 import os
 
-VERSION = "v2.18.0"
+VERSION = "v2.19.0"
 
 ZEABUR_ENV_KEYS = [
     'ZEABUR',
@@ -76,6 +76,8 @@ F_TARGET_FLOOR = 3
 SIMPLIFIED_SKU_RECEIVE_MULTIPLIER = 2
 
 ND_RECEIVE_MULTIPLIER = 2
+
+ND3_KEEP_STOCK = 3
 
 # ── Magic Numbers (data_processor.py) ──────────────────────────────
 

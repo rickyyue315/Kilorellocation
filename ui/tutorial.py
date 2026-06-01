@@ -878,6 +878,46 @@ def _render_nd_sku_group():
         diff_table=None,
     )
 
+    content_nd3 = _build_mode_content(
+        "ND3", "ND限同OM轉貨(補0)", "中",
+        scenario="ND 店舖同 OM 補零庫存，轉出保留 3 件庫存，僅針對零庫存 ND 店舖補貨，參考 C1 模式",
+        source_flow=(
+            _flow_row([_flow_node("ND 店舖<br>按過去2個月銷量升序<br>(0銷量優先轉出)", "blue")])
+            + _flow_arrow("保留 3 件")
+            + _flow_row([
+                _flow_node("Net Stock &#8804; 3<br>不轉出", "red"),
+                _flow_node("Net Stock &gt; 3<br>轉出量 = Net Stock - 3<br>ND3智能轉出(保留3件)", "green"),
+            ])
+        ),
+        dest_flow=_flow_row([
+            _flow_node("ND 零庫存店舖<br>Net Stock = 0<br>目標量=max(Safety&#215;0.5, 3)<br>按銷量降序排序<br>ND3補0接收", "orange"),
+        ]),
+        match_order=[
+            ("ND3智能轉出(保留3件)", "ND3補0接收"),
+        ],
+        scenario_table=_scenario_table(
+            ["店舖", "類型", "Net Stock", "Safety", "過去2個月銷量", "角色", "調撥量"],
+            [
+                ["HA001", "ND", "10", "-", "0", "轉出(0銷量優先)", "-7"],
+                ["HA002", "ND", "6", "-", "3", "轉出(低銷量)", "-3"],
+                ["HA003", "ND", "2", "-", "5", "不轉出(&#8804;3)", "-"],
+                ["HA004", "ND", "0", "4", "2", "接收(ND3補0)", "+3"],
+                ["HA005", "ND", "3", "-", "-", "不轉出(&#8804;3)", "-"],
+            ]
+        ),
+        extra_notes="ND3 參考 C1 模式，僅處理目標需求不回落。轉出必須保留 3 件庫存。接收目標量 = max(Safety&#215;0.5, 3)。同 OM 配對",
+        diff_table=_scenario_table(
+            ["對比項", "ND1", "ND3"],
+            [
+                ["轉出保留", "完全不保留", "保留 3 件"],
+                ["接收對象", "RF緊急 + ND潛在", "僅零庫存 ND"],
+                ["接收目標", "2&#215;銷量", "max(Safety&#215;0.5, 3)"],
+                ["配對範圍", "僅同OM", "僅同OM"],
+                ["參考", "-", "C1"],
+            ]
+        ),
+    )
+
     content_sku_om = _build_mode_content(
         "精簡SKU(限同OM)", "精簡SKU調貨（同OM）", "中",
         scenario="SKU 精簡場景，將超出上限的庫存轉出至有需求的 RF 店舖，剩餘退回 D001",
@@ -973,7 +1013,7 @@ def _render_nd_sku_group():
         ),
     )
 
-    return [content_nd1, content_nd2, content_sku_om, content_sku_cross, content_sku_return_d001]
+    return [content_nd1, content_nd2, content_nd3, content_sku_om, content_sku_cross, content_sku_return_d001]
 
 
 def _render_decision_guide():
@@ -986,7 +1026,7 @@ def _render_decision_guide():
         ("需強制轉出指定商品？", "E1 / E1b / E2", "red"),
         ("重點補零庫存店舖？", "C / C1 / C2", "blue"),
         ("有Type分類需求？", "B2~B3La系列", "green"),
-        ("ND店舖互轉？", "ND1 / ND2", "blue"),
+        ("ND店舖互轉？", "ND1 / ND2 / ND3", "blue"),
         ("SKU精簡？", "精簡SKU(同OM/跨OM/退D001)", "green"),
         ("基礎調貨", "A(保守) / B(加強)", "gray"),
     ]
@@ -1020,6 +1060,10 @@ def _render_decision_guide():
 | Type=L需保留2件 | B2L/B2La/B3L/B3La |
 | Type=T不可出貨 | B2a/B2La/B3a/B3La |
 | 需跨OM配對 | B3/B3a/B3L/B3La |
+| ND互轉僅同OM | ND1 |
+| ND互轉可跨OM | ND2 |
+| ND店舖補零庫存+保留3件 | ND3 |
+| ND互轉可跨OM | ND2 |
 | SKU精簡僅同OM | 精簡SKU(限同OM) |
 | SKU精簡可跨OM | 精簡SKU(跨OM) |
 | SKU精簡全退D001不配對 | 精簡SKU(退D001) |
@@ -1031,7 +1075,7 @@ def render_tutorial_page():
     _render_global_rules()
 
     st.markdown("---")
-    st.markdown("### 25 種模式教學")
+    st.markdown("### 27 種模式教學")
     st.markdown("按業務場景分為 8 組，展開查看詳細教學。")
 
     _render_group("基礎調貨模式（A / B）", "1", _render_basic_group)
@@ -1041,7 +1085,7 @@ def render_tutorial_page():
     _render_group("清貨模式（D / D2）", "5", _render_d_group)
     _render_group("強制轉出系列（E1 / E1b / E2）", "6", _render_e_group)
     _render_group("目標優化系列（F / F2 / F3）", "7", _render_f_group)
-    _render_group("ND/SKU專項（ND1 / ND2 / 精簡SKU）", "8", _render_nd_sku_group)
+    _render_group("ND/SKU專項（ND1 / ND2 / ND3 / 精簡SKU）", "8", _render_nd_sku_group)
 
     st.markdown("---")
     _render_decision_guide()

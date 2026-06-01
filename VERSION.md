@@ -1,6 +1,47 @@
 # 版本更新記錄
 
-## v2.18.0 (2026-06-01)
+## v2.19.0 (2026-06-01)
+
+### 新增 ND3 模式：ND 限同 OM 轉貨（補 0）
+
+#### 模式說明
+- **ND3**：ND 同 OM 轉貨，轉出保留 3 件庫存，僅針對零庫存 ND 店舖補貨
+- 參考 C1 模式：僅處理目標需求，不回落一般缺貨
+- 同 OM 配對（不跨 OM）
+
+#### 轉出規則（`_sources_nd3_mode`）
+- 僅 ND 店舖，`SaSa Net Stock > 3` 才可轉出
+- 轉出量 = `SaSa Net Stock - 3`（保留 3 件）
+- 最高銷量 ND 店舖受保護
+- 按銷量由低到高排序（零銷量優先）
+
+#### 接收規則（`_dests_nd3_mode`）
+- 僅 ND 店舖，`SaSa Net Stock == 0` 才可接收
+- 目標數量 = `max(Safety Stock × 0.5, 3)`（同 C1）
+- 需求數量 = 目標數量 - 總可用庫存
+- 按銷量由高到低排序
+- 接收類型：`ND3補0接收`
+
+#### 配對策略
+- 使用 `nd_mode` 策略（同 ND1/ND2）
+- 可配置接收店數限制
+- 同 OM 配對（groupby Article + OM）
+
+#### 程式碼新增/修改
+- `config.py` — 新增 `ND3_KEEP_STOCK = 3` 常量，版本號 bump 至 v2.19.0
+- `models/mode_registry.py` — 新增 ND3 ModeDef
+- `business_logic.py` — 新增 `_sources_nd3_mode()`、`_dests_nd3_mode()`，更新 import 與 docstring
+- `services/notes.py` — 新增 ND3 轉出/接收分析 note
+- `app.py` — docstring 版本更新（v2.19.0，27 模式）
+
+#### 文件同步
+- `README.md` — 新增 ND3 模式描述、模式對照、接收店數限制列表、教學分頁
+- `VERSION.md` — 本版本記錄
+- `config.py` — 版本號 bump 至 v2.19.0
+- `app.py` — docstring 版本更新
+- `ui/tutorial.py` — 新增 ND3 教學內容
+- `調貨模式詳解.txt` — 新增 ND3 詳細規則
+- `transfer_logic_ai_brief.md` — 新增 ND3 條目
 
 ### 新增 AI 顧問／審計／報表摘要（可選功能）
 
