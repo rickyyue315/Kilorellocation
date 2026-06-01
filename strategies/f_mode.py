@@ -1,5 +1,5 @@
 """
-F/F2模式匹配策略
+F/F2/F3模式匹配策略
 """
 
 from typing import Any, Dict, List, Optional
@@ -38,18 +38,23 @@ class FModeStrategy(BaseMatchStrategy):
         remaining_demand = total_needed
 
         is_f2 = (mode == "F指定模式")
+        is_f3 = (mode == "目標性補0")
+        is_f_mode = (is_f2 or is_f3)
 
         def _sort_key(src, dest_om, dest_site=''):
             rp = str(src.get('rp_type', '')).upper()
             same_om = 1 if src.get('om') == dest_om else 2
-            tier = 0 if rp == 'ND' else (1 if same_om == 1 else 2)
+            if is_f3:
+                tier = 0 if rp == 'ND' else 1
+            else:
+                tier = 0 if rp == 'ND' else (1 if same_om == 1 else 2)
             hd_penalty = 0
-            if (is_f2 and self._f2_allow_hd_transfer
+            if (self._f2_allow_hd_transfer
                     and str(src.get('site', '')).upper().startswith('HD')
                     and dest_site.upper().startswith(('HA', 'HB', 'HC'))):
                 hd_penalty = 10
             windy_penalty = 0
-            if is_f2 and dest_om == 'Windy' and src.get('om') != 'Windy':
+            if dest_om == 'Windy' and src.get('om') != 'Windy':
                 windy_penalty = 5
             return (tier + hd_penalty + windy_penalty, src.get('effective_sold_qty', 0))
 
@@ -87,7 +92,7 @@ class FModeStrategy(BaseMatchStrategy):
                         continue
 
                     if is_hd_to_hk_restricted(source['site'], dest['site']):
-                        if not (is_f2 and self._f2_allow_hd_transfer):
+                        if not (is_f_mode and self._f2_allow_hd_transfer):
                             continue
 
                     transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_demand)

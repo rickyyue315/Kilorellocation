@@ -1,5 +1,37 @@
 # 版本更新記錄
 
+## v2.17.0 (2026-06-01)
+
+### 新增 F3 模式（目標性補0）
+
+#### 功能說明
+- 新增第 26 種模式：`F3: 目標性補0`
+- 基於 F2 架構（僅 Target > 0 店舖接收、HD 轉出選項、Windy 目標優先）
+- **核心差異**：
+  - RF 轉出後保留 2 件（net_stock > 2 才可轉出，轉出量 = net_stock - 2）
+  - RF 按最高庫存優先轉出（同優先級內銷量低優先）
+  - RF 跨 OM 不降級（同 OM / 跨 OM 同等 tier）
+
+#### 程式碼更新
+- [`models/mode_registry.py`](models/mode_registry.py) — MODE_DEFS 新增 F3 記錄
+- [`business_logic.py`](business_logic.py) — `_sources_f_mode` F3 RF 邏輯、模式路由、質量檢查、target_stores 保護
+- [`strategies/f_mode.py`](strategies/f_mode.py) — `_sort_key` F3 tier / HD / Windy 懲罰邏輯
+- [`ui/sidebar.py`](ui/sidebar.py) — F3 HD 轉出選項、模式描述、功能清單、操作指引
+- [`app.py`](app.py) — docstring 更新為 26 模式、F3 ND+Target 衝突檢查
+- [`config.py`](config.py) — 版本號 bump 至 v2.17.0
+
+#### 文件同步
+- [`README.md`](README.md) — 模式列表、跨 OM 規則、功能亮點、模式對照表、教學分組
+- [`VERSION.md`](VERSION.md) — 本版本記錄
+- [`ui/tutorial.py`](ui/tutorial.py) — 目標優化系列新增 F3 教學內容
+- [`調貨模式詳解.txt`](調貨模式詳解.txt) — 模式列表、關鍵差異對比表、F3 詳解
+- [`transfer_logic_ai_brief.md`](transfer_logic_ai_brief.md) — F3 模式說明
+
+#### 測試新增
+- [`tests/test_f3_mode.py`](tests/test_f3_mode.py) — F3 專屬測試（保留2件、最高庫存排序、跨OM不降級等）
+
+---
+
 ## v2.16.0 (2026-05-26)
 
 ### 新增精簡SKU(退D001)模式

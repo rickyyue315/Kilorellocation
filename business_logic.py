@@ -291,13 +291,14 @@ class TransferLogic:
     def _sources_f_mode(self, group_df: pd.DataFrame, mode: str, protected_sites: Optional[Set[str]]) -> List[Dict]:
         sources: List[Dict] = []
         target_series = self._parse_target_series(group_df)
+        is_f3 = (mode == self.mode_f3)
 
         nd_sources = group_df[group_df['RP Type'] == 'ND']
         for _, row in nd_sources.iterrows():
             target_value = target_series.loc[row.name]
             if pd.notna(target_value) and target_value > 0:
                 continue
-            if mode == self.mode_f_target_only and protected_sites:
+            if mode in (self.mode_f_target_only, self.mode_f3) and protected_sites:
                 site_key = str(row['Site']).strip().upper()
                 if site_key in protected_sites:
                     continue
@@ -312,21 +313,35 @@ class TransferLogic:
             target_value = target_series.loc[row.name]
             if pd.notna(target_value) and target_value > 0:
                 continue
-            if mode == self.mode_f_target_only and protected_sites:
+            if mode in (self.mode_f_target_only, self.mode_f3) and protected_sites:
                 site_key = str(row['Site']).strip().upper()
                 if site_key in protected_sites:
                     continue
             net_stock = int(row['SaSa Net Stock'])
             effective_sold = int(row['Effective Sold Qty'])
 
-            if net_stock <= 0:
-                continue
+            if is_f3:
+                if net_stock <= 2:
+                    continue
+                transferable_qty = max(net_stock - 2, 0)
+                source_type = 'F3模式RF轉出(保留2件)'
+                sort_order = -net_stock
+            else:
+                if net_stock <= 0:
+                    continue
+                transferable_qty = net_stock
+                source_type = 'F模式RF轉出'
+                sort_order = 0
+
             if effective_sold >= max_sold_qty:
                 continue
 
-            sources.append(_make_source(row, net_stock, 2, 'F模式RF轉出'))
+            sources.append(_make_source(row, transferable_qty, 2, source_type))
 
-        sources.sort(key=lambda x: (x['priority'], x.get('effective_sold_qty', 0)))
+        if is_f3:
+            sources.sort(key=lambda x: (x['priority'], -x.get('original_stock', 0), x.get('effective_sold_qty', 0)))
+        else:
+            sources.sort(key=lambda x: (x['priority'], x.get('effective_sold_qty', 0)))
         return sources
 
     def _sources_e_mode(self, group_df: pd.DataFrame) -> List[Dict]:
@@ -595,13 +610,13 @@ class TransferLogic:
 
             if pd.notna(target_value) and target_value > 0:
                 target_qty = int(target_value)
-                dest_type = 'F指定模式目標接收' if mode == self.mode_f_target_only else 'F模式目標接收'
+                dest_type = 'F指定模式目標接收' if mode in (self.mode_f_target_only, self.mode_f3) else 'F模式目標接收'
                 destinations.append(_make_dest(row, target_qty, 1, dest_type, target_qty))
                 continue
 
             if rp_type == 'ND':
                 continue
-            if mode == self.mode_f_target_only:
+            if mode in (self.mode_f_target_only, self.mode_f3):
                 continue
 
             if total_available <= 1 and (int(row['Safety Stock']) > 0 or int(row['Effective Sold Qty']) > 0):
@@ -790,7 +805,7 @@ class TransferLogic:
         if self._is_b_special_mode(mode):
             return self._strategies['b_special'].match(sources, destinations, article, product_desc, mode)
 
-        if mode in (self.mode_f, self.mode_f_target_only):
+        if mode in (self.mode_f, self.mode_f_target_only, self.mode_f3):
             return self._strategies['f_mode'].match(sources, destinations, article, product_desc, mode)
         
         if mode == self.mode_c2:
@@ -879,7 +894,7 @@ class TransferLogic:
         
         # F2模式：預先計算全域有Target>0的店舖集合，避免Target店舖任何Article成為轉出源
         target_stores = set()
-        if mode == self.mode_f_target_only:
+        if mode in (self.mode_f_target_only, self.mode_f3):
             target_series_full = self._parse_target_series(df)
             if 'Target' in df.columns:
                 target_mask = target_series_full > 0
@@ -905,7 +920,7 @@ class TransferLogic:
             # 識別轉出候選店鋪
             sources = self.identify_sources(
                 group_df, mode,
-                protected_sites=target_stores if mode == self.mode_f_target_only else None
+                protected_sites=target_stores if mode in (self.mode_f_target_only, self.mode_f3) else None
             )
             
             # 識別接收候選店鋪
@@ -962,7 +977,7 @@ class TransferLogic:
     def perform_quality_checks(self, df: pd.DataFrame, mode: str = '') -> bool:
         from services.quality_checks import run_quality_checks
         logger.info("開始執行質量檢查")
-        skip_nd_check = self._is_nd_transfer_mode(mode) or mode in (self.mode_f, self.mode_f_target_only)
+        skip_nd_check = self._is_nd_transfer_mode(mode) or mode in (self.mode_f, self.mode_f_target_only, self.mode_f3)
         passed, errors = run_quality_checks(self.transfer_recommendations, df, skip_nd_check)
         self.quality_check_passed = passed
         self.quality_errors = errors

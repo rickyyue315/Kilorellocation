@@ -1,5 +1,5 @@
 """
-教學分頁 — 25 種調貨模式圖例教學
+教學分頁 — 26 種調貨模式圖例教學
 """
 
 import streamlit as st
@@ -769,7 +769,47 @@ def _render_f_group():
         diff_table=None,
     )
 
-    return [content_f, content_f2]
+    content_f3 = _build_mode_content(
+        "F3", "目標性補0", "中",
+        scenario="需要集中補貨到指定 Target 店舖，同時確保 RF 轉出店保留最低庫存（不低於2件），且 RF 跨 OM 同 OM 同等優先",
+        source_flow=(
+            _flow_row([_flow_node("ND 店舖<br>全數轉出", "blue")])
+            + _flow_arrow("F3")
+            + _flow_row([
+                _flow_node("RF 店舖<br>轉出後保留2件<br>最高庫存優先轉出<br>跨OM不降級", "green"),
+                _flow_node("保護最高銷量RF<br>不轉出", "purple"),
+            ])
+        ),
+        dest_flow=_flow_row([
+            _flow_node("同 F2<br>僅 Target>0 店<br>直接按Target接收", "purple"),
+        ]),
+        match_order=[("F模式ND轉出", "F指定模式目標接收"),
+                     ("F3模式RF轉出(保留2件)", "F指定模式目標接收")],
+        scenario_table=_scenario_table(
+            ["店舖", "類型", "Net Stock", "Target", "F2 轉出量", "F3 轉出量", "角色"],
+            [
+                ["HD001", "RF", "10", "-", "10", "8", "F3保留2件轉出"],
+                ["HD002", "RF", "3", "-", "3", "1", "F3可轉1件"],
+                ["HD003", "RF", "2", "-", "2", "0", "F3庫存≤2不轉"],
+                ["HD004", "ND", "5", "-", "5", "5", "ND全轉"],
+                ["HD005", "RF", "5", "8", "-", "-", "Target保護不轉"],
+            ]
+        ),
+        extra_notes="F3 = F2 + RF轉出保留2件 + RF最高庫存優先轉出 + RF跨OM不降級。HD轉出選項、Windy目標優先同F2",
+        diff_table=_scenario_table(
+            ["對比項", "F2", "F3"],
+            [
+                ["RF轉出量", "net_stock全轉", "max(net_stock-2, 0)"],
+                ["RF排序", "銷量低優先", "最高庫存優先→銷量低"],
+                ["RF跨OM", "降級(tier+1)", "不降級(同OM同等)"],
+                ["Target接收", "僅Target", "僅Target"],
+                ["HD轉出選項", "可設定", "可設定"],
+                ["Windy目標優先", "是", "是"],
+            ]
+        ),
+    )
+
+    return [content_f, content_f2, content_f3]
 
 
 def _render_nd_sku_group():
@@ -1000,7 +1040,7 @@ def render_tutorial_page():
     _render_group("重點補0系列（C / C1 / C2）", "4", _render_c_group)
     _render_group("清貨模式（D / D2）", "5", _render_d_group)
     _render_group("強制轉出系列（E1 / E1b / E2）", "6", _render_e_group)
-    _render_group("目標優化系列（F / F2）", "7", _render_f_group)
+    _render_group("目標優化系列（F / F2 / F3）", "7", _render_f_group)
     _render_group("ND/SKU專項（ND1 / ND2 / 精簡SKU）", "8", _render_nd_sku_group)
 
     st.markdown("---")
