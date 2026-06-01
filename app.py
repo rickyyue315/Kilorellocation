@@ -32,7 +32,7 @@ from data_processor import DataProcessor
 from business_logic import TransferLogic
 from excel_generator import ExcelGenerator
 from services.target_utils import find_f_mode_nd_target_conflicts
-from services.aim_client import get_ai_status
+from services.ai_client import get_ai_status
 from services.ai_advisor import recommend_mode
 from services.ai_auditor import audit_recommendations
 
