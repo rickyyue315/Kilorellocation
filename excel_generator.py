@@ -354,7 +354,7 @@ class ExcelGenerator:
         with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
             self.create_transfer_recommendations_sheet(writer, recommendations, mode)
             self.create_summary_dashboard_sheet(writer, statistics)
-            if ai_report and ai_report.get('advisor') or ai_report and ai_report.get('audit'):
+            if ai_report and (ai_report.get('advisor') or ai_report.get('audit')):
                 self.create_ai_analysis_sheet(writer, ai_report)
 
         logger.info("Excel文件生成完成（BytesIO）")

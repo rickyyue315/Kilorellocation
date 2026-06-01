@@ -25,8 +25,6 @@ from ui.display import (
     render_results_table,
     render_statistics,
     render_download_button,
-    render_ai_status_badge,
-    render_ai_advisor_card,
     render_ai_audit_report,
 )
 from ui.tutorial import render_tutorial_page
@@ -35,7 +33,6 @@ from business_logic import TransferLogic
 from excel_generator import ExcelGenerator
 from services.target_utils import find_f_mode_nd_target_conflicts
 from services.ai_client import get_ai_status
-from services.ai_advisor import recommend_mode
 from services.ai_auditor import audit_recommendations
 
 
@@ -48,11 +45,10 @@ def _cached_preprocess(file_bytes: bytes) -> tuple:
 
 
 def _ai_report_hash() -> str:
-    advisor = st.session_state.get('ai_advisor_result')
     audit = st.session_state.get('ai_audit_result')
-    if not advisor and not audit:
+    if not audit:
         return ''
-    raw = json.dumps({'advisor': advisor, 'audit': audit}, ensure_ascii=False, sort_keys=True, default=str)
+    raw = json.dumps({'audit': audit}, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.md5(raw.encode()).hexdigest()[:8]
 
 
@@ -175,37 +171,6 @@ with tab_system:
             render_data_preview(df, processing_stats)
 
             st.markdown("---")
-
-            ai_status = get_ai_status()
-            col_advisor_header, _ = st.columns([3, 1])
-            with col_advisor_header:
-                st.markdown("### 🤖 AI 模式建議")
-            if not ai_status.get('enabled'):
-                render_ai_status_badge(ai_status)
-            else:
-                data_signature = f"{uploaded_file.name}_{uploaded_file.size}_{processing_stats['processed_stats']['total_rows']}_{sorted(df.columns)}"
-                if st.session_state.get('ai_advisor_key') != data_signature:
-                    st.session_state.pop('ai_advisor_result', None)
-                    st.session_state['ai_advisor_key'] = data_signature
-
-                col_btn, col_info = st.columns([2, 3])
-                with col_btn:
-                    if st.button("🤖 產生 AI 模式建議", use_container_width=True):
-                        with st.spinner("AI 分析中..."):
-                            result = recommend_mode(df, processing_stats)
-                            st.session_state['ai_advisor_result'] = result
-                with col_info:
-                    if st.session_state.get('ai_advisor_result'):
-                        ai_model = ai_status.get('model', '')
-                        if ai_model:
-                            st.caption(f"模型：{ai_model}")
-
-                render_ai_advisor_card(
-                    st.session_state.get('ai_advisor_result'),
-                    mode_code,
-                )
-
-            st.markdown("---")
             st.markdown("### 🚀 分析與建議")
 
             st.info(f"當前模式:**{transfer_mode}**")
@@ -247,6 +212,8 @@ with tab_system:
             recommendations = st.session_state.get('recommendations')
             statistics = st.session_state.get('statistics', {})
             quality_passed = st.session_state.get('quality_passed')
+
+            ai_status = get_ai_status()
 
             if quality_passed is not None:
                 if quality_passed:
@@ -293,15 +260,12 @@ with tab_system:
                 if st.session_state.get('excel_run_key') != f"{current_run_key}_{_ai_report_hash()}" or 'excel_data' not in st.session_state:
                     with st.spinner("生成 Excel 文件..."):
                         excel_generator = ExcelGenerator()
+                        audit = st.session_state.get('ai_audit_result')
                         ai_report = {
-                            'advisor': st.session_state.get('ai_advisor_result'),
-                            'audit': st.session_state.get('ai_audit_result'),
+                            'audit': audit,
                             'model': ai_status.get('model', ''),
                         }
-                        has_ai_content = bool(
-                            (ai_report.get('advisor') and 'error' not in ai_report['advisor'])
-                            or (ai_report.get('audit') and 'error' not in ai_report['audit'])
-                        )
+                        has_ai_content = bool(audit and 'error' not in audit)
                         st.session_state['excel_data'] = excel_generator.generate_excel_file(
                             recommendations,
                             statistics,
@@ -332,11 +296,8 @@ with tab_system:
                         )
                     else:
                         if st.button("🤖 下載含 AI 摘要的 Excel", use_container_width=True,
-                                     help="自動執行 AI 模式建議與邏輯審計後，產生包含 AI 分析摘要 sheet 的 Excel"):
-                            with st.spinner("AI 分析中..."):
-                                if not st.session_state.get('ai_advisor_result') or 'error' in st.session_state.get('ai_advisor_result', {}):
-                                    advisor = recommend_mode(df, processing_stats)
-                                    st.session_state['ai_advisor_result'] = advisor
+                                     help="自動執行 AI 邏輯審計後，產生包含 AI 分析摘要 sheet 的 Excel"):
+                            with st.spinner("AI 審計中..."):
                                 if not st.session_state.get('ai_audit_result') or 'error' in st.session_state.get('ai_audit_result', {}):
                                     audit = audit_recommendations(
                                         recommendations, statistics,
@@ -347,15 +308,12 @@ with tab_system:
                                     st.session_state['ai_audit_result'] = audit
                             with st.spinner("生成含 AI 摘要的 Excel..."):
                                 excel_gen = ExcelGenerator()
+                                audit = st.session_state.get('ai_audit_result')
                                 ai_report = {
-                                    'advisor': st.session_state.get('ai_advisor_result'),
-                                    'audit': st.session_state.get('ai_audit_result'),
+                                    'audit': audit,
                                     'model': ai_status.get('model', ''),
                                 }
-                                has_ai = bool(
-                                    (ai_report.get('advisor') and 'error' not in ai_report['advisor'])
-                                    or (ai_report.get('audit') and 'error' not in ai_report['audit'])
-                                )
+                                has_ai = bool(audit and 'error' not in audit)
                                 ai_bytes = excel_gen.generate_excel_file(
                                     recommendations, statistics,
                                     mode=st.session_state.get('active_mode_name', ''),
