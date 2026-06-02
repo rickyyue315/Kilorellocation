@@ -273,9 +273,8 @@ def render_ai_executive_summary_button(recommendations: list, statistics: dict, 
     if not is_ai_enabled():
         return
 
-    st.markdown('<div class="ai-summary-btn">', unsafe_allow_html=True)
     if st.button("🤖 生成執行摘要", use_container_width=True,
-                 help="AI 分析結果摘要（可選功能，非必要）"):
+                 help="AI 分析結果摘要（可選功能，非必要）", type="primary", key="ai_exec_summary"):
         with st.spinner("AI 生成中..."):
             summary_data = {
                 'total_recs': statistics.get('total_recommendations', 0),
@@ -308,7 +307,6 @@ def render_ai_executive_summary_button(recommendations: list, statistics: dict, 
     if summary:
         with st.expander("📊 AI 執行摘要", expanded=False):
             st.markdown(summary)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_statistics(statistics: dict):
