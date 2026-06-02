@@ -208,8 +208,8 @@
         box-shadow: 0 8px 28px rgba(52, 211, 153, 0.5) !important;
     }
 
-    /* ═══════ AI 摘要按鈕 — 與下載按鈕一致（綠色），用 title 屬性定位 ═══════ */
-    button[title="AI 分析結果摘要（可選功能，非必要）"] {
+    /* ═══════ AI 摘要按鈕 — 與下載按鈕一致（綠色），用 kind 屬性定位 ═══════ */
+    .stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #34D399 0%, #10B981 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
@@ -223,13 +223,13 @@
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
     }
 
-    button[title="AI 分析結果摘要（可選功能，非必要）"]:hover {
+    .stButton > button[kind="primary"]:hover {
         transform: translateY(-2px) !important;
         background: linear-gradient(135deg, #6EE7B7 0%, #34D399 100%) !important;
         box-shadow: 0 8px 28px rgba(52, 211, 153, 0.5) !important;
     }
 
-    button[title="AI 分析結果摘要（可選功能，非必要）"]:active {
+    .stButton > button[kind="primary"]:active {
         transform: translateY(0px) !important;
     }
 
