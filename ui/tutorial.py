@@ -581,7 +581,7 @@ def _render_d_group():
 
     content_d2 = _build_mode_content(
         "D2", "清貨轉貨（ND限定）", "低",
-        scenario="僅清理 ND 無銷售庫存，RF 店舖完全不做轉出，只做接收",
+        scenario="僅清理 ND 無銷售庫存，RF 店舖完全不做轉出，只做接收。可選擇是否啟用「限制2間店舖接收」優化",
         source_flow=_flow_row([
             _flow_node("ND + 銷量=0<br>&#10132; ND清貨轉出", "red"),
             _flow_node("ND + 銷量&gt;0<br>&#10132; 不轉出", "gray"),
@@ -603,7 +603,7 @@ def _render_d_group():
                 ["HD001", "RF", "10", "1", "RF過剩轉出", "不轉出(僅接收)"],
             ]
         ),
-        extra_notes="D2 是最保守的清貨策略：僅 ND 無銷售店舖轉出，RF 只接收不轉出",
+        extra_notes="D2 是最保守的清貨策略：僅 ND 無銷售店舖轉出，RF 只接收不轉出。可在側邊欄切換「限制2間店舖接收（優化版）」，啟動後每間 ND 轉出源最多配對 2 間 RF 接收店，接收量放大至 200%。",
         diff_table=None,
     )
 

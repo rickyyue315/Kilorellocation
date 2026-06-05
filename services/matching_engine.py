@@ -208,6 +208,31 @@ def match_by_priority(logic, sources: List[Dict], destinations: List[Dict],
             _mark_dest_saturated(mode, dest, received_qty_by_site, receive_site_key, is_b_special, is_d_family)
 
 
+def match_d2_mode(logic, sources: List[Dict], destinations: List[Dict],
+                  article: str, om: str, product_desc: str, mode: str) -> List[Dict]:
+    recommendations = []
+    temp_sources, temp_destinations = prep_temp_lists(sources, destinations)
+    transfer_sites = set()
+    receive_sites = set()
+    received_qty_by_site = {}
+    source_to_receive_sites = {}
+    max_receive = 2
+
+    match_by_priority(logic, temp_sources, temp_destinations, recommendations,
+                      article, om, product_desc, 1, 1, transfer_sites, received_qty_by_site, mode,
+                      receive_sites=receive_sites,
+                      source_to_receive_sites=source_to_receive_sites,
+                      max_receive_sites_per_source=max_receive)
+
+    match_by_priority(logic, temp_sources, temp_destinations, recommendations,
+                      article, om, product_desc, 1, 2, transfer_sites, received_qty_by_site, mode,
+                      receive_sites=receive_sites,
+                      source_to_receive_sites=source_to_receive_sites,
+                      max_receive_sites_per_source=max_receive)
+
+    return recommendations
+
+
 def match_general_mode(logic, sources: List[Dict], destinations: List[Dict],
                        article: str, om: str, product_desc: str, mode: str) -> List[Dict]:
     recommendations = []

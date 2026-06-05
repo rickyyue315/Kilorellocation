@@ -1,5 +1,26 @@
 # 版本更新記錄
 
+## v2.21.0 (2026-06-05)
+
+### D2 優化：新增 UI 選擇鍵 + 限制接收店舖數量 + 放寬數量
+
+#### 變更說明
+- D2 模式新增 UI 選擇鍵：可在側邊欄切換「不限店舖數量（原有設定）」與「限制2間店舖接收（優化版）」
+- 優化版限制每間 ND 轉出源最多配對 2 間 RF 接收店（`max_receive_sites_per_source=2`），避免轉出店需為大量不同店舖打包
+- 優化版將接收量放大至 200%（`D2_NEEDED_QTY_MULTIPLIER=2`），補償接收店數量減少的影響
+
+#### 新增檔案
+- `.kilo/plans/1780626584804-quiet-garden.md` — 實作計劃文件
+
+#### 修改檔案
+- `config.py` — 新增 `D2_MAX_RECEIVE_SITES_PER_SOURCE`、`D2_NEEDED_QTY_MULTIPLIER` 常數；版本號 bump 至 v2.21.0
+- `models/mode_registry.py` — D2 ModeDef 新增 `extra_ui_options=frozenset({'d2_enable_2site_limit'})`
+- `ui/sidebar.py` — 新增 D2 模式選擇鍵（st.radio）
+- `app.py` — 提取 `d2_enable_2site_limit` 選項並傳入 `TransferLogic`
+- `business_logic.py` — 新增 `_dests_d2_mode()` 方法（target_qty ×2）、`d2_enable_2site_limit` 參數、條件路由（identify_destinations/match_transfers）
+- `services/matching_engine.py` — 新增 `match_d2_mode()` 函式，每回合傳入 `max_receive_sites_per_source=2`
+- `services/notes.py` — D2 優化版 note 增加「限制接收店≤2間，接收量放大至200%」標示
+
 ## v2.20.0 (2026-06-01)
 
 ### 方案三：優先級分組 + 可選 AI 執行摘要

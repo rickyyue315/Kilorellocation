@@ -25,7 +25,10 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
         return "【轉出分析: F模式ND類型店鋪，無庫存限制，全數轉出】"
     if source['rp_type'] == 'ND' and mode_info['is_d_family']:
         mode_label = 'D2' if mode == mode_info['mode_d2'] else 'D'
-        return f"【轉出分析: ND店鋪清貨(模式{mode_label})，轉出後剩餘庫存({remaining})件，已優化避免1件餘貨】"
+        suffix = ""
+        if mode == mode_info['mode_d2'] and mode_info.get('d2_enable_2site_limit'):
+            suffix = "（優化版: 限制接收店≤2間，接收量放大至200%）"
+        return f"【轉出分析: ND店鋪清貨(模式{mode_label})，轉出後剩餘庫存({remaining})件，已優化避免1件餘貨{suffix}】"
     if src_type == 'F模式RF轉出':
         return f"【轉出分析: F模式RF轉出，可忽視最小庫存要求，轉出後剩餘庫存({remaining})件】"
     if src_type == 'E模式強制轉出':

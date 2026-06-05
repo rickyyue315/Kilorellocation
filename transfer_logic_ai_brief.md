@@ -174,6 +174,10 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - ND with sales records (Last Month > 0 or MTD > 0): also skipped
 - Special rule: same avoid 1-piece remainder as Mode D
 - Destination rules: same as Mode D (Emergency + Potential Replenishment)
+- **Optional optimization (UI toggle)**: "Limit to 2 receiving stores"
+  - `max_receive_sites_per_source = 2` per ND source
+  - target_qty × 2 (200%) per receiving store to compensate
+  - Uses separate `_dests_d2_mode()` + `match_d2_mode()` when enabled
 - Grouping: same OM only (Article + OM)
 - Goal: clear ND dead stock, RF stores only receive, never transfer out
 

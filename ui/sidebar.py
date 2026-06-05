@@ -143,6 +143,18 @@ def render_sidebar() -> Dict:
             if f2_hd_option == "HD 可轉出（最後優先）":
                 f2_allow_hd_transfer = True
 
+        d2_enable_2site_limit = False
+        if mode_code == "D2":
+            d2_option = st.radio(
+                "接收店舖數量限制",
+                ["不限店舖數量（原有設定）", "限制2間店舖接收（優化版）"],
+                index=0,
+                key='d2_site_limit_option',
+                help="限制模式：同一SKU各ND轉出源最多配對2間RF接收店，並將接收量放大至200%。"
+            )
+            if d2_option == "限制2間店舖接收（優化版）":
+                d2_enable_2site_limit = True
+
         st.caption(MODE_DESCRIPTIONS.get(transfer_mode, ""))
 
         with st.expander("📋 詳細模式說明", expanded=False):
@@ -240,6 +252,7 @@ def render_sidebar() -> Dict:
             - RF店舖只作為接收方(緊急缺貨/潛在缺貨)
             - 仍限制同一組OM內配對
             - 避免1件餘貨邏輯同D模式
+            - 可切換「限制2間店舖接收（優化版）」：限制每間ND轉出源最多配對2間RF接收店，接收量放大至200%
             
             **E1模式(強制轉出)**
             - 針對標記為*ALL*的商品行,全數強制轉出
@@ -358,4 +371,5 @@ def render_sidebar() -> Dict:
         'b_special_max_receive_sites_per_source': b_special_max_receive_sites_per_source,
         'b_special_receive_site_limit_option': b_special_receive_site_limit_option,
         'f2_allow_hd_transfer': f2_allow_hd_transfer,
+        'd2_enable_2site_limit': d2_enable_2site_limit,
     }

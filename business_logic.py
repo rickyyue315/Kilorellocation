@@ -1,5 +1,5 @@
 """
-業務邏輯模組 v2.17.0
+業務邏輯模組 v2.21.0
 實現調貨規則、源/目的地識別和匹配算法
 支持二十七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 """
@@ -19,6 +19,7 @@ from config import (
     SIMPLIFIED_SKU_RECEIVE_MULTIPLIER,
     ND_RECEIVE_MULTIPLIER,
     ND3_KEEP_STOCK,
+    D2_MAX_RECEIVE_SITES_PER_SOURCE, D2_NEEDED_QTY_MULTIPLIER,
 )
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.target_utils import parse_target_series
@@ -28,6 +29,7 @@ from services.matching_engine import (
     can_transfer as _can_transfer_impl,
     match_by_priority as _match_by_priority_impl,
     match_general_mode as _match_general_mode_impl,
+    match_d2_mode as _match_d2_mode_impl,
 )
 from services.post_processing import (
     get_record_sales_total as _get_record_sales_total_impl,
@@ -113,10 +115,11 @@ def _compute_max_protected_sold(df) -> float:
 
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.17.0"""
+    """調貨業務邏輯類 v2.21.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
-                 f2_allow_hd_transfer: bool = False):
+                 f2_allow_hd_transfer: bool = False,
+                 d2_enable_2site_limit: bool = False):
         self.transfer_recommendations = []
         self.quality_check_passed = True
         self.quality_errors = []
@@ -126,6 +129,7 @@ class TransferLogic:
             else None
         )
         self.f2_allow_hd_transfer = f2_allow_hd_transfer
+        self.d2_enable_2site_limit = d2_enable_2site_limit
         self._mode_by_name = {d.name: d for d in MODE_DEFS}
         self._mode_by_code = {d.code: d for d in MODE_DEFS}
         for d in MODE_DEFS:
@@ -147,6 +151,7 @@ class TransferLogic:
                 'mode_d2': self.mode_d2,
                 'mode_simplified_sku_same': self.mode_simplified_sku_same,
                 'mode_simplified_sku_return_d001': self.mode_simplified_sku_return_d001,
+                'd2_enable_2site_limit': self.d2_enable_2site_limit,
             }
 
         self._ALL_MODES = get_all_mode_names()
@@ -567,6 +572,8 @@ class TransferLogic:
     def identify_destinations(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
         mode_def = self._mode_by_name.get(mode)
         if mode_def and mode_def.dest_method:
+            if mode == self.mode_d2 and self.d2_enable_2site_limit:
+                return self._dests_d2_mode(group_df)
             method = getattr(self, mode_def.dest_method)
             if mode_def.dest_method in ('_dests_f_mode', '_dests_e_mode'):
                 return method(group_df, mode)
@@ -791,6 +798,35 @@ class TransferLogic:
         destinations.sort(key=lambda x: x['priority'])
         return destinations
 
+    def _dests_d2_mode(self, group_df: pd.DataFrame) -> List[Dict]:
+        destinations: List[Dict] = []
+        rf_destinations = group_df[group_df['RP Type'] == 'RF']
+        m = D2_NEEDED_QTY_MULTIPLIER
+        for _, row in rf_destinations.iterrows():
+            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+            safety_stock = int(row['Safety Stock'])
+            is_no_stock = int(row['SaSa Net Stock']) == 0
+            has_sales_history = int(row['Effective Sold Qty']) > 0
+
+            if is_no_stock and has_sales_history:
+                target_qty = max(safety_stock * m, 2 * m)
+                needed_qty = target_qty - total_available
+                if needed_qty <= 0:
+                    continue
+                destinations.append(_make_dest(row, needed_qty, 1, '緊急缺貨補貨', target_qty,
+                                                max_receive_qty=target_qty))
+                continue
+
+            is_insufficient_stock = total_available < safety_stock
+            if is_insufficient_stock:
+                target_qty = safety_stock * m
+                needed_qty = target_qty - total_available
+                destinations.append(_make_dest(row, needed_qty, 2, '潛在缺貨補貨', target_qty,
+                                                max_receive_qty=target_qty))
+
+        destinations.sort(key=lambda x: x['priority'])
+        return destinations
+
     def _dests_c1_mode(self, group_df: pd.DataFrame) -> List[Dict]:
         destinations: List[Dict] = []
         rf_destinations = group_df[group_df['RP Type'] == 'RF']
@@ -865,6 +901,9 @@ class TransferLogic:
 
         if self._is_simplified_sku_mode(mode):
             return self._strategies['simplified_sku'].match(sources, destinations, article, product_desc, mode)
+
+        if mode == self.mode_d2 and self.d2_enable_2site_limit:
+            return _match_d2_mode_impl(self, sources, destinations, article, om, product_desc, mode)
 
         return _match_general_mode_impl(self, sources, destinations, article, om, product_desc, mode)
 
