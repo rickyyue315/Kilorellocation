@@ -394,7 +394,7 @@ class ExcelGenerator:
         worksheet.write(row, 1, ai_summary, text_fmt)
         row += 2
 
-        worksheet.write(row, 0, '此摘要由 AI 基於聚合統計數據生成，僅供參考，不取代系統規則及人工覆核。', footer_fmt)
+        worksheet.write(row, 0, '此摘要由 AI 基於聚合統計數據生成，並不包含銷量庫存數據，摘要僅供參考，不能取代系統規則及人手覆核。', footer_fmt)
 
         worksheet.set_column('A:A', 14)
         worksheet.set_column('B:B', 80)
