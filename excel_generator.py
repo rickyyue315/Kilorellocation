@@ -1,4 +1,4 @@
-﻿"""
+"""
 Excel輸出模組 v2.16.0
 生成調貨建議和統計摘要的Excel文件
 支持二十五模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
@@ -82,8 +82,6 @@ class ExcelGenerator:
                 'Transfer MOQ': rec['MOQ'],
                 'Remark': remark,
                 'Notes': rec.get('Notes', ''),
-                'AI Risk': rec.get('AI Risk', ''),
-                'AI Needs Review': rec.get('AI Needs Review', ''),
                 # 新增銷售數據欄位
                 'Transfer Site Last Month Sold Qty': rec.get('Transfer Site Last Month Sold Qty', 0),
                 'Transfer Site MTD Sold Qty': rec.get('Transfer Site MTD Sold Qty', 0),
@@ -121,16 +119,14 @@ class ExcelGenerator:
         worksheet.set_column('L:L', 12)  # Transfer MOQ
         worksheet.set_column('M:M', 25)  # Remark - 簡潔的轉出→接收映射
         worksheet.set_column('N:N', 75)  # Notes - 600像素約等於75字符
-        worksheet.set_column('O:O', 10)  # AI Risk
-        worksheet.set_column('P:P', 12)  # AI Needs Review
-        worksheet.set_column('Q:Q', 18)  # Transfer Site Last Month Sold Qty
-        worksheet.set_column('R:R', 15)  # Transfer Site MTD Sold Qty
-        worksheet.set_column('S:S', 18)  # Receive Site Last Month Sold Qty
-        worksheet.set_column('T:T', 15)  # Receive Site MTD Sold Qty
-        worksheet.set_column('U:U', 15)  # Receive Original Stock
+        worksheet.set_column('O:O', 18)  # Transfer Site Last Month Sold Qty
+        worksheet.set_column('P:P', 15)  # Transfer Site MTD Sold Qty
+        worksheet.set_column('Q:Q', 18)  # Receive Site Last Month Sold Qty
+        worksheet.set_column('R:R', 15)  # Receive Site MTD Sold Qty
+        worksheet.set_column('S:S', 15)  # Receive Original Stock
         if show_d001_col:
-            worksheet.set_column('V:V', 18)  # D001 Receive Qty
-
+            worksheet.set_column('T:T', 18)  # D001 Receive Qty
+        
         # 添加標題格式
         header_format = workbook.add_format({
             'bold': True,
@@ -141,11 +137,11 @@ class ExcelGenerator:
             'font_name': 'Arial',
             'font_size': 10
         })
-
+        
         # 應用標題格式
         for col_num, value in enumerate(df.columns.values):
             worksheet.write(0, col_num, value, header_format)
-
+        
         # 添加數據格式
         data_format = workbook.add_format({
             'border': 1,
@@ -154,7 +150,7 @@ class ExcelGenerator:
             'font_name': 'Arial',
             'font_size': 10
         })
-
+        
         # Notes欄位的特殊格式（換行和自動高度）
         notes_format = workbook.add_format({
             'border': 1,
@@ -164,14 +160,14 @@ class ExcelGenerator:
             'font_size': 10,
             'align': 'left'
         })
-
+        
         # 應用數據格式（使用列格式避免逐格寫入，提高效能）
         worksheet.set_column('A:M', None, data_format)
         worksheet.set_column('N:N', 75, notes_format)
-        worksheet.set_column('O:P', None, data_format)
-        worksheet.set_column('Q:U', None, data_format)
         if show_d001_col:
-            worksheet.set_column('V:V', None, data_format)
+            worksheet.set_column('O:T', None, data_format)
+        else:
+            worksheet.set_column('O:S', None, data_format)
 
         # 設置標題行高度與預設行高（避免逐行設定）
         worksheet.set_row(0, 40)
@@ -402,5 +398,3 @@ class ExcelGenerator:
 
         worksheet.set_column('A:A', 14)
         worksheet.set_column('B:B', 80)
-
-
