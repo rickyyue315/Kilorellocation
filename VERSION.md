@@ -1,5 +1,48 @@
 # 版本更新記錄
 
+## v2.22.0 (2026-06-08)
+
+### 新增 AI 批次 Notes（並行執行）
+
+#### 變更說明
+- 在保留現有模板 Notes 不變的前提下，新增可選的 AI 批次分析功能
+- 按 Article 分組，每組並行呼叫一次 OpenRouter API，為每條調貨建議附加 AI 生成的分析說明與風險標記
+- 預設關閉（`AI_BATCH_NOTES_ENABLED=false`），不影響既有調貨流程
+
+#### 新增檔案
+- `services/ai_batch_notes.py` — AI 批次分析核心模組（~160 行）
+  - `_build_batch_context()`：聚合一個 Article 的所有建議為 AI 輸入 JSON
+  - `_parse_ai_response()`：解析 AI 回傳的 JSON，對應回每條 rec 的 index
+  - `_process_one_article()`：單一 Article 的完整流程
+  - `enrich_notes_with_ai()`：主入口，ThreadPoolExecutor 並行處理
+- `tests/test_ai_batch_notes.py` — 12 項測試案例
+
+#### 修改檔案
+- `config.py` — 新增 `AI_BATCH_NOTES_ENABLED`、`AI_BATCH_MAX_WORKERS`、`AI_BATCH_NOTES_TIMEOUT`、`AI_BATCH_NOTES_MAX_TOKENS_PER_REC`；版本號 bump 至 v2.22.0
+- `business_logic.py` — 在 `generate_transfer_recommendations()` 末尾新增 `enrich_notes_with_ai()` 呼叫
+- `ui/display.py` — 在 `render_ai_executive_summary_button()` 中新增 AI Notes 狀態顯示
+- `app.py` — docstring 版本更新
+- `README.md` — AI 批次 Notes 功能說明、環境變數
+
+#### 使用方式
+1. 設定環境變數 `AI_BATCH_NOTES_ENABLED=true`
+2. 確保 `AI_ENABLED=true` 且已設定 `OPENROUTER_API_KEY`
+3. AI Notes 會在生成調貨建議後自動執行，每條建議的 Notes 末尾附加 `【AI分析: ...】` 和 `【AI風險: ...】`
+4. 結果表中新增 `AI Risk` 和 `AI Needs Review` 欄位
+
+#### 環境變數
+```text
+AI_BATCH_NOTES_ENABLED = true    # 啟用 AI 批次 Notes
+AI_BATCH_MAX_WORKERS = 10         # 並行線程數
+AI_BATCH_NOTES_TIMEOUT = 60       # 整體超時（秒）
+```
+
+#### 文件同步
+- `README.md` — 新增 AI 批次 Notes 功能說明、環境變數
+- `VERSION.md` — 本版本記錄
+- `config.py` — 版本號 bump 至 v2.22.0
+- `app.py` — docstring 版本更新
+
 ## v2.21.0 (2026-06-05)
 
 ### D2 優化：新增 UI 選擇鍵 + 限制接收店舖數量 + 放寬數量

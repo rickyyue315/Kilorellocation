@@ -4,7 +4,7 @@
 
 import os
 
-VERSION = "v2.21.0"
+VERSION = "v2.22.0"
 
 ZEABUR_ENV_KEYS = [
     'ZEABUR',
@@ -43,6 +43,13 @@ ZEABUR_RESULT_PREVIEW_LIMIT = _get_env_int('KILO_ZEABUR_RESULT_PREVIEW_LIMIT', 1
 AI_DEFAULT_MODEL = os.getenv('AI_MODEL', 'deepseek/deepseek-v4-flash')
 AI_ENABLED = _get_env_bool('AI_ENABLED', False)
 AI_REQUEST_TIMEOUT = _get_env_int('AI_REQUEST_TIMEOUT', 30)
+
+# ── AI 批次 Notes ─────────────────────────────────────────────────
+
+AI_BATCH_NOTES_ENABLED = _get_env_bool('AI_BATCH_NOTES_ENABLED', False)
+AI_BATCH_MAX_WORKERS = _get_env_int('AI_BATCH_MAX_WORKERS', 10)
+AI_BATCH_NOTES_TIMEOUT = _get_env_int('AI_BATCH_NOTES_TIMEOUT', 60)
+AI_BATCH_NOTES_MAX_TOKENS_PER_REC = 150
 
 # ── Magic Numbers (business_logic.py) ──────────────────────────────
 
