@@ -1,4 +1,4 @@
-﻿# KiLo 庫存調貨建議系統 v2.22.0
+# KiLo 庫存調貨建議系統 v2.22.0
 
 ## 系統概述
 
@@ -100,7 +100,7 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx
 AI_ENABLED=true
 AI_MODEL=deepseek/deepseek-v4-flash
 AI_REQUEST_TIMEOUT=30
-AI_BATCH_NOTES_ENABLED=true          # 可選，啟用 AI 批次 Notes（預設 true）
+AI_BATCH_NOTES_ENABLED=true          # 可選，啟用 AI 批次 Notes（預設 false）
 AI_BATCH_MAX_WORKERS=10              # 並行線程數
 AI_BATCH_NOTES_TIMEOUT=60            # 整體超時（秒）
 ```
@@ -294,5 +294,3 @@ python -m pytest tests/test_b2_b3_source_receive_site_limit.py tests/test_b2_pri
 
 - 目前版本：`v2.19.0`
 - 詳細異動請見 `VERSION.md`
-
-
