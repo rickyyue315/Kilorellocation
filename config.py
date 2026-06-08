@@ -1,4 +1,4 @@
-"""
+﻿"""
 集中配置模組 — 版本、環境偵測、Magic Numbers、配色方案、欄位定義
 """
 
@@ -46,7 +46,7 @@ AI_REQUEST_TIMEOUT = _get_env_int('AI_REQUEST_TIMEOUT', 30)
 
 # ── AI 批次 Notes ─────────────────────────────────────────────────
 
-AI_BATCH_NOTES_ENABLED = _get_env_bool('AI_BATCH_NOTES_ENABLED', False)
+AI_BATCH_NOTES_ENABLED = _get_env_bool('AI_BATCH_NOTES_ENABLED', True)
 AI_BATCH_MAX_WORKERS = _get_env_int('AI_BATCH_MAX_WORKERS', 10)
 AI_BATCH_NOTES_TIMEOUT = _get_env_int('AI_BATCH_NOTES_TIMEOUT', 60)
 AI_BATCH_NOTES_MAX_TOKENS_PER_REC = 150

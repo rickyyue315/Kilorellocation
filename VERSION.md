@@ -1,4 +1,4 @@
-# 版本更新記錄
+﻿# 版本更新記錄
 
 ## v2.22.0 (2026-06-08)
 
@@ -32,12 +32,11 @@
 
 #### 環境變數
 ```text
-AI_BATCH_NOTES_ENABLED = true    # 啟用 AI 批次 Notes
+AI_BATCH_NOTES_ENABLED = true    # 啟用 AI 批次 Notes（預設 true）
 AI_BATCH_MAX_WORKERS = 10         # 並行線程數
 AI_BATCH_NOTES_TIMEOUT = 60       # 整體超時（秒）
-```
 
-#### 文件同步
+#### 文件同步#### 文件同步
 - `README.md` — 新增 AI 批次 Notes 功能說明、環境變數
 - `VERSION.md` — 本版本記錄
 - `config.py` — 版本號 bump 至 v2.22.0
@@ -1147,3 +1146,4 @@ C1模式依賴「沒有緊急/潛在缺貨目的地」的巧合來讓RF來源正
 
 **開發者：Ricky**
 **最後更新：2026-02-10**
+
