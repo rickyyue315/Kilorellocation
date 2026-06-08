@@ -60,7 +60,6 @@ class ExcelGenerator:
         
         # 準備數據
         show_d001_col = mode == "精簡SKU(退D001)" if mode else False
-        show_ai_cols = any('AI Risk' in rec for rec in recommendations)
         df_data = []
         for rec in recommendations:
             # 生成Remark
@@ -83,6 +82,8 @@ class ExcelGenerator:
                 'Transfer MOQ': rec['MOQ'],
                 'Remark': remark,
                 'Notes': rec.get('Notes', ''),
+                'AI Risk': rec.get('AI Risk', ''),
+                'AI Needs Review': rec.get('AI Needs Review', ''),
                 # 新增銷售數據欄位
                 'Transfer Site Last Month Sold Qty': rec.get('Transfer Site Last Month Sold Qty', 0),
                 'Transfer Site MTD Sold Qty': rec.get('Transfer Site MTD Sold Qty', 0),
@@ -93,9 +94,6 @@ class ExcelGenerator:
             }
             if show_d001_col:
                 row_data['D001 Receive Qty'] = rec['Transfer Qty']
-            if show_ai_cols:
-                row_data['AI Risk'] = rec.get('AI Risk', '')
-                row_data['AI Needs Review'] = rec.get('AI Needs Review', '')
             df_data.append(row_data)
         
         # 創建DataFrame
@@ -109,52 +107,29 @@ class ExcelGenerator:
         worksheet = writer.sheets['調貨建議 (Transfer Recommendations)']
         
         # 設置列寬（優化為適中寬度）
-        col = 0
-        worksheet.set_column(col, col, 14)  # Brand
-        col = 1
-        worksheet.set_column(col, col, 12)  # Article
-        col = 2
-        worksheet.set_column(col, col, 25)  # Product Desc
-        col = 3
-        worksheet.set_column(col, col, 12)  # Transfer OM
-        col = 4
-        worksheet.set_column(col, col, 12)  # Transfer Site
-        col = 5
-        worksheet.set_column(col, col, 12)  # Receive OM
-        col = 6
-        worksheet.set_column(col, col, 12)  # Receive Site
-        col = 7
-        worksheet.set_column(col, col, 10)  # Transfer Qty
-        col = 8
-        worksheet.set_column(col, col, 18)  # Transfer Original Stock
-        col = 9
-        worksheet.set_column(col, col, 20)  # Transfer After Transfer Stock
-        col = 10
-        worksheet.set_column(col, col, 18)  # Transfer Safety Stock
-        col = 11
-        worksheet.set_column(col, col, 12)  # Transfer MOQ
-        col = 12
-        worksheet.set_column(col, col, 25)  # Remark
-        col = 13
-        worksheet.set_column(col, col, 75)  # Notes
-        col = 14
-        if show_ai_cols:
-            worksheet.set_column(col, col, 10)  # AI Risk
-            col += 1
-            worksheet.set_column(col, col, 12)  # AI Needs Review
-            col += 1
-        worksheet.set_column(col, col, 18)  # Transfer Site Last Month Sold Qty
-        col += 1
-        worksheet.set_column(col, col, 15)  # Transfer Site MTD Sold Qty
-        col += 1
-        worksheet.set_column(col, col, 18)  # Receive Site Last Month Sold Qty
-        col += 1
-        worksheet.set_column(col, col, 15)  # Receive Site MTD Sold Qty
-        col += 1
-        worksheet.set_column(col, col, 15)  # Receive Original Stock
-        col += 1
+        worksheet.set_column('A:A', 14)  # Brand
+        worksheet.set_column('B:B', 12)  # Article
+        worksheet.set_column('C:C', 25)  # Product Desc
+        worksheet.set_column('D:D', 12)  # Transfer OM
+        worksheet.set_column('E:E', 12)  # Transfer Site
+        worksheet.set_column('F:F', 12)  # Receive OM
+        worksheet.set_column('G:G', 12)  # Receive Site
+        worksheet.set_column('H:H', 10)  # Transfer Qty
+        worksheet.set_column('I:I', 18)  # Transfer Original Stock
+        worksheet.set_column('J:J', 20)  # Transfer After Transfer Stock
+        worksheet.set_column('K:K', 18)  # Transfer Safety Stock
+        worksheet.set_column('L:L', 12)  # Transfer MOQ
+        worksheet.set_column('M:M', 25)  # Remark - 簡潔的轉出→接收映射
+        worksheet.set_column('N:N', 75)  # Notes - 600像素約等於75字符
+        worksheet.set_column('O:O', 10)  # AI Risk
+        worksheet.set_column('P:P', 12)  # AI Needs Review
+        worksheet.set_column('Q:Q', 18)  # Transfer Site Last Month Sold Qty
+        worksheet.set_column('R:R', 15)  # Transfer Site MTD Sold Qty
+        worksheet.set_column('S:S', 18)  # Receive Site Last Month Sold Qty
+        worksheet.set_column('T:T', 15)  # Receive Site MTD Sold Qty
+        worksheet.set_column('U:U', 15)  # Receive Original Stock
         if show_d001_col:
-            worksheet.set_column(col, col, 18)  # D001 Receive Qty
+            worksheet.set_column('V:V', 18)  # D001 Receive Qty
 
         # 添加標題格式
         header_format = workbook.add_format({
@@ -191,16 +166,12 @@ class ExcelGenerator:
         })
 
         # 應用數據格式（使用列格式避免逐格寫入，提高效能）
-        worksheet.set_column(0, 13, None, data_format)  # A:N
-        worksheet.set_column(13, 13, 75, notes_format)  # Notes
-        next_col = 14
-        if show_ai_cols:
-            worksheet.set_column(next_col, next_col + 1, None, data_format)
-            next_col += 2
-        last_data_col = next_col + 4  # 4 sales columns
-        worksheet.set_column(next_col, last_data_col, None, data_format)
+        worksheet.set_column('A:M', None, data_format)
+        worksheet.set_column('N:N', 75, notes_format)
+        worksheet.set_column('O:P', None, data_format)
+        worksheet.set_column('Q:U', None, data_format)
         if show_d001_col:
-            worksheet.set_column(last_data_col + 1, last_data_col + 1, None, data_format)
+            worksheet.set_column('V:V', None, data_format)
 
         # 設置標題行高度與預設行高（避免逐行設定）
         worksheet.set_row(0, 40)
@@ -431,6 +402,5 @@ class ExcelGenerator:
 
         worksheet.set_column('A:A', 14)
         worksheet.set_column('B:B', 80)
-
 
 
