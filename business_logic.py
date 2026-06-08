@@ -119,7 +119,8 @@ class TransferLogic:
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False,
-                 d2_enable_2site_limit: bool = False):
+                 d2_enable_2site_limit: bool = False,
+                 c1_threshold: int = 1):
         self.transfer_recommendations = []
         self.quality_check_passed = True
         self.quality_errors = []
@@ -130,6 +131,7 @@ class TransferLogic:
         )
         self.f2_allow_hd_transfer = f2_allow_hd_transfer
         self.d2_enable_2site_limit = d2_enable_2site_limit
+        self.c1_threshold = c1_threshold
         self._mode_by_name = {d.name: d for d in MODE_DEFS}
         self._mode_by_code = {d.code: d for d in MODE_DEFS}
         for d in MODE_DEFS:
@@ -832,7 +834,7 @@ class TransferLogic:
         rf_destinations = group_df[group_df['RP Type'] == 'RF']
         for _, row in rf_destinations.iterrows():
             total_available = row['SaSa Net Stock'] + row['Pending Received']
-            if total_available > 1:
+            if total_available > self.c1_threshold:
                 continue
             if int(row['Safety Stock']) <= 0 and int(row['Effective Sold Qty']) <= 0:
                 continue

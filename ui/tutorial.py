@@ -482,14 +482,14 @@ def _render_c_group():
 
     content_c1 = _build_mode_content(
         "C1", "重點補0（只補0/1）", "低",
-        scenario="精準只補充零庫存或 1 件庫存的店舖，不會觸發一般缺貨補貨",
+        scenario="精準只補充零庫存或低庫存的店舖，門檻 N 可於側邊欄設定，不會觸發一般缺貨補貨",
         source_flow=(
             _flow_row([_flow_node("RF 店舖<br>Net Stock &gt; 2", "green")])
             + _flow_arrow("最少2件起轉")
             + _flow_row([_flow_node("可轉=min(庫存&#215;30%, 3件)<br>最少 2 件", "blue")])
         ),
         dest_flow=_flow_row([
-            _flow_node("僅 total_available &#8804; 1<br>目標=max(Safety&#215;0.5, 3)", "purple"),
+            _flow_node("僅 total_available &#8804; N<br>N 可於側邊欄設定（預設1）<br>目標=max(Safety&#215;0.5, 3)", "purple"),
         ]),
         match_order=[
             ("ND轉出", "緊急缺貨"),
@@ -505,8 +505,17 @@ def _render_c_group():
                 ["HD004", "10", "0", "4", "轉出(RF過剩)", "-3"],
             ]
         ),
-        extra_notes="C1 與 C 最大差異：不回落到緊急/潛在缺貨補貨，僅處理 total_available&#8804;1 的店舖。轉出最低 2 件",
-        diff_table=None,
+        extra_notes="C1 與 C 最大差異：不回落到緊急/潛在缺貨補貨，僅處理 total_available&#8804;N 的店舖（N 可於側邊欄設定，預設 1）。轉出最低 2 件",
+        diff_table=_scenario_table(
+            ["對比項", "C", "C1", "C2"],
+            [
+                ["接收類型", "重點補0+緊急+潛在", "僅重點補0", "重點補0+緊急+潛在"],
+                ["補0門檻", "total_available&#8804;1", "可自訂（預設1）", "total_available&#8804;1"],
+                ["轉出量下限", "1件", "2件", "1件"],
+                ["跨OM", "否", "否", "是"],
+                ["適用場景", "全面補低庫存", "精準只補零庫存", "跨OM重點補0"],
+            ]
+        ),
     )
 
     content_c2 = _build_mode_content(

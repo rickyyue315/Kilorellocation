@@ -1,5 +1,22 @@
 # 版本更新記錄
 
+## v2.22.0 (2026-06-08)
+
+### C1 模式新增可調節補0門檻（UI 選擇鍵）
+
+#### 變更說明
+- C1 模式新增 UI 選擇鍵：可在側邊欄設定補0門檻（`c1_threshold`，預設 N=1），調整 C1 模式處理的 total_available 上限
+- 原本固定 `total_available > 1` 跳過，現改為 `total_available > self.c1_threshold`（可設定）
+- 預設值 `1` 完整向後兼容原有行為
+- 輸入範圍：0-100（0 = 不補任何店舖，100 = 補幾乎所有 RF 店舖）
+
+#### 修改檔案
+- `config.py` — 新增 `C1_MODE_DEFAULT_THRESHOLD = 1`；版本號 bump 至 v2.22.0
+- `models/mode_registry.py` — C1 ModeDef 新增 `extra_ui_options=frozenset({'c1_threshold'})`
+- `ui/sidebar.py` — 新增 C1 門檻數字輸入（st.number_input），更新 C1 描述文字
+- `app.py` — 提取 `c1_threshold` 選項、傳入 `TransferLogic` 建構子、加入 run_key
+- `business_logic.py` — 新增 `c1_threshold` 參數（預設 1），`_dests_c1_mode` 條件改為 `total_available > self.c1_threshold`
+
 ## v2.21.0 (2026-06-05)
 
 ### D2 優化：新增 UI 選擇鍵 + 限制接收店舖數量 + 放寬數量
