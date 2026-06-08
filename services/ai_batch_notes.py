@@ -1,11 +1,25 @@
-import json
+﻿import json
 import logging
+import numpy as np
+
+
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
 import config
 from services.ai_client import chat_completion, is_ai_enabled
+
+class _NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
+        return super().default(obj)
+
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +129,7 @@ def _process_one_article(article: str, recs: List[Dict], mode: str,
 
     messages = [
         {"role": "system", "content": BATCH_SYSTEM_PROMPT},
-        {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
+        {"role": "user", "content": json.dumps(context, ensure_ascii=False, cls=_NumpyEncoder)},
     ]
 
     response = chat_completion(
