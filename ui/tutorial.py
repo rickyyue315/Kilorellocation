@@ -481,7 +481,7 @@ def _render_c_group():
     )
 
     content_c1 = _build_mode_content(
-        "C1", "重點補0（只補0/1）", "低",
+        "C1", "重點補0（只補0/1，或自選數量）", "低",
         scenario="精準只補充零庫存或低庫存的店舖，門檻 N 可於側邊欄設定，不會觸發一般缺貨補貨",
         source_flow=(
             _flow_row([_flow_node("RF 店舖<br>Net Stock &gt; 2", "green")])

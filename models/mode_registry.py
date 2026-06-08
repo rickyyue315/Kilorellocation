@@ -63,7 +63,7 @@ MODE_DEFS: List[ModeDef] = [
             strategy_key='b_special', dest_method='_dests_b_special', receive_site_limit=True),
     ModeDef("C", "重點補0", "補充庫存≤1的店舖",
             attr_name="mode_c", source_filter=False),
-    ModeDef("C1", "重點補0-只補0/1", "僅補total_available≤1，不回落一般缺貨",
+    ModeDef("C1", "重點補0-只補0/1 (或自選數量)", "僅補total_available≤N（N可自訂），不回落一般缺貨",
             attr_name="mode_c1",
             dest_method='_dests_c1_mode', source_filter=False,
             extra_ui_options=frozenset({'c1_threshold'})),
