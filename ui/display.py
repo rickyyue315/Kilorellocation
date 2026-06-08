@@ -267,16 +267,11 @@ def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_
 
 def render_ai_executive_summary_button(recommendations: list, statistics: dict, mode_name: str):
     from services.ai_client import is_ai_enabled, chat_completion
-    from config import AI_DEFAULT_MODEL, AI_BATCH_NOTES_ENABLED
+    from config import AI_DEFAULT_MODEL
     import json
 
     if not is_ai_enabled():
         return
-
-    if AI_BATCH_NOTES_ENABLED:
-        ai_notes_count = sum(1 for r in recommendations if 'AI Risk' in r)
-        if ai_notes_count > 0:
-            st.caption(f"🤖 AI Notes 已為 {ai_notes_count} 條建議生成分析")
 
     if st.button("🤖 生成執行摘要", use_container_width=True,
                  help="AI 分析結果摘要（可選功能，非必要）", type="primary", key="ai_exec_summary"):

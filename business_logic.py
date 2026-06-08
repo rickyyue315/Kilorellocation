@@ -1,5 +1,5 @@
 """
-業務邏輯模組 v2.22.0
+業務邏輯模組 v2.21.0
 實現調貨規則、源/目的地識別和匹配算法
 支持二十七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1)/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 """
@@ -115,7 +115,7 @@ def _compute_max_protected_sold(df) -> float:
 
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.22.0"""
+    """調貨業務邏輯類 v2.21.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False,
@@ -1071,10 +1071,7 @@ class TransferLogic:
         )
 
         logger.info(f"共生成 {len(all_recommendations)} 條調貨建議")
-
-        from services.ai_batch_notes import enrich_notes_with_ai
-        enrich_notes_with_ai(all_recommendations, mode)
-
+        
         self.transfer_recommendations = all_recommendations
         return all_recommendations
     
