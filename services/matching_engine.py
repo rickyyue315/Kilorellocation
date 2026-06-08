@@ -73,6 +73,9 @@ def compute_transfer_qty(logic, source: Dict, dest: Dict, mode: str, current_rec
     transfer_qty = _clamp_target_qty(is_b_special, is_d_family, dest, transfer_qty, current_received_qty)
     transfer_qty = _adjust_d_family_remainder(is_d_family, source, transfer_qty)
 
+    if mode == logic.mode_c1 and transfer_qty < 2:
+        return 0
+
     return max(transfer_qty, 0)
 
 
