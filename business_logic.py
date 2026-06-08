@@ -842,7 +842,10 @@ class TransferLogic:
             needed_qty = target_qty - total_available
             if needed_qty <= 0:
                 continue
-            destinations.append(_make_dest(row, int(needed_qty), 1, '重點補0', int(target_qty)))
+            needed_qty = int(needed_qty)
+            if needed_qty < 2:
+                needed_qty = 2
+            destinations.append(_make_dest(row, needed_qty, 1, '重點補0', int(target_qty)))
         destinations.sort(key=lambda x: x['priority'])
         return destinations
 
