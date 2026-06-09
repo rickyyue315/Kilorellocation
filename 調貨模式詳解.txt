@@ -1082,6 +1082,11 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 1. Target 有數字：直接按 Target Qty 安排接收（不論 ND/RF，不考慮 Pending Received）
 2. 未標 Target 且總可用庫存 ≤ 1：按補0邏輯補充（僅限 RF 店舖）
 
+**新功能（v2.23.0 新增）：**
+- **「優先滿足小型目標」選項**：可在側邊欄勾選，勾選後 Priority-1 目標店按 needed_qty 升序排序（小型目標優先），最大化達成目標數量
+- **配對後缺口填補**：主要配對完成後，若有剩餘來源庫存，自動分配給尚未滿足的目標店
+- **Target達成分析 Excel 工作表**：獨立工作表顯示每組 (Article, Site) 的 Target Qty 與 Actual Received 對比、Gap、Status（達成/部分達成/未達成），以及彙總 KPI（總目標數、達成數、達成率、總差距）
+
 **轉出規則：**
 - ND店鋪可全數轉出（若有 Target 則不轉出，改為接收方）
 - RF店鋪可轉出（保護最高銷量店鋪）
@@ -1103,6 +1108,11 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 - **Target 店舖不論 ND 或 RF 均可接收**（打破 ND 不可接收限制）
 - **Target 數量直接作為接收量**（不考慮現有庫存與在途數量）
 - **Windy 目標店優先從同 OM 無 Target 店提取**：若目標店為 Windy（有 Target），優先從其他無 Target 的 Windy 店舖提取；僅在 Windy 來源不足時，才回落至非 Windy 來源
+
+**新功能（v2.23.0 新增）：**
+- **「優先滿足小型目標」選項**：可在側邊欄勾選，勾選後 Priority-1 目標店按 needed_qty 升序排序（小型目標優先），最大化達成目標數量
+- **配對後缺口填補**：主要配對完成後，若有剩餘來源庫存，自動分配給尚未滿足的目標店
+- **Target達成分析 Excel 工作表**：獨立工作表顯示每組 (Article, Site) 的 Target Qty 與 Actual Received 對比、Gap、Status（達成/部分達成/未達成），以及彙總 KPI（總目標數、達成數、達成率、總差距）
 
 **接收規則：**
 1. Target 有數字：直接按 Target Qty 安排接收（不論 ND/RF，不考慮 Pending Received）
@@ -1133,6 +1143,11 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 - **Target 店舖不論 ND 或 RF 均可接收**（打破 ND 不可接收限制）
 - **Target 數量直接作為接收量**（不考慮現有庫存與在途數量）
 - **Windy 目標店優先從同 OM 無 Target 店提取**
+
+**新功能（v2.23.0 新增）：**
+- **「優先滿足小型目標」選項**：可在側邊欄勾選，勾選後 Priority-1 目標店按 needed_qty 升序排序（小型目標優先），最大化達成目標數量
+- **配對後缺口填補**：主要配對完成後，若有剩餘來源庫存，自動分配給尚未滿足的目標店
+- **Target達成分析 Excel 工作表**：獨立工作表顯示每組 (Article, Site) 的 Target Qty 與 Actual Received 對比、Gap、Status（達成/部分達成/未達成），以及彙總 KPI（總目標數、達成數、達成率、總差距）
 
 **接收規則：**
 1. Target 有數字：直接按 Target Qty 安排接收（不論 ND/RF，不考慮 Pending Received）

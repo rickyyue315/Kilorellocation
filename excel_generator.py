@@ -13,6 +13,8 @@ import xlsxwriter
 from typing import Dict, List, Optional
 import logging
 
+from services.statistics import compute_target_fulfillment_stats
+
 # 設置日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -355,6 +357,8 @@ class ExcelGenerator:
         with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
             self.create_transfer_recommendations_sheet(writer, recommendations, mode)
             self.create_summary_dashboard_sheet(writer, statistics)
+            if mode in ("目標優化", "F指定模式", "目標性補0"):
+                self.create_target_fulfillment_sheet(writer, recommendations)
             if ai_summary:
                 self.create_smart_summary_sheet(writer, ai_summary)
 
@@ -398,3 +402,96 @@ class ExcelGenerator:
 
         worksheet.set_column('A:A', 14)
         worksheet.set_column('B:B', 80)
+
+    def create_target_fulfillment_sheet(self, writer, recommendations: List[Dict]):
+        """
+        創建 Target 達成分析工作表（僅 F/F2/F3 模式）
+        """
+        logger.info("創建Target達成分析工作表")
+        fulfillment = compute_target_fulfillment_stats(recommendations)
+        details = fulfillment.get('details', [])
+        if not details:
+            return
+
+        workbook = writer.book
+        worksheet = workbook.add_worksheet('Target達成分析')
+
+        title_fmt = workbook.add_format({
+            'bold': True, 'font_size': 16, 'align': 'center',
+            'valign': 'vcenter', 'font_name': 'Arial',
+        })
+        kpi_label_fmt = workbook.add_format({
+            'bold': True, 'font_size': 11, 'bg_color': '#4472C4',
+            'font_color': 'white', 'align': 'center', 'valign': 'vcenter',
+            'border': 1, 'font_name': 'Arial',
+        })
+        kpi_value_fmt = workbook.add_format({
+            'bold': True, 'font_size': 11, 'bg_color': '#D7E4BC',
+            'align': 'center', 'valign': 'vcenter', 'border': 1,
+            'font_name': 'Arial',
+        })
+        header_fmt = workbook.add_format({
+            'bold': True, 'bg_color': '#D7E4BC', 'border': 1,
+            'font_name': 'Arial', 'font_size': 10, 'text_wrap': True,
+            'valign': 'vcenter',
+        })
+        data_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+        })
+        ok_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+            'font_color': '#006100', 'bg_color': '#C6EFCE',
+        })
+        fail_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+            'font_color': '#9C0006', 'bg_color': '#FFC7CE',
+        })
+
+        row = 0
+        worksheet.merge_range(row, 0, row, 9, 'Target 達成分析', title_fmt)
+        row += 2
+
+        kpi_cols = [
+            ('總目標數', fulfillment['total_targets']),
+            ('已達成', fulfillment['fulfilled']),
+            ('達成率', f"{fulfillment['fulfillment_rate']}%"),
+            ('未達成', fulfillment['unfulfilled']),
+            ('總缺口件數', fulfillment['total_gap']),
+        ]
+        for i, (label, value) in enumerate(kpi_cols):
+            worksheet.write(row, i * 2, label, kpi_label_fmt)
+            worksheet.write(row, i * 2 + 1, value, kpi_value_fmt)
+        row += 2
+
+        headers = ['Brand', 'Article', 'Product Desc', 'Receive OM', 'Receive Site',
+                    'Target Qty', 'Actual Received', 'Gap', 'Fulfillment %', 'Status']
+        for col, h in enumerate(headers):
+            worksheet.write(row, col, h, header_fmt)
+        row += 1
+
+        for entry in details:
+            is_ok = entry['gap'] <= 0
+            fmt = ok_fmt if is_ok else fail_fmt
+            worksheet.write(row, 0, entry.get('brand', ''), data_fmt)
+            worksheet.write(row, 1, entry.get('article', ''), data_fmt)
+            worksheet.write(row, 2, entry.get('product_desc', ''), data_fmt)
+            worksheet.write(row, 3, entry.get('receive_om', ''), data_fmt)
+            worksheet.write(row, 4, entry.get('receive_site', ''), data_fmt)
+            worksheet.write(row, 5, entry['target_qty'], data_fmt)
+            worksheet.write(row, 6, entry['actual_received'], data_fmt)
+            worksheet.write(row, 7, entry['gap'], fmt)
+            worksheet.write(row, 8, entry.get('fulfillment_pct', 0), data_fmt)
+            worksheet.write(row, 9, entry['status'], fmt)
+            row += 1
+
+        worksheet.set_column('A:A', 14)
+        worksheet.set_column('B:B', 12)
+        worksheet.set_column('C:C', 25)
+        worksheet.set_column('D:D', 12)
+        worksheet.set_column('E:E', 12)
+        worksheet.set_column('F:F', 12)
+        worksheet.set_column('G:G', 14)
+        worksheet.set_column('H:H', 8)
+        worksheet.set_column('I:I', 14)
+        worksheet.set_column('J:J', 20)
+        worksheet.set_default_row(18)

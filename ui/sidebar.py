@@ -143,6 +143,15 @@ def render_sidebar() -> Dict:
             if f2_hd_option == "HD 可轉出（最後優先）":
                 f2_allow_hd_transfer = True
 
+        f_fulfill_small_first = False
+        if mode_code in ("F", "F2", "F3"):
+            f_fulfill_small_first = st.checkbox(
+                "優先滿足小型目標",
+                value=False,
+                key='f_fulfill_small_first',
+                help="勾選後，需Target的店舖按需求量由小到大排序分配，讓更多小型目標能被完全滿足。預設為大目標優先（現有行為）。"
+            )
+
         d2_enable_2site_limit = False
         if mode_code == "D2":
             d2_option = st.radio(
@@ -382,4 +391,5 @@ def render_sidebar() -> Dict:
         'f2_allow_hd_transfer': f2_allow_hd_transfer,
         'd2_enable_2site_limit': d2_enable_2site_limit,
         'c1_threshold': c1_threshold,
+        'f_fulfill_small_first': f_fulfill_small_first,
     }

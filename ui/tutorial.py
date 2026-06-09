@@ -737,7 +737,7 @@ def _render_f_group():
                 ["HD005", "RF", "0", "-", "接收(補0)", "+3"],
             ]
         ),
-        extra_notes="F 模式打破 ND 不可接收限制（僅限有 Target 的 ND 店舖）。Target 數量直接作為接收量。跨 OM 允許",
+        extra_notes="F 模式打破 ND 不可接收限制（僅限有 Target 的 ND 店舖）。Target 數量直接作為接收量。跨 OM 允許。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。",
         diff_table=_scenario_table(
             ["對比項", "F", "F2"],
             [
@@ -774,7 +774,7 @@ def _render_f_group():
                 ["HD004", "RF", "-", "不接收", "不接收"],
             ]
         ),
-        extra_notes="F2 = 僅 Target 店接收。Windy 目標店優先從同 OM 無 Target Windy 店提取。可設定 HD 可轉出（最後優先）",
+        extra_notes="F2 = 僅 Target 店接收。Windy 目標店優先從同 OM 無 Target Windy 店提取。可設定 HD 可轉出（最後優先）。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。",
         diff_table=None,
     )
 
@@ -804,7 +804,7 @@ def _render_f_group():
                 ["HD005", "RF", "5", "8", "-", "-", "Target保護不轉"],
             ]
         ),
-        extra_notes="F3 = F2 + RF轉出保留2件 + RF最高庫存優先轉出 + RF跨OM不降級。HD轉出選項、Windy目標優先同F2",
+        extra_notes="F3 = F2 + RF轉出保留2件 + RF最高庫存優先轉出 + RF跨OM不降級。HD轉出選項、Windy目標優先同F2。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。",
         diff_table=_scenario_table(
             ["對比項", "F2", "F3"],
             [

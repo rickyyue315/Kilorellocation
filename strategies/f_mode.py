@@ -11,9 +11,10 @@ from services.matching_engine import prep_temp_lists
 
 
 class FModeStrategy(BaseMatchStrategy):
-    def __init__(self, create_note=None, f2_allow_hd_transfer=False):
+    def __init__(self, create_note=None, f2_allow_hd_transfer=False, f_fulfill_small_first=False):
         super().__init__(create_note)
         self._f2_allow_hd_transfer = f2_allow_hd_transfer
+        self._f_fulfill_small_first = f_fulfill_small_first
 
     def match(
         self,
@@ -61,7 +62,10 @@ class FModeStrategy(BaseMatchStrategy):
         for priority_level in [1, 2]:
             priority_dests = [d for d in temp_destinations if d['priority'] == priority_level]
             if priority_level == 1:
-                priority_dests.sort(key=lambda x: x['needed_qty'], reverse=True)
+                if self._f_fulfill_small_first:
+                    priority_dests.sort(key=lambda x: x['needed_qty'])
+                else:
+                    priority_dests.sort(key=lambda x: x['needed_qty'], reverse=True)
 
             for dest in priority_dests:
                 if dest['needed_qty'] <= 0 or remaining_demand <= 0:
@@ -115,4 +119,62 @@ class FModeStrategy(BaseMatchStrategy):
                         dest['needed_qty'] = 0
 
         self._log_match_stats(recommendations, temp_sources, temp_destinations, article, mode)
+
+        self._post_match_gap_fill(recommendations, temp_sources, temp_destinations, article, product_desc, mode)
+
         return recommendations
+
+    def _post_match_gap_fill(self, recommendations, temp_sources, temp_destinations,
+                              article, product_desc, mode):
+        gap_dests = [d for d in temp_destinations
+                     if d.get('target_qty') is not None and d.get('target_qty', 0) > 0
+                     and d.get('received_qty', 0) < d['target_qty']
+                     and d.get('needed_qty', 0) > 0]
+
+        if not gap_dests:
+            return
+
+        leftover_sources = [s for s in temp_sources if s.get('transferable_qty', 0) > 0]
+        if not leftover_sources:
+            return
+
+        is_f2 = (mode == "F指定模式")
+        is_f3 = (mode == "目標性補0")
+        is_f_mode = (is_f2 or is_f3)
+
+        for dest in sorted(gap_dests, key=lambda x: x['needed_qty']):
+            if dest['needed_qty'] <= 0:
+                continue
+
+            for src in sorted(leftover_sources, key=lambda s: -s['transferable_qty']):
+                if src['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
+                    continue
+
+                transfer_qty = min(src['transferable_qty'], dest['needed_qty'])
+                if transfer_qty <= 0:
+                    continue
+
+                if is_hd_to_hk_restricted(src['site'], dest['site']):
+                    if not (is_f_mode and self._f2_allow_hd_transfer):
+                        continue
+
+                if src.get('om') == 'Windy' and dest.get('om') != 'Windy':
+                    continue
+
+                if dest.get('rp_type') == 'ND':
+                    continue
+
+                receive_site_key = f"{dest['site']}_{article}"
+                current_received_qty = 0
+
+                notes = (self._create_note(src, dest, current_received_qty, transfer_qty, mode)
+                         if self._create_note else "")
+                recommendation = build_recommendation(
+                    article, product_desc, src, dest, transfer_qty, notes, current_received_qty
+                )
+                recommendations.append(recommendation)
+
+                src['transferable_qty'] -= transfer_qty
+                src['total_transferred'] = src.get('total_transferred', 0) + transfer_qty
+                dest['needed_qty'] -= transfer_qty
+                dest['received_qty'] = dest.get('received_qty', 0) + transfer_qty

@@ -224,6 +224,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - HD source cannot transfer to HA/HB/HC destinations
   - Windy source can only transfer to Windy destinations
 - Key change: Target Qty is used directly as needed_qty (no subtraction of current stock or pending); ND stores with Target can receive
+- **New v2.23.0**: Optional "fulfill small targets first" checkbox — when checked, Priority-1 destinations are sorted by needed_qty ASC (smallest target first); post-match gap filling allocates leftover source stock to still-unfilled destinations; Excel output includes a "Target達成分析" sheet
 - Goal: Target-driven allocation, zero stock replenishment for non-Target RF sites
 
 ## Mode F2: Target-Only Optimization
@@ -240,6 +241,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - Windy source can only transfer to Windy destinations
   - **Windy source priority**: when a Windy store has Target (is a destination group), Windy sources without Target are prioritized over non-Windy sources (windy_penalty=5 added to sort key); non-Windy sources are only used when Windy sources are insufficient
 - Key change: Target Qty is used directly as needed_qty (no subtraction of current stock or pending); ND stores with Target can receive
+- **New v2.23.0**: Optional "fulfill small targets first" checkbox — when checked, Priority-1 destinations are sorted by needed_qty ASC; post-match gap filling allocates leftover source stock to still-unfilled destinations; Excel output includes a "Target達成分析" sheet
 - Goal: Target-only allocation, concentrate transfer to designated stores
 
 ## Mode F3: Targeted Zero-Fill (目標性補0)
@@ -262,6 +264,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - RF transferable_qty = max(net_stock - 2, 0) instead of net_stock
   - RF sort by highest stock first (not lowest sales first)
   - RF cross-OM no tier downgrade (both same-OM and cross-OM RF are tier 1)
+- **New v2.23.0**: Optional "fulfill small targets first" checkbox — when checked, Priority-1 destinations are sorted by needed_qty ASC; post-match gap filling allocates leftover source stock to still-unfilled destinations; Excel output includes a "Target達成分析" sheet
 - Goal: Target-only allocation with RF minimum stock preservation and cross-OM fairness
 
 ## Mode ND1: ND Same-OM Transfer

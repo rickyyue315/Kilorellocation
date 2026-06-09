@@ -1,5 +1,30 @@
 # 版本更新記錄
 
+## v2.23.0 (2026-06-09)
+
+### F/F2/F3 模式 Target 達成改善（優先滿足小型目標 + 配對後缺口填補 + Target達成分析）
+
+#### 變更說明
+- **「優先滿足小型目標」checkbox**（F/F2/F3 側邊欄）：勾選後 Priority-1 目標店按 needed_qty 升序排序（小型目標優先），最大化達成目標數量
+- **配對後缺口填補**：主要配對完成後，若有剩餘來源庫存，自動分配給尚未滿足的目標店
+- **Target達成分析 Excel 工作表**：新增獨立工作表，顯示每組 (Article, Site) 的 Target Qty 與 Actual Received 對比、Gap、Status（達成/部分達成/未達成），以及彙總 KPI（總目標數、達成數、達成率、總差距）
+
+#### 修改檔案
+- `business_logic.py` — 新增 `f_fulfill_small_first` 參數、`_f_mode_gap_fill()` 方法、`_generate_target_fulfillment_analysis()` 方法；Priority-1 目標排序邏輯
+- `models/mode_registry.py` — F/F2/F3 ModeDef 新增 `extra_ui_options=frozenset({'f_fulfill_small_first'})`
+- `ui/sidebar.py` — 新增 F/F2/F3「優先滿足小型目標」checkbox
+- `app.py` — 提取 `f_fulfill_small_first` 選項並傳入 `TransferLogic`
+- `excel_generator.py` — 新增 `create_target_fulfillment_analysis_sheet()` 方法；F/F2/F3 模式下生成 Target達成分析工作表
+
+#### 文件同步
+- `README.md` — 模式對照表、功能亮點、輸出內容更新
+- `VERSION.md` — 本版本記錄
+- `config.py` — 版本號 bump 至 v2.23.0
+- `app.py` — docstring 版本更新
+- `ui/tutorial.py` — F/F2/F3 教學內容更新（新增 Target fulfillment 說明）
+- `調貨模式詳解.txt` — F/F2/F3 模式新增描述
+- `transfer_logic_ai_brief.md` — F/F2/F3 模式更新
+
 ## v2.22.0 (2026-06-08)
 
 ### C1 模式新增可調節補0門檻（UI 選擇鍵）

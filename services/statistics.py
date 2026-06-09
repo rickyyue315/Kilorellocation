@@ -1,7 +1,7 @@
 """
 Statistics service — computes aggregate stats from transfer recommendations.
 """
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 
 def compute_transfer_statistics(recommendations: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -72,4 +72,72 @@ def compute_transfer_statistics(recommendations: List[Dict[str, Any]]) -> Dict[s
         'om_stats': om_stats,
         'source_type_stats': source_type_stats,
         'dest_type_stats': dest_type_stats,
+    }
+
+
+def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    From F/F2/F3 recommendations, compute per-(Article, Receive Site) target fulfillment.
+    Only considers recs with a 'Target Qty' > 0 that came from target-mode matching.
+
+    Returns:
+        dict with:
+          - total_targets: number of (article, site) pairs with a target
+          - fulfilled: count of those where received >= target
+          - unfulfilled: count where received < target
+          - fulfillment_rate: float 0-100
+          - total_gap: sum of all gaps (target - received) where positive
+          - details: list of dicts per pair
+    """
+    from collections import defaultdict
+
+    fulfillment_map = defaultdict(lambda: {
+        'brand': '', 'product_desc': '', 'receive_om': '', 'receive_site': '',
+        'rp_type': '', 'target_qty': 0, 'actual_received': 0,
+    })
+
+    for rec in recommendations:
+        target_qty = rec.get('Target Qty')
+        if target_qty is None or target_qty <= 0:
+            continue
+        key = (rec['Article'], rec['Receive Site'])
+        entry = fulfillment_map[key]
+        entry['brand'] = rec.get('Brand') or rec.get('Product Hierarchy', '')
+        entry['product_desc'] = rec.get('Product Desc', '')
+        entry['receive_om'] = rec.get('Receive OM', '')
+        entry['receive_site'] = rec.get('Receive Site', '')
+        entry['rp_type'] = rec.get('Destination Type', '')
+        entry['target_qty'] = int(target_qty)
+        entry['actual_received'] += int(rec.get('Transfer Qty', 0))
+        entry['article'] = rec['Article']
+
+    details = []
+    total_gap = 0
+    fulfilled = 0
+    unfulfilled = 0
+
+    for key, entry in fulfillment_map.items():
+        target = entry['target_qty']
+        actual = entry['actual_received']
+        gap = max(target - actual, 0)
+        if gap <= 0:
+            fulfilled += 1
+        else:
+            unfulfilled += 1
+        total_gap += gap
+        entry['gap'] = gap
+        entry['fulfillment_pct'] = round(actual / target * 100, 1) if target > 0 else 0.0
+        entry['status'] = '已達成' if gap <= 0 else f'未達成(缺口{gap}件)'
+        details.append(dict(entry))
+
+    total_targets = len(details)
+    details.sort(key=lambda x: (x['status'], -x['gap']))
+
+    return {
+        'total_targets': total_targets,
+        'fulfilled': fulfilled,
+        'unfulfilled': unfulfilled,
+        'fulfillment_rate': round(fulfilled / total_targets * 100, 1) if total_targets > 0 else 0.0,
+        'total_gap': total_gap,
+        'details': details,
     }

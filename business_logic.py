@@ -120,7 +120,8 @@ class TransferLogic:
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False,
                  d2_enable_2site_limit: bool = False,
-                 c1_threshold: int = 1):
+                 c1_threshold: int = 1,
+                 f_fulfill_small_first: bool = False):
         self.transfer_recommendations = []
         self.quality_check_passed = True
         self.quality_errors = []
@@ -132,6 +133,7 @@ class TransferLogic:
         self.f2_allow_hd_transfer = f2_allow_hd_transfer
         self.d2_enable_2site_limit = d2_enable_2site_limit
         self.c1_threshold = c1_threshold
+        self.f_fulfill_small_first = f_fulfill_small_first
         self._mode_by_name = {d.name: d for d in MODE_DEFS}
         self._mode_by_code = {d.code: d for d in MODE_DEFS}
         for d in MODE_DEFS:
@@ -179,6 +181,7 @@ class TransferLogic:
             'f_mode': FModeStrategy(
                 create_note=self._create_recommendation_note,
                 f2_allow_hd_transfer=self.f2_allow_hd_transfer,
+                f_fulfill_small_first=self.f_fulfill_small_first,
             ),
             'e1_mode': E1ModeStrategy(
                 create_note=self._create_recommendation_note,
