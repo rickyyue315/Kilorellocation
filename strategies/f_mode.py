@@ -57,6 +57,8 @@ class FModeStrategy(BaseMatchStrategy):
             windy_penalty = 0
             if dest_om == 'Windy' and src.get('om') != 'Windy':
                 windy_penalty = 5
+            if self._f_fulfill_small_first:
+                return (tier + hd_penalty + windy_penalty, -src.get('transferable_qty', 0))
             return (tier + hd_penalty + windy_penalty, src.get('effective_sold_qty', 0))
 
         for priority_level in [1, 2]:
@@ -120,15 +122,14 @@ class FModeStrategy(BaseMatchStrategy):
 
         self._log_match_stats(recommendations, temp_sources, temp_destinations, article, mode)
 
-        self._post_match_gap_fill(recommendations, temp_sources, temp_destinations, article, product_desc, mode)
+        self._post_match_gap_fill(recommendations, temp_sources, temp_destinations, article, product_desc, mode, received_qty_by_site)
 
         return recommendations
 
     def _post_match_gap_fill(self, recommendations, temp_sources, temp_destinations,
-                              article, product_desc, mode):
+                              article, product_desc, mode, received_qty_by_site):
         gap_dests = [d for d in temp_destinations
                      if d.get('target_qty') is not None and d.get('target_qty', 0) > 0
-                     and d.get('received_qty', 0) < d['target_qty']
                      and d.get('needed_qty', 0) > 0]
 
         if not gap_dests:
@@ -161,16 +162,13 @@ class FModeStrategy(BaseMatchStrategy):
                 if src.get('om') == 'Windy' and dest.get('om') != 'Windy':
                     continue
 
-                if dest.get('rp_type') == 'ND':
-                    continue
-
                 receive_site_key = f"{dest['site']}_{article}"
-                current_received_qty = 0
+                current_received = received_qty_by_site.get(receive_site_key, 0)
 
-                notes = (self._create_note(src, dest, current_received_qty, transfer_qty, mode)
+                notes = (self._create_note(src, dest, current_received, transfer_qty, mode)
                          if self._create_note else "")
                 recommendation = build_recommendation(
-                    article, product_desc, src, dest, transfer_qty, notes, current_received_qty
+                    article, product_desc, src, dest, transfer_qty, notes, current_received
                 )
                 recommendations.append(recommendation)
 
@@ -178,3 +176,8 @@ class FModeStrategy(BaseMatchStrategy):
                 src['total_transferred'] = src.get('total_transferred', 0) + transfer_qty
                 dest['needed_qty'] -= transfer_qty
                 dest['received_qty'] = dest.get('received_qty', 0) + transfer_qty
+                received_qty_by_site[receive_site_key] = current_received + transfer_qty
+
+                if (dest.get('target_qty') is not None
+                        and received_qty_by_site[receive_site_key] >= dest['target_qty']):
+                    dest['needed_qty'] = 0
