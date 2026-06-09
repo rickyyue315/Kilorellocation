@@ -455,14 +455,16 @@ class ExcelGenerator:
         })
 
         row = 0
-        worksheet.merge_range(row, 0, row, 9, 'Target 達成分析', title_fmt)
+        worksheet.merge_range(row, 0, row, 13, 'Target 達成分析', title_fmt)
         row += 2
 
         kpi_cols = [
-            ('總目標數', fulfillment['total_targets']),
-            ('已達成', fulfillment['fulfilled']),
-            ('達成率', f"{fulfillment['fulfillment_rate']}%"),
-            ('未達成', fulfillment['unfulfilled']),
+            ('需達SKU數', fulfillment['total_targets']),
+            ('目標件數', fulfillment['total_target_qty']),
+            ('達標SKU數', fulfillment['fulfilled']),
+            ('達成件數', fulfillment['total_achieved_qty']),
+            ('達成率(SKU)', f"{fulfillment['fulfillment_rate']}%"),
+            ('未達標SKU數', fulfillment['unfulfilled']),
             ('總缺口件數', fulfillment['total_gap']),
         ]
         for i, (label, value) in enumerate(kpi_cols):

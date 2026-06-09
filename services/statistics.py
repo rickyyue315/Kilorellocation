@@ -140,12 +140,16 @@ def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]],
 
     details = []
     total_gap = 0
+    total_target_qty = 0
+    total_achieved_qty = 0
     fulfilled = 0
     unfulfilled = 0
 
     for key, entry in fulfillment_map.items():
         target = entry['target_qty']
         actual = entry['actual_received']
+        total_target_qty += target
+        total_achieved_qty += actual
         gap = max(target - actual, 0)
         if gap <= 0:
             fulfilled += 1
@@ -166,5 +170,7 @@ def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]],
         'unfulfilled': unfulfilled,
         'fulfillment_rate': round(fulfilled / total_targets * 100, 1) if total_targets > 0 else 0.0,
         'total_gap': total_gap,
+        'total_target_qty': total_target_qty,
+        'total_achieved_qty': total_achieved_qty,
         'details': details,
     }
