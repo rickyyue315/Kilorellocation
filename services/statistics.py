@@ -1,7 +1,9 @@
 """
 Statistics service — computes aggregate stats from transfer recommendations.
 """
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+import pandas as pd
 
 
 def compute_transfer_statistics(recommendations: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -75,10 +77,14 @@ def compute_transfer_statistics(recommendations: List[Dict[str, Any]]) -> Dict[s
     }
 
 
-def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]]) -> Dict[str, Any]:
+def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]],
+                                     df: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
     """
     From F/F2/F3 recommendations, compute per-(Article, Receive Site) target fulfillment.
     Only considers recs with a 'Target Qty' > 0 that came from target-mode matching.
+
+    If `df` (the raw uploaded DataFrame) is provided, also includes Target>0 rows that
+    have zero actual received (no recommendations generated), so every target is visible.
 
     Returns:
         dict with:
@@ -90,6 +96,8 @@ def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]]) -> D
           - details: list of dicts per pair
     """
     from collections import defaultdict
+
+    from services.target_utils import parse_target_series
 
     fulfillment_map = defaultdict(lambda: {
         'brand': '', 'product_desc': '', 'receive_om': '', 'receive_site': '',
@@ -110,6 +118,25 @@ def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]]) -> D
         entry['target_qty'] = int(target_qty)
         entry['actual_received'] += int(rec.get('Transfer Qty', 0))
         entry['article'] = rec['Article']
+
+    if df is not None and 'Target' in df.columns:
+        target_series = parse_target_series(df)
+        for idx, row in df.iterrows():
+            target_qty = target_series.loc[idx]
+            if pd.isna(target_qty) or target_qty <= 0:
+                continue
+            key = (str(row.get('Article', '')), str(row.get('Site', '')).strip().upper())
+            if key not in fulfillment_map:
+                fulfillment_map[key] = {
+                    'brand': str(row.get('Product Hierarchy', row.get('Brand', ''))),
+                    'product_desc': str(row.get('Article Description', '')),
+                    'receive_om': str(row.get('OM', '')),
+                    'receive_site': str(row.get('Site', '')),
+                    'rp_type': str(row.get('RP Type', '')),
+                    'target_qty': int(target_qty),
+                    'actual_received': 0,
+                    'article': str(row.get('Article', '')),
+                }
 
     details = []
     total_gap = 0

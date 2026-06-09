@@ -240,6 +240,7 @@ with tab_system:
                             statistics,
                             mode=st.session_state.get('active_mode_name', ''),
                             ai_summary=_ai_summary or None,
+                            df=df,
                         )
                         st.session_state['excel_filename'] = excel_generator.output_filename
                         st.session_state['excel_run_key'] = _excel_cache_key

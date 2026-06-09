@@ -334,7 +334,8 @@ class ExcelGenerator:
     def generate_excel_file(self, recommendations: List[Dict], statistics: Dict,
                            output_path: Optional[str] = None,
                            mode: str = None,
-                           ai_summary: Optional[str] = None) -> bytes:
+                           ai_summary: Optional[str] = None,
+                           df: Optional[pd.DataFrame] = None) -> bytes:
         """
         生成完整的Excel文件，返回 bytes（記憶體操作，無磁碟 I/O）
         
@@ -344,6 +345,7 @@ class ExcelGenerator:
             output_path: 保留參數（已棄用，不再使用）
             mode: 調貨模式名稱
             ai_summary: optional AI executive summary text
+            df: optional raw DataFrame for computing full target fulfillment stats
         
         Returns:
             Excel 文件的 bytes 內容
@@ -358,7 +360,7 @@ class ExcelGenerator:
             self.create_transfer_recommendations_sheet(writer, recommendations, mode)
             self.create_summary_dashboard_sheet(writer, statistics)
             if mode in ("目標優化", "F指定模式", "目標性補0"):
-                self.create_target_fulfillment_sheet(writer, recommendations)
+                self.create_target_fulfillment_sheet(writer, recommendations, df)
             if ai_summary:
                 self.create_smart_summary_sheet(writer, ai_summary)
 
@@ -403,12 +405,17 @@ class ExcelGenerator:
         worksheet.set_column('A:A', 14)
         worksheet.set_column('B:B', 80)
 
-    def create_target_fulfillment_sheet(self, writer, recommendations: List[Dict]):
+    def create_target_fulfillment_sheet(self, writer, recommendations: List[Dict],
+                                        df: Optional[pd.DataFrame] = None):
         """
         創建 Target 達成分析工作表（僅 F/F2/F3 模式）
+        
+        Args:
+            df: optional raw DataFrame; when provided, all Target>0 rows are included
+                 even if no recommendations were generated for them.
         """
         logger.info("創建Target達成分析工作表")
-        fulfillment = compute_target_fulfillment_stats(recommendations)
+        fulfillment = compute_target_fulfillment_stats(recommendations, df)
         details = fulfillment.get('details', [])
         if not details:
             return
