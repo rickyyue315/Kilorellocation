@@ -375,7 +375,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
      - Transferable = min(Total Available - Cap, SaSa Net Stock)
      - Protect highest sales store
 - **No RF receive pairing**: all transferred quantities directly return to D001
-- No minimum quantity limit (even 1 piece can return to D001)
+- **No minimum quantity limit for ND stores (even 1 piece can return to D001); RF stores: minimum 2 pieces (1 piece skipped for efficiency)**
 - supply_source 1/4 excluded from return
 - Source labels: 精簡SKU ND轉出, 精簡SKU RF轉出
 - Dest labels: 退回D001

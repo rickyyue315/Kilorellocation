@@ -101,7 +101,7 @@ def render_sidebar() -> Dict:
              2. **選擇轉貨模式**
                    - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C1/C2/D/D2/E1/E1b/E2/F/F2/F3/ND1/ND2/ND3/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001))
                - 查看模式說明了解各模式特點
-                      - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
+                      - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
             
             3. **啟動分析**
                - 點擊「生成調貨建議」按鈕開始處理

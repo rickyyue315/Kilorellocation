@@ -31,6 +31,8 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
         return f"【轉出分析: ND店鋪清貨(模式{mode_label})，轉出後剩餘庫存({remaining})件，已優化避免1件餘貨{suffix}】"
     if src_type == 'F模式RF轉出':
         return f"【轉出分析: F模式RF轉出，可忽視最小庫存要求，轉出後剩餘庫存({remaining})件】"
+    if src_type == 'F3模式RF轉出(保留2件)':
+        return f"【轉出分析: F3模式RF轉出(保留2件)，轉出後保留2件庫存，轉出後剩餘庫存({remaining})件】"
     if src_type == 'E模式強制轉出':
         rp_type = source.get('rp_type', '')
         is_cross_om = mode == mode_info['mode_e2'] and source['om'] != dest['om']
@@ -40,9 +42,9 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
         if mode_info['is_b_l_retain']:
             return "【轉出分析: Local店舖低銷量特例（附加B-L系列模式），保留2件後轉出】"
         return "【轉出分析: Local店舖全轉出（附加B系列模式），可全數轉出】"
-    if src_type == 'RF過剩轉出':
-        return f"【轉出分析: RF過剩轉出，轉出後剩餘庫存({remaining})仍高於安全庫存({source.get('safety_stock', 'N/A')})】"
-    if src_type == 'RF加強轉出':
+    if src_type == 'RF過剩轉出' or src_type.startswith('RF過剩轉出'):
+        return f"【轉出分析: RF過剩轉出，轉出後剩餘庫存({remaining})件仍高於安全庫存({source.get('safety_stock', 'N/A')})】"
+    if src_type == 'RF加強轉出' or src_type.startswith('RF加強轉出'):
         return f"【轉出分析: RF加強轉出，轉出後剩餘庫存({remaining})可能低於安全庫存({source.get('safety_stock', 'N/A')})】"
     if src_type == '精簡SKU ND轉出':
         return f"【轉出分析: 精簡SKU模式ND轉出，全數可轉出，轉出後剩餘{remaining}件】"
@@ -139,6 +141,8 @@ def create_recommendation_note(source, dest, current_received_qty, transfer_qty,
 
     if source['source_type'] in ['RF加強轉出']:
         notes_parts.append("【特殊標記: 加強轉出類型，需注意轉出後庫存狀況】")
+    if '(C模式回退)' in source.get('source_type', ''):
+        notes_parts.append("【特殊標記: E2模式C模式回退來源，同OM無法接收時啟用C模式邏輯補充】")
     if source['source_type'] == 'E模式強制轉出':
         if mode == mode_info['mode_e1']:
             notes_parts.append("【特殊標記: E1模式強制轉出，僅同OM配對，店鋪被標記為*ALL*必須全數轉出】")
