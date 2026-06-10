@@ -125,7 +125,7 @@
         font-weight: 600 !important;
         color: #ffffff !important;
         margin-bottom: 4px !important;
-        font-size: 0.325rem !important;
+        font-size: 0.95rem !important;
     }
 
     div[data-testid="stRadio"] div[role="radiogroup"] {
@@ -143,7 +143,7 @@
         transition: all 0.15s ease;
         margin-bottom: 1px !important;
         border: 1px solid transparent;
-        font-size: 0.25rem !important;
+        font-size: 0.875rem !important;
         font-weight: 500 !important;
         color: #ffffff !important;
         letter-spacing: 0.1px;
