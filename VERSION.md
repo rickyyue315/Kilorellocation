@@ -1,5 +1,18 @@
 # 版本更新記錄
 
+## v2.24.1 (2026-06-10)
+
+### Bug fixes & Zeabur deployment hardening
+
+#### 變更說明
+- 修復 `safe_get_last2m` NaN crash：`services/source_dest_factory.py` 中 `int()` 遇到 NaN 會拋出 `ValueError`，現加入 `pd.notna()` 保護
+- 修復 `notes.py` 不可能條件：`transfer_qty==2` 與 `original_stock==1` 不可能同時成立，移除無效的 dead code
+- 修復 article_site_index 字串比對容錯性：`Site` 與 `Transfer Site` 欄位進行 `.strip().upper()` 正規化，避免靜默查詢失敗
+- 鎖定 Zeabur Python 版本（新增 `runtime.txt` → python-3.12）
+- 鎖定 Streamlit 版本為 `1.38.0`（避免容器環境 breaking changes）
+- 新增 `.streamlit/secrets.toml.example` 範本，API Key 改由 Zeabur Dashboard Secrets 管理
+- 新增 `pytest>=8.0.0` 以相容 Python 3.13
+
 ## v2.24.0 (2026-06-10)
 
 ### C1 模式新增每店轉出件數上限滑塊（3~10 件，自選）

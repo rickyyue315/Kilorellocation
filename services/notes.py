@@ -128,9 +128,7 @@ def create_recommendation_note(source, dest, current_received_qty, transfer_qty,
     remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
 
     reasons = []
-    if transfer_qty == 2 and source.get('original_stock', 0) == 1:
-        reasons.append("已優化至2件")
-    elif transfer_qty == 1:
+    if transfer_qty == 1:
         reasons.append("最小1件")
     if target_qty is not None and cum_received >= target_qty:
         reasons.append("已達接收上限")

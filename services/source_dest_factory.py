@@ -10,8 +10,10 @@ import pandas as pd
 
 def safe_get_last2m(row) -> int:
     if 'Last 2 Month Sold Qty' in row.index:
-        return int(row['Last 2 Month Sold Qty'])
-    return int(row['Last Month Sold Qty'])
+        val = row['Last 2 Month Sold Qty']
+        return int(val) if pd.notna(val) else 0
+    val = row['Last Month Sold Qty']
+    return int(val) if pd.notna(val) else 0
 
 
 def make_source(row, transferable_qty: int, priority: int, source_type: str, **extra) -> Dict:

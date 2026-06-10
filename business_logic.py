@@ -497,7 +497,9 @@ class TransferLogic:
         # 預先建立全局 (Article, Site) → Safety Stock / MOQ 索引，避免迴圈內重複建立（效能優化）
         _index_cols = [c for c in ['Safety Stock', 'MOQ'] if c in df.columns]
         if _index_cols:
-            article_site_index = df.set_index(['Article', 'Site'])[_index_cols]
+            temp = df.copy()
+            temp['_site_key'] = temp['Site'].astype(str).str.strip().str.upper()
+            article_site_index = temp.set_index(['Article', '_site_key'])[_index_cols]
         else:
             article_site_index = pd.DataFrame(index=pd.MultiIndex.from_tuples([]))
         
@@ -567,7 +569,7 @@ class TransferLogic:
             # 更新安全庫存和MOQ信息（使用迴圈外預建索引，O(1) 查詢）
             if recommendations and not article_site_index.empty:
                 for rec in recommendations:
-                    key = (rec['Article'], rec['Transfer Site'])
+                    key = (rec['Article'], str(rec['Transfer Site']).strip().upper())
                     if key in article_site_index.index:
                         if 'Safety Stock' in article_site_index.columns:
                             rec['Safety Stock'] = article_site_index.at[key, 'Safety Stock']
