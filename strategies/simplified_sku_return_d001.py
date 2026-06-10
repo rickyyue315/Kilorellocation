@@ -7,12 +7,32 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+
 from strategies.base import BaseMatchStrategy
+from strategies.simplified_sku import identify_sources_simplified_sku
 from services.recommendation_factory import build_recommendation
 from services.matching_engine import prep_temp_lists
 
 
 class SimplifiedSKUReturnD001Strategy(BaseMatchStrategy):
+    def identify_sources(
+        self,
+        group_df: pd.DataFrame,
+        mode: str,
+        protected_sites: Optional[set] = None,
+    ) -> List[Dict[str, Any]]:
+        return identify_sources_simplified_sku(group_df)
+
+    def identify_destinations(
+        self,
+        group_df: pd.DataFrame,
+        mode: str,
+    ) -> List[Dict[str, Any]]:
+        return []
+
     def match(
         self,
         sources: List[Dict[str, Any]],

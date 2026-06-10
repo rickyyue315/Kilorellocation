@@ -1,0 +1,388 @@
+[
+  {
+    "code": "C",
+    "name": "重點補0",
+    "risk": "中",
+    "scenario": "針對性補充極低庫存（&#8804;1件）的店舖，確保最低服務水平",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "ND 店舖<br>全數可轉出",
+            "color": "blue"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": ""
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "RF 店舖<br>可轉=min(庫存&#215;30%, 3件)<br>至少1件",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "重點補0<br>庫存&#8804;1<br>目標=max(Safety&#215;0.5, 3)",
+            "color": "purple"
+          },
+          {
+            "type": "node",
+            "text": "緊急缺貨<br>Net Stock=0<br>有銷量",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "潛在缺貨<br>庫存 &lt; Safety",
+            "color": "orange"
+          }
+        ]
+      }
+    ],
+    "match_order": [
+      [
+        "ND轉出",
+        "重點補0"
+      ],
+      [
+        "ND轉出",
+        "緊急缺貨"
+      ],
+      [
+        "ND轉出",
+        "潛在缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "重點補0"
+      ],
+      [
+        "RF過剩轉出",
+        "緊急缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "潛在缺貨"
+      ],
+      [
+        "RF加強轉出",
+        "重點補0"
+      ],
+      [
+        "RF加強轉出",
+        "緊急缺貨"
+      ],
+      [
+        "RF加強轉出",
+        "潛在缺貨"
+      ]
+    ],
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "Net Stock",
+        "Pending",
+        "Safety",
+        "角色",
+        "調撥量"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "0",
+          "0",
+          "4",
+          "接收(重點補0)",
+          "+3"
+        ],
+        [
+          "HD002",
+          "1",
+          "0",
+          "5",
+          "接收(重點補0)",
+          "+3"
+        ],
+        [
+          "HD003",
+          "10",
+          "0",
+          "4",
+          "轉出(RF過剩)",
+          "-3"
+        ],
+        [
+          "HD004",
+          "0",
+          "0",
+          "4",
+          "接收(緊急缺貨)",
+          "+3"
+        ]
+      ]
+    },
+    "extra_notes": "C 模式獨有「重點補0」接收類型：庫存+在途&#8804;1 的店舖優先補至 max(Safety&#215;0.5, 3) 件",
+    "diff_table": {
+      "headers": [
+        "對比項",
+        "C",
+        "C1",
+        "C2"
+      ],
+      "rows": [
+        [
+          "接收類型",
+          "重點補0+緊急+潛在",
+          "僅重點補0",
+          "重點補0+緊急+潛在"
+        ],
+        [
+          "轉出量下限",
+          "1件",
+          "2件",
+          "1件"
+        ],
+        [
+          "跨OM",
+          "否",
+          "否",
+          "是"
+        ],
+        [
+          "適用場景",
+          "全面補低庫存",
+          "精準只補零庫存",
+          "跨OM重點補0"
+        ]
+      ]
+    }
+  },
+  {
+    "code": "C1",
+    "name": "重點補0（只補0/1，或自選數量）",
+    "risk": "低",
+    "scenario": "精準只補充零庫存或低庫存的店舖，門檻 N 可於側邊欄設定，不會觸發一般缺貨補貨",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "RF 店舖<br>Net Stock &gt; 2",
+            "color": "green"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "最少2件起轉"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "可轉=min(庫存&#215;30%, 3件)<br>最少 2 件",
+            "color": "blue"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "僅 total_available &#8804; N<br>N 可於側邊欄設定（預設1）<br>目標=max(Safety&#215;0.5, 3)",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": [
+      [
+        "ND轉出",
+        "緊急缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "重點補0"
+      ],
+      [
+        "RF加強轉出",
+        "重點補0"
+      ]
+    ],
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "Net Stock",
+        "Pending",
+        "Safety",
+        "角色",
+        "調撥量"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "0",
+          "0",
+          "4",
+          "接收(重點補0)",
+          "+3"
+        ],
+        [
+          "HD002",
+          "1",
+          "0",
+          "5",
+          "接收(重點補0)",
+          "+3"
+        ],
+        [
+          "HD003",
+          "0",
+          "4",
+          "4",
+          "不接收(非C1目標)",
+          "-"
+        ],
+        [
+          "HD004",
+          "10",
+          "0",
+          "4",
+          "轉出(RF過剩)",
+          "-3"
+        ]
+      ]
+    },
+    "extra_notes": "C1 與 C 最大差異：不回落到緊急/潛在缺貨補貨，僅處理 total_available&#8804;N 的店舖（N 可於側邊欄設定，預設 1）。轉出最低 2 件",
+    "diff_table": {
+      "headers": [
+        "對比項",
+        "C",
+        "C1",
+        "C2"
+      ],
+      "rows": [
+        [
+          "接收類型",
+          "重點補0+緊急+潛在",
+          "僅重點補0",
+          "重點補0+緊急+潛在"
+        ],
+        [
+          "補0門檻",
+          "total_available&#8804;1",
+          "可自訂（預設1）",
+          "total_available&#8804;1"
+        ],
+        [
+          "轉出量下限",
+          "1件",
+          "2件",
+          "1件"
+        ],
+        [
+          "跨OM",
+          "否",
+          "否",
+          "是"
+        ],
+        [
+          "適用場景",
+          "全面補低庫存",
+          "精準只補零庫存",
+          "跨OM重點補0"
+        ]
+      ]
+    }
+  },
+  {
+    "code": "C2",
+    "name": "附加C跨OM重點補0",
+    "risk": "中",
+    "scenario": "需要跨 OM 重點補0，全局性零庫存補充策略",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 C 模式轉出邏輯",
+            "color": "green"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "跨OM配對"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "HD &#10132; 不能到 HA/HB/HC",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "Windy &#10132; 只能到 Windy",
+            "color": "orange"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 C 模式接收邏輯",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": null,
+    "scenario_table": {
+      "headers": [
+        "場景",
+        "說明"
+      ],
+      "rows": [
+        [
+          "OM-A 內無多餘庫存",
+          "可從 OM-B 的店舖調貨到 OM-A 的零庫存店"
+        ],
+        [
+          "Windy &#10132; HD",
+          "不允許（Windy 只能到 Windy）"
+        ],
+        [
+          "HD &#10132; HA",
+          "不允許（HD 限制）"
+        ]
+      ]
+    },
+    "extra_notes": "C2 = C 模式邏輯 + 跨 OM + HD/Windy 限制",
+    "diff_table": null
+  }
+]

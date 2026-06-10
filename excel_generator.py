@@ -16,7 +16,6 @@ import logging
 from services.statistics import compute_target_fulfillment_stats
 
 # 設置日誌
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ExcelGenerator:

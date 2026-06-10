@@ -1,0 +1,271 @@
+[
+  {
+    "code": "B3",
+    "name": "附加B跨OM特別模式",
+    "risk": "中",
+    "scenario": "B2 場景但需要跨 OM 配對，擴大調貨範圍",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 B2 轉出邏輯",
+            "color": "green"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "跨OM配對"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "HD &#10132; 不能到 HA/HB/HC",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "Windy &#10132; 只能到 Windy",
+            "color": "orange"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 B2 接收優先級",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": null,
+    "scenario_table": {
+      "headers": [
+        "轉出店",
+        "OM",
+        "接收店",
+        "OM",
+        "是否允許"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "HD",
+          "HA001",
+          "HA",
+          "不允許(HD限制)"
+        ],
+        [
+          "HD001",
+          "HD",
+          "HB001",
+          "HB",
+          "不允許(HD限制)"
+        ],
+        [
+          "HD001",
+          "HD",
+          "Windy001",
+          "Windy",
+          "允許"
+        ],
+        [
+          "Windy001",
+          "Windy",
+          "HD001",
+          "HD",
+          "不允許(Windy限制)"
+        ],
+        [
+          "Windy001",
+          "Windy",
+          "Windy002",
+          "Windy",
+          "允許"
+        ]
+      ]
+    },
+    "extra_notes": "B3 = B2 邏輯 + 跨 OM + HD/Windy 限制。同樣套用 Mix 保護規則",
+    "diff_table": {
+      "headers": [
+        "對比項",
+        "B3",
+        "B3a",
+        "B3L",
+        "B3La"
+      ],
+      "rows": [
+        [
+          "Type=L低銷量",
+          "全數轉出",
+          "全數轉出",
+          "保留2件後轉出",
+          "保留2件後轉出"
+        ],
+        [
+          "Type=T出貨",
+          "可",
+          "不可",
+          "可",
+          "不可"
+        ],
+        [
+          "跨OM",
+          "可",
+          "可",
+          "可",
+          "可"
+        ]
+      ]
+    }
+  },
+  {
+    "code": "B3a",
+    "name": "附加B3a跨OM特別模式（T遊客鋪不出貨）",
+    "risk": "中",
+    "scenario": "B3 + Type=T 不可出貨",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "Type=T？<br>&#10132; 不可出貨",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "同 B3 轉出邏輯",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 B2 接收優先級",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": null,
+    "scenario_table": null,
+    "extra_notes": "B3a = B3 + Type=T 不可出貨",
+    "diff_table": null
+  },
+  {
+    "code": "B3L",
+    "name": "附加B3L跨OM特別模式（Type=L保留2件）",
+    "risk": "中",
+    "scenario": "B3 + Type=L 低銷量保留 2 件",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 B2L 轉出邏輯",
+            "color": "green"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "跨OM配對"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "HD/Windy 限制",
+            "color": "red"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 B2 接收優先級",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": null,
+    "scenario_table": null,
+    "extra_notes": "B3L = B3 跨OM + B2L 的 Type=L 保留 2 件規則",
+    "diff_table": null
+  },
+  {
+    "code": "B3La",
+    "name": "附加B3La跨OM特別模式（Type=L保留2件 + T不出貨）",
+    "risk": "中",
+    "scenario": "B3L + Type=T 不可出貨",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "Type=T？<br>&#10132; 不可出貨",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "同 B2L 轉出邏輯",
+            "color": "green"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "跨OM配對"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "HD/Windy 限制",
+            "color": "red"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 B2 接收優先級",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": null,
+    "scenario_table": null,
+    "extra_notes": "B3La = B3L + Type=T 不可出貨",
+    "diff_table": null
+  }
+]

@@ -1,0 +1,293 @@
+[
+  {
+    "code": "A",
+    "name": "保守轉貨",
+    "risk": "低",
+    "scenario": "追求穩定運營，嚴格保護安全庫存，不願承擔庫存風險",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "RF 店舖<br>庫存 > Safety Stock",
+            "color": "green"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "計算可轉量"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "可轉 = min(<br>庫存-Safety,<br>max(庫存&#215;20%, 2),<br>Net Stock)",
+            "color": "blue"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "緊急缺貨<br>Net Stock=0<br>有銷量",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "潛在缺貨<br>庫存 &lt; Safety<br>最高銷量店",
+            "color": "orange"
+          }
+        ]
+      }
+    ],
+    "match_order": [
+      [
+        "ND轉出",
+        "緊急缺貨"
+      ],
+      [
+        "ND轉出",
+        "潛在缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "緊急缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "潛在缺貨"
+      ]
+    ],
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "類型",
+        "Net Stock",
+        "Safety",
+        "角色",
+        "調撥量",
+        "調撥後"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "RF",
+          "10",
+          "4",
+          "轉出(RF過剩)",
+          "2",
+          "8"
+        ],
+        [
+          "HD002",
+          "RF",
+          "0",
+          "4",
+          "接收(緊急)",
+          "+2",
+          "2"
+        ],
+        [
+          "HD003",
+          "RF",
+          "2",
+          "4",
+          "接收(潛在)",
+          "- ",
+          "2"
+        ],
+        [
+          "HA001",
+          "ND",
+          "5",
+          "3",
+          "轉出(ND)",
+          "5",
+          "0"
+        ]
+      ]
+    },
+    "extra_notes": "單件自動上調：若可轉量=1且轉出後仍餘&#8805;3件，自動上調至2件轉出",
+    "diff_table": {
+      "headers": [
+        "對比項",
+        "A 保守",
+        "B 加強"
+      ],
+      "rows": [
+        [
+          "轉出比例上限",
+          "20%",
+          "50%"
+        ],
+        [
+          "安全庫存保護",
+          "嚴格（不可低於）",
+          "可下探"
+        ],
+        [
+          "轉出類型",
+          "僅 RF 過剩",
+          "RF 過剩 + RF 加強"
+        ],
+        [
+          "風險等級",
+          "低",
+          "中"
+        ]
+      ]
+    }
+  },
+  {
+    "code": "B",
+    "name": "加強轉貨",
+    "risk": "中",
+    "scenario": "需要積極處理滯銷庫存，最大化調貨效率，允許下探安全庫存",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "RF 店舖<br>庫存 > Safety Stock",
+            "color": "green"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "計算可轉量"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "可轉 = min(<br>庫存-Safety,<br>max(庫存&#215;50%, 2),<br>Net Stock)",
+            "color": "blue"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "判斷類型"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "轉出後 &#8805; Safety<br>&#10132; RF過剩轉出",
+            "color": "green"
+          },
+          {
+            "type": "node",
+            "text": "轉出後 &lt; Safety<br>&#10132; RF加強轉出",
+            "color": "orange"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "緊急缺貨<br>Net Stock=0<br>有銷量",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "潛在缺貨<br>庫存 &lt; Safety<br>最高銷量店",
+            "color": "orange"
+          }
+        ]
+      }
+    ],
+    "match_order": [
+      [
+        "ND轉出",
+        "緊急缺貨"
+      ],
+      [
+        "ND轉出",
+        "潛在缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "緊急缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "潛在缺貨"
+      ],
+      [
+        "RF加強轉出",
+        "緊急缺貨"
+      ],
+      [
+        "RF加強轉出",
+        "潛在缺貨"
+      ]
+    ],
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "類型",
+        "Net Stock",
+        "Safety",
+        "角色",
+        "調撥量",
+        "調撥後"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "RF",
+          "10",
+          "4",
+          "轉出(RF過剩)",
+          "5",
+          "5"
+        ],
+        [
+          "HD002",
+          "RF",
+          "6",
+          "4",
+          "轉出(RF加強)",
+          "3",
+          "3"
+        ],
+        [
+          "HD003",
+          "RF",
+          "0",
+          "4",
+          "接收(緊急)",
+          "+4",
+          "4"
+        ],
+        [
+          "HD004",
+          "RF",
+          "2",
+          "5",
+          "接收(潛在)",
+          "+4",
+          "6"
+        ]
+      ]
+    },
+    "extra_notes": "B 模式更進取，RF 可轉出 50% 庫存（A 模式僅 20%），允許低於安全庫存轉出",
+    "diff_table": null
+  }
+]

@@ -1,0 +1,317 @@
+[
+  {
+    "code": "E1",
+    "name": "強制轉出（僅同OM）",
+    "risk": "高",
+    "scenario": "季節性商品下架、新品試銷分配等，需強制清空指定商品。僅同 OM 配對",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "ALL 欄位有標記？",
+            "color": "yellow"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": ""
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "有標記 &#10132; 全數強制轉出<br>忽略安全庫存",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "無標記 &#10132; 不處理",
+            "color": "gray"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "RF 店舖<br>接收上限 Safety&#215;2<br>僅同 OM",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": [
+      [
+        "E模式強制轉出",
+        "E模式接收"
+      ]
+    ],
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "類型",
+        "Net Stock",
+        "ALL",
+        "角色",
+        "調撥量"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "RF",
+          "10",
+          "Y",
+          "強制轉出",
+          "10"
+        ],
+        [
+          "HD002",
+          "ND",
+          "5",
+          "Y",
+          "強制轉出",
+          "5"
+        ],
+        [
+          "HD003",
+          "RF",
+          "2",
+          "Y",
+          "強制轉出",
+          "2"
+        ],
+        [
+          "HD004",
+          "RF",
+          "0",
+          "",
+          "不處理",
+          "-"
+        ],
+        [
+          "HD005",
+          "RF",
+          "3",
+          "",
+          "接收(E模式)",
+          "+5"
+        ]
+      ]
+    },
+    "extra_notes": "E1 需要 Excel 中有「ALL」欄位。僅處理標記的商品行。HD 不能轉到 HA/HB/HC",
+    "diff_table": {
+      "headers": [
+        "對比項",
+        "E1",
+        "E1b",
+        "E2"
+      ],
+      "rows": [
+        [
+          "轉出邏輯",
+          "ALL標記全轉",
+          "ALL標記全轉",
+          "ALL標記全轉"
+        ],
+        [
+          "接收排序",
+          "標準",
+          "Type=T/M優先",
+          "標準"
+        ],
+        [
+          "跨OM",
+          "否",
+          "否",
+          "是"
+        ],
+        [
+          "C模式回退",
+          "否",
+          "否",
+          "是(Phase3)"
+        ]
+      ]
+    }
+  },
+  {
+    "code": "E1b",
+    "name": "強制轉出（優先類型接收）",
+    "risk": "高",
+    "scenario": "E1 場景但希望優先分配給遊客區/混合型店舖",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 E1 轉出邏輯",
+            "color": "red"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "1&#65039;&#8419; Type T 高銷量",
+            "color": "purple"
+          },
+          {
+            "type": "node",
+            "text": "2&#65039;&#8419; Type M 高銷量",
+            "color": "purple"
+          },
+          {
+            "type": "node",
+            "text": "3&#65039;&#8419; Type T Safety",
+            "color": "green"
+          },
+          {
+            "type": "node",
+            "text": "4&#65039;&#8419; Type M Safety",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "match_order": null,
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "Type",
+        "Net Stock",
+        "Safety",
+        "銷量",
+        "接收優先級"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "T",
+          "0",
+          "4",
+          "8",
+          "1&#65039;&#8419; Type T 高銷量"
+        ],
+        [
+          "HD002",
+          "M",
+          "0",
+          "4",
+          "6",
+          "2&#65039;&#8419; Type M 高銷量"
+        ],
+        [
+          "HD003",
+          "T",
+          "2",
+          "6",
+          "3",
+          "3&#65039;&#8419; Type T Safety"
+        ],
+        [
+          "HD004",
+          "M",
+          "1",
+          "5",
+          "1",
+          "4&#65039;&#8419; Type M Safety"
+        ]
+      ]
+    },
+    "extra_notes": "E1b = E1 轉出 + B2 接收優先級。新品推廣重點放在遊客區店舖時使用",
+    "diff_table": null
+  },
+  {
+    "code": "E2",
+    "name": "強制轉出（跨OM）",
+    "risk": "高",
+    "scenario": "需要跨 OM 強制轉出，覆蓋更廣的店舖範圍",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 E1 轉出邏輯",
+            "color": "red"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "分階段配對"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "Phase 1<br>同OM配對",
+            "color": "green"
+          },
+          {
+            "type": "node",
+            "text": "Phase 2<br>跨OM配對",
+            "color": "orange"
+          },
+          {
+            "type": "node",
+            "text": "Phase 3<br>C模式回退",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "RF 接收上限 Safety&#215;2",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": null,
+    "scenario_table": {
+      "headers": [
+        "階段",
+        "條件",
+        "說明"
+      ],
+      "rows": [
+        [
+          "Phase 1",
+          "同OM有接收需求",
+          "優先同OM配對"
+        ],
+        [
+          "Phase 2",
+          "同OM不足",
+          "跨OM配對(HD限制)"
+        ],
+        [
+          "Phase 3",
+          "其他OM無E模式來源",
+          "用C模式邏輯補充"
+        ]
+      ]
+    },
+    "extra_notes": "E2 三階段：同OM &#10132; 跨OM &#10132; C模式回退。HD 不能轉到 HA/HB/HC",
+    "diff_table": null
+  }
+]

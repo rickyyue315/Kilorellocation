@@ -6,6 +6,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional
 
+import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,6 +26,21 @@ class BaseMatchStrategy(ABC):
         om: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         ...
+
+    def identify_sources(
+        self,
+        group_df: pd.DataFrame,
+        mode: str,
+        protected_sites: Optional[set] = None,
+    ) -> List[Dict[str, Any]]:
+        raise NotImplementedError
+
+    def identify_destinations(
+        self,
+        group_df: pd.DataFrame,
+        mode: str,
+    ) -> List[Dict[str, Any]]:
+        raise NotImplementedError
 
     def _log_match_stats(self, recommendations: List[Dict[str, Any]],
                          sources: List[Dict[str, Any]],

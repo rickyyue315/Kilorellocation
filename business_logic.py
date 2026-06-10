@@ -48,70 +48,15 @@ from models.mode_registry import (
     get_codes_needing_column,
 )
 from services.perf_timer import perf_timer
+from services.source_dest_factory import (
+    safe_get_last2m,
+    make_source as _make_source,
+    make_dest as _make_dest,
+    compute_max_protected_sold as _compute_max_protected_sold,
+)
 
 # 設置日誌
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-def _safe_get_last2m(row) -> int:
-    if 'Last 2 Month Sold Qty' in row.index:
-        return int(row['Last 2 Month Sold Qty'])
-    return int(row['Last Month Sold Qty'])
-
-
-def _make_source(row, transferable_qty: int, priority: int, source_type: str, **extra) -> Dict:
-    source = {
-        'site': row['Site'],
-        'om': row['OM'],
-        'rp_type': row['RP Type'],
-        'transferable_qty': transferable_qty,
-        'priority': priority,
-        'original_stock': int(row['SaSa Net Stock']),
-        'effective_sold_qty': int(row['Effective Sold Qty']) if pd.notna(row.get('Effective Sold Qty', 0)) else 0,
-        'source_type': source_type,
-        'store_type': '',
-        'last_month_sold_qty': int(row['Last Month Sold Qty']) if pd.notna(row.get('Last Month Sold Qty', 0)) else 0,
-        'mtd_sold_qty': int(row['MTD Sold Qty']) if pd.notna(row.get('MTD Sold Qty', 0)) else 0,
-        'last_2_month_sold_qty': _safe_get_last2m(row),
-        'supply_source': row.get('Supply source'),
-    }
-    source.update(extra)
-    return source
-
-
-def _make_dest(row, needed_qty: int, priority: int, dest_type: str,
-               target_qty: int, max_receive_qty: Optional[int] = None, **extra) -> Dict:
-    dest = {
-        'site': row['Site'],
-        'om': row['OM'],
-        'rp_type': row['RP Type'],
-        'needed_qty': needed_qty,
-        'priority': priority,
-        'current_stock': int(row['SaSa Net Stock']),
-        'pending_received': int(row['Pending Received']),
-        'safety_stock': int(row['Safety Stock']) if pd.notna(row.get('Safety Stock', 0)) else 0,
-        'moq': int(row['MOQ']) if pd.notna(row.get('MOQ', 0)) else 0,
-        'effective_sold_qty': int(row['Effective Sold Qty']) if pd.notna(row.get('Effective Sold Qty', 0)) else 0,
-        'dest_type': dest_type,
-        'target_qty': target_qty,
-        'received_qty': 0,
-        'last_month_sold_qty': int(row['Last Month Sold Qty']) if pd.notna(row.get('Last Month Sold Qty', 0)) else 0,
-        'mtd_sold_qty': int(row['MTD Sold Qty']) if pd.notna(row.get('MTD Sold Qty', 0)) else 0,
-    }
-    if max_receive_qty is not None:
-        dest['max_receive_qty'] = max_receive_qty
-    dest.update(extra)
-    return dest
-
-
-def _compute_max_protected_sold(df) -> float:
-    if df.empty:
-        return 0
-    max_sold = df['Effective Sold Qty'].max()
-    if len(df) == 1 or max_sold == 0 or (df['Effective Sold Qty'] == max_sold).sum() >= len(df):
-        return float('inf')
-    return max_sold
 
 
 class TransferLogic:
@@ -198,6 +143,10 @@ class TransferLogic:
             'b_special': BSpecialStrategy(
                 match_by_priority=self._match_by_priority,
                 max_receive_sites_per_source=self.b_special_max_receive_sites_per_source,
+                is_b_tourist_no_source_fn=self._is_b_tourist_no_source_mode,
+                is_b_l_retain_fn=self._is_b_l_retain_mode,
+                is_d_family_fn=self._is_d_family_mode,
+                mode_d2_name=self.mode_d2,
             ),
         }
 
@@ -234,211 +183,17 @@ class TransferLogic:
 
     def _parse_target_series(self, df: pd.DataFrame) -> pd.Series:
         return parse_target_series(df)
-    
+
+    @perf_timer("identify_sources")
     def identify_sources(self, group_df: pd.DataFrame, mode: str, protected_sites: Optional[Set[str]] = None) -> List[Dict]:
         mode_def = self._mode_by_name.get(mode)
         if mode_def and mode_def.source_method:
+            if mode_def.strategy_key:
+                strategy = self._strategies[mode_def.strategy_key]
+                return strategy.identify_sources(group_df, mode, protected_sites)
             method = getattr(self, mode_def.source_method)
-            if mode_def.source_method == '_sources_f_mode':
-                return method(group_df, mode, protected_sites)
             return method(group_df)
         return self._sources_general(group_df, mode)
-
-    def _sources_simplified_sku(self, group_df: pd.DataFrame) -> List[Dict]:
-        sources: List[Dict] = []
-        nd_stores = group_df[group_df['RP Type'] == 'ND']
-        for _, row in nd_stores.iterrows():
-            net_stock = int(row['SaSa Net Stock'])
-            if net_stock <= 0:
-                continue
-            sources.append(_make_source(row, net_stock, 1, '精簡SKU ND轉出'))
-
-        rf_sources = group_df[group_df['RP Type'] == 'RF']
-        max_sold_qty = _compute_max_protected_sold(rf_sources)
-
-        for _, row in rf_sources.iterrows():
-            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-            safety_stock = int(row['Safety Stock'])
-            last_two_month_sold = _safe_get_last2m(row)
-            cap = max(safety_stock * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER, last_two_month_sold * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER)
-            effective_sold = int(row['Effective Sold Qty'])
-
-            if effective_sold >= max_sold_qty:
-                continue
-            if total_available <= cap:
-                continue
-
-            transferable_qty = min(total_available - cap, int(row['SaSa Net Stock']))
-            if transferable_qty <= 0:
-                continue
-
-            sources.append(_make_source(row, transferable_qty, 2, '精簡SKU RF轉出'))
-
-        sources.sort(key=lambda x: x['priority'])
-        return sources
-
-    def _sources_nd_mode(self, group_df: pd.DataFrame) -> List[Dict]:
-        sources: List[Dict] = []
-        nd_stores = group_df[group_df['RP Type'] == 'ND']
-        max_nd_sold = _compute_max_protected_sold(nd_stores)
-
-        for _, row in nd_stores.iterrows():
-            net_stock = int(row['SaSa Net Stock'])
-            if net_stock <= 0:
-                continue
-            effective_sold = int(row['Effective Sold Qty'])
-            if effective_sold >= max_nd_sold:
-                continue
-
-            last_month_sold = int(row['Last Month Sold Qty'])
-            mtd_sold = int(row['MTD Sold Qty'])
-            total_sales = last_month_sold + mtd_sold
-
-            sources.append(_make_source(row, net_stock, 1, 'ND智能轉出',
-                                        total_sales_sort=total_sales))
-
-        sources.sort(key=lambda x: x.get('total_sales_sort', 0))
-        return sources
-
-    def _sources_nd3_mode(self, group_df: pd.DataFrame) -> List[Dict]:
-        sources: List[Dict] = []
-        nd_stores = group_df[group_df['RP Type'] == 'ND']
-        max_nd_sold = _compute_max_protected_sold(nd_stores)
-
-        for _, row in nd_stores.iterrows():
-            net_stock = int(row['SaSa Net Stock'])
-            if net_stock <= ND3_KEEP_STOCK:
-                continue
-            effective_sold = int(row['Effective Sold Qty'])
-            if effective_sold >= max_nd_sold:
-                continue
-
-            transferable_qty = net_stock - ND3_KEEP_STOCK
-            last_month_sold = int(row['Last Month Sold Qty'])
-            mtd_sold = int(row['MTD Sold Qty'])
-            total_sales = last_month_sold + mtd_sold
-
-            sources.append(_make_source(row, transferable_qty, 1, 'ND3智能轉出(保留3件)',
-                                        total_sales_sort=total_sales))
-
-        sources.sort(key=lambda x: x.get('total_sales_sort', 0))
-        return sources
-
-    def _sources_f_mode(self, group_df: pd.DataFrame, mode: str, protected_sites: Optional[Set[str]]) -> List[Dict]:
-        sources: List[Dict] = []
-        target_series = self._parse_target_series(group_df)
-        is_f3 = (mode == self.mode_f3)
-
-        nd_sources = group_df[group_df['RP Type'] == 'ND']
-        for _, row in nd_sources.iterrows():
-            target_value = target_series.loc[row.name]
-            if pd.notna(target_value) and target_value > 0:
-                continue
-            if mode in (self.mode_f_target_only, self.mode_f3) and protected_sites:
-                site_key = str(row['Site']).strip().upper()
-                if site_key in protected_sites:
-                    continue
-            net_stock = int(row['SaSa Net Stock'])
-            if net_stock > 0:
-                sources.append(_make_source(row, net_stock, 1, 'F模式ND轉出'))
-
-        rf_sources = group_df[group_df['RP Type'] == 'RF']
-        max_sold_qty = _compute_max_protected_sold(rf_sources)
-
-        for _, row in rf_sources.iterrows():
-            target_value = target_series.loc[row.name]
-            if pd.notna(target_value) and target_value > 0:
-                continue
-            if mode in (self.mode_f_target_only, self.mode_f3) and protected_sites:
-                site_key = str(row['Site']).strip().upper()
-                if site_key in protected_sites:
-                    continue
-            net_stock = int(row['SaSa Net Stock'])
-            effective_sold = int(row['Effective Sold Qty'])
-
-            if is_f3:
-                if net_stock <= 2:
-                    continue
-                transferable_qty = max(net_stock - 2, 0)
-                source_type = 'F3模式RF轉出(保留2件)'
-                sort_order = -net_stock
-            else:
-                if net_stock <= 0:
-                    continue
-                transferable_qty = net_stock
-                source_type = 'F模式RF轉出'
-                sort_order = 0
-
-            if effective_sold >= max_sold_qty:
-                continue
-
-            sources.append(_make_source(row, transferable_qty, 2, source_type))
-
-        if is_f3:
-            sources.sort(key=lambda x: (x['priority'], -x.get('original_stock', 0), x.get('effective_sold_qty', 0)))
-        else:
-            sources.sort(key=lambda x: (x['priority'], x.get('effective_sold_qty', 0)))
-        return sources
-
-    def _sources_e_mode(self, group_df: pd.DataFrame) -> List[Dict]:
-        sources: List[Dict] = []
-        if 'ALL' not in group_df.columns:
-            return sources
-        all_marked = group_df[
-            (group_df['ALL'].notna()) & 
-            (group_df['ALL'].astype(str).str.strip() != '')
-        ]
-        for _, row in all_marked.iterrows():
-            net_stock = int(row['SaSa Net Stock'])
-            if net_stock > 0:
-                sources.append(_make_source(row, net_stock, 1, 'E模式強制轉出',
-                                            is_e_mode=True))
-        sources.sort(key=lambda x: x['priority'])
-        return sources
-
-    def _identify_nd_sources(self, group_df: pd.DataFrame, mode: str,
-                             type_series) -> List[Dict]:
-        sources = []
-        nd_sources = group_df[group_df['RP Type'] == 'ND']
-        for _, row in nd_sources.iterrows():
-            if self._is_b_tourist_no_source_mode(mode) and type_series is not None and type_series.loc[row.name] == 'T':
-                continue
-            if row['SaSa Net Stock'] > 0:
-                last_month_sold = int(row['Last Month Sold Qty'])
-                mtd_sold = int(row['MTD Sold Qty'])
-
-                if self._is_d_family_mode(mode) and last_month_sold == 0 and mtd_sold == 0:
-                    source_type = 'ND清貨轉出'
-                elif mode == self.mode_d2:
-                    continue
-                else:
-                    source_type = 'ND轉出'
-
-                source_store_type = type_series.loc[row.name] if type_series is not None else ''
-                sources.append(_make_source(row, int(row['SaSa Net Stock']), 1, source_type,
-                                            store_type=source_store_type))
-        return sources
-
-    def _identify_b_special_type_l_sources(self, group_df: pd.DataFrame, mode: str,
-                                           type_series) -> List[Dict]:
-        sources = []
-        type_l_sources = group_df[(type_series == 'L') & (group_df['RP Type'] == 'RF')]
-        for _, row in type_l_sources.iterrows():
-            last_month_sold = int(row['Last Month Sold Qty'])
-            mtd_sold = int(row['MTD Sold Qty'])
-            if max(last_month_sold, mtd_sold) > 2:
-                continue
-
-            net_stock = int(row['SaSa Net Stock'])
-            if self._is_b_l_retain_mode(mode):
-                transferable_qty = max(net_stock - 2, 0)
-            else:
-                transferable_qty = net_stock
-
-            if transferable_qty > 0:
-                sources.append(_make_source(row, transferable_qty, 2, 'Local店舖全轉出',
-                                            store_type=type_series.loc[row.name]))
-        return sources
 
     def _compute_rf_transferable(self, row, mode: str, total_available: int,
                                   safety_stock: int) -> Optional[Tuple[int, str]]:
@@ -507,10 +262,20 @@ class TransferLogic:
         else:
             type_series = None
 
-        sources.extend(self._identify_nd_sources(group_df, mode, type_series))
+        from strategies.b_special import identify_nd_sources, identify_b_special_type_l_sources
+
+        sources.extend(identify_nd_sources(
+            group_df, mode, type_series,
+            is_b_tourist_no_source=self._is_b_tourist_no_source_mode(mode),
+            is_d_family=self._is_d_family_mode(mode),
+            mode_d2=self.mode_d2,
+        ))
 
         if self._is_b_special_mode(mode):
-            sources.extend(self._identify_b_special_type_l_sources(group_df, mode, type_series))
+            sources.extend(identify_b_special_type_l_sources(
+                group_df, mode, type_series,
+                is_b_l_retain=self._is_b_l_retain_mode(mode),
+            ))
 
         if mode == self.mode_d2:
             sources.sort(key=lambda x: x['priority'])
@@ -573,284 +338,26 @@ class TransferLogic:
 
         sources.sort(key=lambda x: x['priority'])
         return sources
-    
+
+    @perf_timer("identify_destinations")
     def identify_destinations(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
         mode_def = self._mode_by_name.get(mode)
         if mode_def and mode_def.dest_method:
+            if mode_def.strategy_key and mode_def.dest_method in ('_dests_f_mode', '_dests_e_mode', '_dests_b_special', '_dests_simplified_sku', '_dests_nd_mode', '_dests_nd3_mode'):
+                strategy = self._strategies[mode_def.strategy_key]
+                result = strategy.identify_destinations(group_df, mode)
+                if result is not None:
+                    return result
             if mode == self.mode_d2 and self.d2_enable_2site_limit:
-                return self._dests_d2_mode(group_df)
-            method = getattr(self, mode_def.dest_method)
-            if mode_def.dest_method in ('_dests_f_mode', '_dests_e_mode'):
-                return method(group_df, mode)
-            return method(group_df)
+                from strategies.d_mode import identify_destinations_d2_mode
+                return identify_destinations_d2_mode(group_df, self.d2_enable_2site_limit)
+            if mode_def.dest_method == '_dests_d_mode':
+                from strategies.d_mode import identify_destinations_d_mode
+                return identify_destinations_d_mode(group_df)
+            if mode_def.dest_method == '_dests_c1_mode':
+                from strategies.c1_mode import identify_destinations_c1_mode
+                return identify_destinations_c1_mode(group_df, self.c1_threshold)
         return self._dests_general(group_df, mode)
-
-    def _dests_simplified_sku(self, group_df: pd.DataFrame) -> List[Dict]:
-        destinations: List[Dict] = []
-        rf_stores = group_df[group_df['RP Type'] == 'RF']
-        for _, row in rf_stores.iterrows():
-            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-            safety_stock = int(row['Safety Stock'])
-            last_two_month_sold = _safe_get_last2m(row)
-            cap = max(safety_stock * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER, last_two_month_sold * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER)
-            if total_available >= cap:
-                continue
-            needed_qty = cap - total_available
-            if needed_qty <= 0:
-                continue
-            destinations.append(_make_dest(row, needed_qty, 1, '精簡SKU接收', cap,
-                                            max_receive_qty=needed_qty))
-        destinations.sort(key=lambda x: x['priority'])
-        return destinations
-
-    def _dests_nd_mode(self, group_df: pd.DataFrame) -> List[Dict]:
-        destinations: List[Dict] = []
-        rf_stores = group_df[group_df['RP Type'] == 'RF']
-        nd_stores = group_df[group_df['RP Type'] == 'ND']
-
-        for _, row in rf_stores.iterrows():
-            is_no_stock = int(row['SaSa Net Stock']) == 0
-            has_sales = int(row['Effective Sold Qty']) > 0
-            if is_no_stock and has_sales:
-                needed_qty = int(row['Safety Stock'])
-                if needed_qty <= 0:
-                    needed_qty = 2
-                destinations.append(_make_dest(row, needed_qty, 1, 'RF緊急缺貨補貨', needed_qty,
-                                                max_receive_qty=needed_qty,
-                                                total_sales=int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])))
-
-        for _, row in nd_stores.iterrows():
-            last_month_sold = int(row['Last Month Sold Qty'])
-            mtd_sold = int(row['MTD Sold Qty'])
-            total_sales = last_month_sold + mtd_sold
-            if total_sales <= 0:
-                continue
-            max_receive = ND_RECEIVE_MULTIPLIER * total_sales
-            current_stock = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-            if current_stock >= max_receive:
-                continue
-            needed_qty = max_receive - current_stock
-            destinations.append(_make_dest(row, needed_qty, 2, 'ND潛在缺貨接收', max_receive,
-                                            max_receive_qty=max_receive,
-                                            total_sales=total_sales))
-
-        destinations.sort(key=lambda x: (x['priority'], -x.get('total_sales', 0)))
-        return destinations
-
-    def _dests_nd3_mode(self, group_df: pd.DataFrame) -> List[Dict]:
-        destinations: List[Dict] = []
-        nd_stores = group_df[group_df['RP Type'] == 'ND']
-
-        for _, row in nd_stores.iterrows():
-            net_stock = int(row['SaSa Net Stock'])
-            if net_stock > 0:
-                continue
-            safety_stock = int(row['Safety Stock']) if pd.notna(row.get('Safety Stock', 0)) else 0
-            total_available = net_stock + int(row['Pending Received'])
-            target_qty = max(int(safety_stock * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
-            needed_qty = target_qty - total_available
-            if needed_qty <= 0:
-                continue
-
-            last_month_sold = int(row['Last Month Sold Qty'])
-            mtd_sold = int(row['MTD Sold Qty'])
-            total_sales = last_month_sold + mtd_sold
-
-            destinations.append(_make_dest(row, needed_qty, 1, 'ND3補0接收', target_qty,
-                                           max_receive_qty=target_qty,
-                                           total_sales=total_sales))
-
-        destinations.sort(key=lambda x: (x['priority'], -x.get('total_sales', 0)))
-        return destinations
-
-    def _dests_f_mode(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
-        destinations: List[Dict] = []
-        target_series = self._parse_target_series(group_df)
-
-        for idx, row in group_df.iterrows():
-            total_available = row['SaSa Net Stock'] + row['Pending Received']
-            target_value = target_series.loc[idx]
-            rp_type = row['RP Type']
-
-            if pd.notna(target_value) and target_value > 0:
-                target_qty = int(target_value)
-                dest_type = 'F指定模式目標接收' if mode in (self.mode_f_target_only, self.mode_f3) else 'F模式目標接收'
-                destinations.append(_make_dest(row, target_qty, 1, dest_type, target_qty))
-                continue
-
-            if rp_type == 'ND':
-                continue
-            if mode in (self.mode_f_target_only, self.mode_f3):
-                continue
-
-            if total_available <= 1 and (int(row['Safety Stock']) > 0 or int(row['Effective Sold Qty']) > 0):
-                target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
-                needed_qty = target_qty - total_available
-                if needed_qty > 0:
-                    destinations.append(_make_dest(row, needed_qty, 2, '重點補0', target_qty))
-
-        destinations.sort(key=lambda x: x['priority'])
-        return destinations
-
-    def _dests_e_mode(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
-        destinations: List[Dict] = []
-        rf_destinations = group_df[group_df['RP Type'] == 'RF']
-        if 'Type' in rf_destinations.columns:
-            type_series = rf_destinations['Type'].astype(str).str.upper()
-        else:
-            type_series = pd.Series("", index=rf_destinations.index)
-
-        for _, row in rf_destinations.iterrows():
-            total_available = row['SaSa Net Stock'] + row['Pending Received']
-            safety_stock = int(row['Safety Stock'])
-            max_can_receive = max(int(safety_stock * SAFETY_RECEIVE_MULTIPLIER), MIN_RECEIVE_FLOOR)
-
-            if total_available < max_can_receive:
-                needed_qty = max_can_receive - total_available
-                sales_total = int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])
-
-                if mode == self.mode_e1b:
-                    store_type = type_series.loc[row.name]
-                    if store_type == 'T':
-                        priority, dest_type = (1, 'E1b遊客區店舖 高銷量優先') if sales_total > 0 else (3, 'E1b遊客區店舖 Safety優先')
-                    elif store_type == 'M':
-                        priority, dest_type = (2, 'E1b混合型店舖 高銷量優先') if sales_total > 0 else (4, 'E1b混合型店舖 Safety優先')
-                    else:
-                        priority, dest_type = 5, 'E1b其他類型店舖'
-                else:
-                    priority, dest_type = 1, 'E模式接收'
-
-                destinations.append(_make_dest(row, int(needed_qty), priority, dest_type, max_can_receive,
-                                                max_receive_qty=max_can_receive))
-
-        if mode == self.mode_e1b:
-            def e1b_sort_key(item: Dict) -> Tuple[int, int, int]:
-                if item['priority'] in (1, 2):
-                    return (item['priority'], -int(item.get('effective_sold_qty', 0)), 0)
-                return (item['priority'], -int(item.get('safety_stock', 0)), 0)
-            destinations.sort(key=e1b_sort_key)
-        else:
-            destinations.sort(key=lambda x: x['priority'])
-        return destinations
-
-    def _dests_b_special(self, group_df: pd.DataFrame) -> List[Dict]:
-        destinations: List[Dict] = []
-        rf_destinations = group_df[group_df['RP Type'] == 'RF']
-        if 'Type' in rf_destinations.columns:
-            type_series = rf_destinations['Type'].astype(str).str.upper()
-        else:
-            type_series = pd.Series("", index=rf_destinations.index)
-
-        for idx, row in rf_destinations.iterrows():
-            total_available = row['SaSa Net Stock'] + row['Pending Received']
-            safety_stock = int(row['Safety Stock'])
-            max_can_receive = max(safety_stock * SAFETY_RECEIVE_MULTIPLIER, MIN_RECEIVE_FLOOR)
-
-            if total_available >= safety_stock:
-                continue
-
-            sales_total = int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])
-            store_type = type_series.loc[idx]
-
-            if store_type == 'T':
-                priority, dest_type = (1, '遊客區店舖 高銷量優先') if sales_total > 0 else (3, '遊客區店舖 Safety優先')
-            elif store_type == 'M':
-                priority, dest_type = (2, '混合型店舖 高銷量優先') if sales_total > 0 else (4, '混合型店舖 Safety優先')
-            else:
-                priority, dest_type = 4, '其他類型 Safety優先'
-
-            needed_qty = safety_stock - total_available
-            needed_qty = min(needed_qty, max_can_receive - total_available)
-            if needed_qty <= 0:
-                continue
-
-            destinations.append(_make_dest(row, int(needed_qty), priority, dest_type, max_can_receive,
-                                            max_receive_qty=max_can_receive,
-                                            store_type=store_type))
-
-        def b2_sort_key(item: Dict) -> Tuple[int, int, int]:
-            if item['priority'] in (1, 2):
-                return (item['priority'], -int(item.get('effective_sold_qty', 0)), 0)
-            return (item['priority'], -int(item.get('safety_stock', 0)), 0)
-
-        destinations.sort(key=b2_sort_key)
-        return destinations
-
-    def _dests_d_mode(self, group_df: pd.DataFrame) -> List[Dict]:
-        destinations: List[Dict] = []
-        rf_destinations = group_df[group_df['RP Type'] == 'RF']
-        for _, row in rf_destinations.iterrows():
-            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-            safety_stock = int(row['Safety Stock'])
-            is_no_stock = int(row['SaSa Net Stock']) == 0
-            has_sales_history = int(row['Effective Sold Qty']) > 0
-
-            if is_no_stock and has_sales_history:
-                needed_qty = max(safety_stock, 2) - total_available
-                if needed_qty <= 0:
-                    continue
-                max_receive = max(safety_stock, 2)
-                destinations.append(_make_dest(row, needed_qty, 1, '緊急缺貨補貨', max_receive,
-                                                max_receive_qty=max_receive))
-                continue
-
-            is_insufficient_stock = total_available < safety_stock
-            if is_insufficient_stock:
-                needed_qty = safety_stock - total_available
-                destinations.append(_make_dest(row, needed_qty, 2, '潛在缺貨補貨', safety_stock,
-                                                max_receive_qty=safety_stock))
-
-        destinations.sort(key=lambda x: x['priority'])
-        return destinations
-
-    def _dests_d2_mode(self, group_df: pd.DataFrame) -> List[Dict]:
-        destinations: List[Dict] = []
-        rf_destinations = group_df[group_df['RP Type'] == 'RF']
-        m = D2_NEEDED_QTY_MULTIPLIER
-        for _, row in rf_destinations.iterrows():
-            total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
-            safety_stock = int(row['Safety Stock'])
-            is_no_stock = int(row['SaSa Net Stock']) == 0
-            has_sales_history = int(row['Effective Sold Qty']) > 0
-
-            if is_no_stock and has_sales_history:
-                target_qty = max(safety_stock * m, 2 * m)
-                needed_qty = target_qty - total_available
-                if needed_qty <= 0:
-                    continue
-                destinations.append(_make_dest(row, needed_qty, 1, '緊急缺貨補貨', target_qty,
-                                                max_receive_qty=target_qty))
-                continue
-
-            is_insufficient_stock = total_available < safety_stock
-            if is_insufficient_stock:
-                target_qty = safety_stock * m
-                needed_qty = target_qty - total_available
-                destinations.append(_make_dest(row, needed_qty, 2, '潛在缺貨補貨', target_qty,
-                                                max_receive_qty=target_qty))
-
-        destinations.sort(key=lambda x: x['priority'])
-        return destinations
-
-    def _dests_c1_mode(self, group_df: pd.DataFrame) -> List[Dict]:
-        destinations: List[Dict] = []
-        rf_destinations = group_df[group_df['RP Type'] == 'RF']
-        for _, row in rf_destinations.iterrows():
-            total_available = row['SaSa Net Stock'] + row['Pending Received']
-            if total_available > self.c1_threshold:
-                continue
-            if int(row['Safety Stock']) <= 0 and int(row['Effective Sold Qty']) <= 0:
-                continue
-            target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
-            needed_qty = target_qty - total_available
-            if needed_qty <= 0:
-                continue
-            needed_qty = int(needed_qty)
-            if needed_qty < 2:
-                needed_qty = 2
-            destinations.append(_make_dest(row, needed_qty, 1, '重點補0', int(target_qty)))
-        destinations.sort(key=lambda x: x['priority'])
-        return destinations
 
     def _dests_general(self, group_df: pd.DataFrame, mode: str) -> List[Dict]:
         destinations: List[Dict] = []
@@ -882,6 +389,7 @@ class TransferLogic:
         destinations.sort(key=lambda x: x['priority'])
         return destinations
     
+    @perf_timer("match_transfers")
     def match_transfers(self, article: str, om: str, sources: List[Dict], 
                        destinations: List[Dict], product_desc: str, mode: str) -> List[Dict]:
         """

@@ -16,7 +16,6 @@ from config import (
     OUTLIER_CAP, FILE_SIZE_LIMIT_BYTES,
 )
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 _store_data_cache = None

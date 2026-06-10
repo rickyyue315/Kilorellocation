@@ -1,13 +1,117 @@
 """
-F/F2/F3模式匹配策略
+F/F2/F3模式匹配策略 + Source/Dest 識別邏輯
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
+
+import pandas as pd
 
 from strategies.base import BaseMatchStrategy
 from strategies.predicates import validate_pair, is_hd_to_hk_restricted
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.matching_engine import prep_temp_lists
+from services.source_dest_factory import make_source, make_dest, compute_max_protected_sold
+from services.target_utils import parse_target_series
+from config import F_TARGET_MULTIPLIER, F_TARGET_FLOOR
+
+
+def identify_sources_f_mode(
+    group_df: pd.DataFrame,
+    mode: str,
+    protected_sites: Optional[Set[str]],
+    mode_f3: str,
+    mode_f_target_only: str,
+    f_fulfill_small_first: bool,
+) -> List[Dict]:
+    sources: List[Dict] = []
+    target_series = parse_target_series(group_df)
+    is_f3 = (mode == mode_f3)
+
+    nd_sources = group_df[group_df['RP Type'] == 'ND']
+    for _, row in nd_sources.iterrows():
+        target_value = target_series.loc[row.name]
+        if pd.notna(target_value) and target_value > 0:
+            continue
+        if mode in (mode_f_target_only, mode_f3) and protected_sites:
+            site_key = str(row['Site']).strip().upper()
+            if site_key in protected_sites:
+                continue
+        net_stock = int(row['SaSa Net Stock'])
+        if net_stock > 0:
+            sources.append(make_source(row, net_stock, 1, 'F模式ND轉出'))
+
+    rf_sources = group_df[group_df['RP Type'] == 'RF']
+    max_sold_qty = compute_max_protected_sold(rf_sources)
+
+    for _, row in rf_sources.iterrows():
+        target_value = target_series.loc[row.name]
+        if pd.notna(target_value) and target_value > 0:
+            continue
+        if mode in (mode_f_target_only, mode_f3) and protected_sites:
+            site_key = str(row['Site']).strip().upper()
+            if site_key in protected_sites:
+                continue
+        net_stock = int(row['SaSa Net Stock'])
+        effective_sold = int(row['Effective Sold Qty'])
+
+        if is_f3:
+            if net_stock <= 2:
+                continue
+            transferable_qty = max(net_stock - 2, 0)
+            source_type = 'F3模式RF轉出(保留2件)'
+            sort_order = -net_stock
+        else:
+            if net_stock <= 0:
+                continue
+            transferable_qty = net_stock
+            source_type = 'F模式RF轉出'
+            sort_order = 0
+
+        if effective_sold >= max_sold_qty:
+            continue
+
+        sources.append(make_source(row, transferable_qty, 2, source_type))
+
+    if is_f3:
+        sources.sort(key=lambda x: (x['priority'], -x.get('original_stock', 0), x.get('effective_sold_qty', 0)))
+    else:
+        sources.sort(key=lambda x: (x['priority'], x.get('effective_sold_qty', 0)))
+    return sources
+
+
+def identify_destinations_f_mode(
+    group_df: pd.DataFrame,
+    mode: str,
+    mode_f_target_only: str,
+    mode_f3: str,
+) -> List[Dict]:
+    destinations: List[Dict] = []
+    target_series = parse_target_series(group_df)
+
+    for idx, row in group_df.iterrows():
+        total_available = row['SaSa Net Stock'] + row['Pending Received']
+        target_value = target_series.loc[idx]
+        rp_type = row['RP Type']
+
+        if pd.notna(target_value) and target_value > 0:
+            target_qty = int(target_value)
+            dest_type = 'F指定模式目標接收' if mode in (mode_f_target_only, mode_f3) else 'F模式目標接收'
+            destinations.append(make_dest(row, target_qty, 1, dest_type, target_qty))
+            continue
+
+        if rp_type == 'ND':
+            continue
+        if mode in (mode_f_target_only, mode_f3):
+            continue
+
+        if total_available <= 1 and (int(row['Safety Stock']) > 0 or int(row['Effective Sold Qty']) > 0):
+            target_qty = max(int(row['Safety Stock'] * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
+            needed_qty = target_qty - total_available
+            if needed_qty > 0:
+                destinations.append(make_dest(row, needed_qty, 2, '重點補0', target_qty))
+
+    destinations.sort(key=lambda x: x['priority'])
+    return destinations
 
 
 class FModeStrategy(BaseMatchStrategy):
@@ -15,6 +119,28 @@ class FModeStrategy(BaseMatchStrategy):
         super().__init__(create_note)
         self._f2_allow_hd_transfer = f2_allow_hd_transfer
         self._f_fulfill_small_first = f_fulfill_small_first
+
+    def identify_sources(
+        self,
+        group_df: pd.DataFrame,
+        mode: str,
+        protected_sites: Optional[set] = None,
+    ) -> List[Dict[str, Any]]:
+        return identify_sources_f_mode(
+            group_df, mode, protected_sites,
+            mode_f3="目標性補0", mode_f_target_only="F指定模式",
+            f_fulfill_small_first=self._f_fulfill_small_first,
+        )
+
+    def identify_destinations(
+        self,
+        group_df: pd.DataFrame,
+        mode: str,
+    ) -> List[Dict[str, Any]]:
+        return identify_destinations_f_mode(
+            group_df, mode,
+            mode_f_target_only="F指定模式", mode_f3="目標性補0",
+        )
 
     def match(
         self,

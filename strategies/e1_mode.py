@@ -1,19 +1,97 @@
 """
-E1/E1b/E2模式（僅同OM配對）匹配策略
+E1/E1b/E2模式（僅同OM配對）匹配策略 + Source/Dest 識別邏輯
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import pandas as pd
 
 from strategies.base import BaseMatchStrategy
 from strategies.predicates import validate_pair, is_hd_to_hk_restricted
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.matching_engine import prep_temp_lists
+from services.source_dest_factory import make_source, make_dest
+from config import SAFETY_RECEIVE_MULTIPLIER, MIN_RECEIVE_FLOOR
+
+
+def identify_sources_e_mode(group_df: pd.DataFrame) -> List[Dict]:
+    sources: List[Dict] = []
+    if 'ALL' not in group_df.columns:
+        return sources
+    all_marked = group_df[
+        (group_df['ALL'].notna()) &
+        (group_df['ALL'].astype(str).str.strip() != '')
+    ]
+    for _, row in all_marked.iterrows():
+        net_stock = int(row['SaSa Net Stock'])
+        if net_stock > 0:
+            sources.append(make_source(row, net_stock, 1, 'E模式強制轉出',
+                                        is_e_mode=True))
+    sources.sort(key=lambda x: x['priority'])
+    return sources
+
+
+def identify_destinations_e_mode(group_df: pd.DataFrame, mode: str, mode_e1b: str) -> List[Dict]:
+    destinations: List[Dict] = []
+    rf_destinations = group_df[group_df['RP Type'] == 'RF']
+    if 'Type' in rf_destinations.columns:
+        type_series = rf_destinations['Type'].astype(str).str.upper()
+    else:
+        type_series = pd.Series("", index=rf_destinations.index)
+
+    for _, row in rf_destinations.iterrows():
+        total_available = row['SaSa Net Stock'] + row['Pending Received']
+        safety_stock = int(row['Safety Stock'])
+        max_can_receive = max(int(safety_stock * SAFETY_RECEIVE_MULTIPLIER), MIN_RECEIVE_FLOOR)
+
+        if total_available < max_can_receive:
+            needed_qty = max_can_receive - total_available
+            sales_total = int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])
+
+            if mode == mode_e1b:
+                store_type = type_series.loc[row.name]
+                if store_type == 'T':
+                    priority, dest_type = (1, 'E1b遊客區店舖 高銷量優先') if sales_total > 0 else (3, 'E1b遊客區店舖 Safety優先')
+                elif store_type == 'M':
+                    priority, dest_type = (2, 'E1b混合型店舖 高銷量優先') if sales_total > 0 else (4, 'E1b混合型店舖 Safety優先')
+                else:
+                    priority, dest_type = 5, 'E1b其他類型店舖'
+            else:
+                priority, dest_type = 1, 'E模式接收'
+
+            destinations.append(make_dest(row, int(needed_qty), priority, dest_type, max_can_receive,
+                                           max_receive_qty=max_can_receive))
+
+    if mode == mode_e1b:
+        def e1b_sort_key(item: Dict) -> Tuple[int, int, int]:
+            if item['priority'] in (1, 2):
+                return (item['priority'], -int(item.get('effective_sold_qty', 0)), 0)
+            return (item['priority'], -int(item.get('safety_stock', 0)), 0)
+        destinations.sort(key=e1b_sort_key)
+    else:
+        destinations.sort(key=lambda x: x['priority'])
+    return destinations
 
 
 class E1ModeStrategy(BaseMatchStrategy):
     def __init__(self, create_note=None, max_receive_sites_per_source=None):
         super().__init__(create_note)
         self._max_receive_sites_per_source = max_receive_sites_per_source
+
+    def identify_sources(
+        self,
+        group_df: pd.DataFrame,
+        mode: str,
+        protected_sites: Optional[set] = None,
+    ) -> List[Dict[str, Any]]:
+        return identify_sources_e_mode(group_df)
+
+    def identify_destinations(
+        self,
+        group_df: pd.DataFrame,
+        mode: str,
+    ) -> List[Dict[str, Any]]:
+        return identify_destinations_e_mode(group_df, mode, mode_e1b="強制轉出(優先類型接收)")
 
     def match(
         self,

@@ -1,8 +1,8 @@
 """
-精簡SKU模式匹配策略
+精簡SKU模式匹配策略 + Source/Dest 識別邏輯
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import pandas as pd
 
@@ -10,9 +10,84 @@ from strategies.base import BaseMatchStrategy
 from strategies.predicates import validate_pair
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.matching_engine import prep_temp_lists
+from services.source_dest_factory import (
+    safe_get_last2m,
+    make_source,
+    make_dest,
+    compute_max_protected_sold,
+)
+from config import SIMPLIFIED_SKU_RECEIVE_MULTIPLIER
+
+
+def identify_sources_simplified_sku(group_df: pd.DataFrame) -> List[Dict]:
+    sources: List[Dict] = []
+    nd_stores = group_df[group_df['RP Type'] == 'ND']
+    for _, row in nd_stores.iterrows():
+        net_stock = int(row['SaSa Net Stock'])
+        if net_stock <= 0:
+            continue
+        sources.append(make_source(row, net_stock, 1, '精簡SKU ND轉出'))
+
+    rf_sources = group_df[group_df['RP Type'] == 'RF']
+    max_sold_qty = compute_max_protected_sold(rf_sources)
+
+    for _, row in rf_sources.iterrows():
+        total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+        safety_stock = int(row['Safety Stock'])
+        last_two_month_sold = safe_get_last2m(row)
+        cap = max(safety_stock * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER, last_two_month_sold * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER)
+        effective_sold = int(row['Effective Sold Qty'])
+
+        if effective_sold >= max_sold_qty:
+            continue
+        if total_available <= cap:
+            continue
+
+        transferable_qty = min(total_available - cap, int(row['SaSa Net Stock']))
+        if transferable_qty <= 0:
+            continue
+
+        sources.append(make_source(row, transferable_qty, 2, '精簡SKU RF轉出'))
+
+    sources.sort(key=lambda x: x['priority'])
+    return sources
+
+
+def identify_destinations_simplified_sku(group_df: pd.DataFrame) -> List[Dict]:
+    destinations: List[Dict] = []
+    rf_stores = group_df[group_df['RP Type'] == 'RF']
+    for _, row in rf_stores.iterrows():
+        total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
+        safety_stock = int(row['Safety Stock'])
+        last_two_month_sold = safe_get_last2m(row)
+        cap = max(safety_stock * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER, last_two_month_sold * SIMPLIFIED_SKU_RECEIVE_MULTIPLIER)
+        if total_available >= cap:
+            continue
+        needed_qty = cap - total_available
+        if needed_qty <= 0:
+            continue
+        destinations.append(make_dest(row, needed_qty, 1, '精簡SKU接收', cap,
+                                       max_receive_qty=needed_qty))
+    destinations.sort(key=lambda x: x['priority'])
+    return destinations
 
 
 class SimplifiedSKUStrategy(BaseMatchStrategy):
+    def identify_sources(
+        self,
+        group_df: pd.DataFrame,
+        mode: str,
+        protected_sites: Optional[set] = None,
+    ) -> List[Dict[str, Any]]:
+        return identify_sources_simplified_sku(group_df)
+
+    def identify_destinations(
+        self,
+        group_df: pd.DataFrame,
+        mode: str,
+    ) -> List[Dict[str, Any]]:
+        return identify_destinations_simplified_sku(group_df)
+
     def match(
         self,
         sources: List[Dict[str, Any]],

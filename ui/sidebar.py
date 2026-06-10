@@ -9,10 +9,27 @@ from typing import Dict, Optional
 from config import VERSION
 from models.mode import MODE_DESCRIPTIONS
 from models.mode_registry import get_ui_options, get_receive_limit_codes
+from services.perf_timer import ENABLE_PERF, get_perf_records, clear_perf_records
 from ui.mojibake import fix_mojibake_text
 
 
 _MODE_OPTIONS = get_ui_options()
+
+
+def _render_perf_panel():
+    if not ENABLE_PERF:
+        return
+    records = get_perf_records()
+    if not records:
+        return
+    with st.expander("⏱ 效能面板", expanded=False):
+        total = sum(r['elapsed'] for r in records)
+        st.markdown(f"**總耗時：{total:.3f}s**（共 {len(records)} 次呼叫）")
+        for r in records:
+            st.markdown(f"- `{r['label']}` — {r['elapsed']:.3f}s")
+        if st.button("清除效能記錄", key="_clear_perf"):
+            clear_perf_records()
+            st.rerun()
 
 
 def render_sidebar() -> Dict:
@@ -382,6 +399,8 @@ def render_sidebar() -> Dict:
 
         st.markdown("---")
         st.caption(f"更新時間: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+        _render_perf_panel()
 
     return {
         'mode_code': mode_code,

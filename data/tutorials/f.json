@@ -1,0 +1,401 @@
+[
+  {
+    "code": "F",
+    "name": "目標優化",
+    "risk": "中",
+    "scenario": "有明確接收目標量（Target），需要按指定數量分配到指定店舖",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "ND 店舖<br>Target&gt;0 &#10132; 接收方<br>否則全數轉出",
+            "color": "blue"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": ""
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "RF 店舖<br>可轉出(保護最高銷量店)",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "1&#65039;&#8419; Target&gt;0<br>直接按Target接收<br>不論ND/RF",
+            "color": "purple"
+          },
+          {
+            "type": "node",
+            "text": "2&#65039;&#8419; 無Target且庫存&#8804;1<br>補0邏輯(僅RF)",
+            "color": "orange"
+          }
+        ]
+      }
+    ],
+    "match_order": [
+      [
+        "F模式ND/RF轉出",
+        "F模式目標接收"
+      ],
+      [
+        "F模式ND/RF轉出",
+        "重點補0"
+      ]
+    ],
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "類型",
+        "Net Stock",
+        "Target",
+        "角色",
+        "調撥量"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "RF",
+          "15",
+          "-",
+          "轉出(F模式RF)",
+          "-8"
+        ],
+        [
+          "HD002",
+          "ND",
+          "5",
+          "-",
+          "轉出(F模式ND)",
+          "-5"
+        ],
+        [
+          "HD003",
+          "RF",
+          "2",
+          "5",
+          "接收(目標)",
+          "+5"
+        ],
+        [
+          "HD004",
+          "ND",
+          "0",
+          "3",
+          "接收(目標ND也可收)",
+          "+3"
+        ],
+        [
+          "HD005",
+          "RF",
+          "0",
+          "-",
+          "接收(補0)",
+          "+3"
+        ]
+      ]
+    },
+    "extra_notes": "F 模式打破 ND 不可接收限制（僅限有 Target 的 ND 店舖）。Target 數量直接作為接收量。跨 OM 允許。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。",
+    "diff_table": {
+      "headers": [
+        "對比項",
+        "F",
+        "F2"
+      ],
+      "rows": [
+        [
+          "Target 店接收",
+          "是",
+          "是"
+        ],
+        [
+          "非Target補0",
+          "是(庫存&#8804;1的RF)",
+          "否"
+        ],
+        [
+          "ND可接收",
+          "有Target時可",
+          "有Target時可"
+        ],
+        [
+          "Windy目標優先",
+          "否",
+          "是"
+        ],
+        [
+          "HD轉出選項",
+          "預設限制",
+          "可設定允許"
+        ]
+      ]
+    }
+  },
+  {
+    "code": "F2",
+    "name": "F指定模式",
+    "risk": "中",
+    "scenario": "需要集中補貨到指定 Target 店舖，非 Target 店舖完全不接收",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 F 模式轉出邏輯",
+            "color": "green"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "僅Target接收"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "Target&gt;0 的店舖<br>直接按Target接收<br>不論ND/RF",
+            "color": "purple"
+          },
+          {
+            "type": "node",
+            "text": "無Target的店舖<br>完全不接收",
+            "color": "gray"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "Windy目標店<br>優先從同OM<br>無Target Windy提取",
+            "color": "orange"
+          }
+        ]
+      }
+    ],
+    "match_order": [
+      [
+        "F模式ND/RF轉出",
+        "F指定模式目標接收"
+      ]
+    ],
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "類型",
+        "Target",
+        "F 模式",
+        "F2 模式"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "RF",
+          "5",
+          "接收(目標)",
+          "接收(目標)"
+        ],
+        [
+          "HD002",
+          "ND",
+          "3",
+          "接收(目標ND)",
+          "接收(目標ND)"
+        ],
+        [
+          "HD003",
+          "RF",
+          "-",
+          "接收(補0)",
+          "不接收"
+        ],
+        [
+          "HD004",
+          "RF",
+          "-",
+          "不接收",
+          "不接收"
+        ]
+      ]
+    },
+    "extra_notes": "F2 = 僅 Target 店接收。Windy 目標店優先從同 OM 無 Target Windy 店提取。可設定 HD 可轉出（最後優先）。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。",
+    "diff_table": null
+  },
+  {
+    "code": "F3",
+    "name": "目標性補0",
+    "risk": "中",
+    "scenario": "需要集中補貨到指定 Target 店舖，同時確保 RF 轉出店保留最低庫存（不低於2件），且 RF 跨 OM 同 OM 同等優先",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "ND 店舖<br>全數轉出",
+            "color": "blue"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "F3"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "RF 店舖<br>轉出後保留2件<br>最高庫存優先轉出<br>跨OM不降級",
+            "color": "green"
+          },
+          {
+            "type": "node",
+            "text": "保護最高銷量RF<br>不轉出",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 F2<br>僅 Target>0 店<br>直接按Target接收",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": [
+      [
+        "F模式ND轉出",
+        "F指定模式目標接收"
+      ],
+      [
+        "F3模式RF轉出(保留2件)",
+        "F指定模式目標接收"
+      ]
+    ],
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "類型",
+        "Net Stock",
+        "Target",
+        "F2 轉出量",
+        "F3 轉出量",
+        "角色"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "RF",
+          "10",
+          "-",
+          "10",
+          "8",
+          "F3保留2件轉出"
+        ],
+        [
+          "HD002",
+          "RF",
+          "3",
+          "-",
+          "3",
+          "1",
+          "F3可轉1件"
+        ],
+        [
+          "HD003",
+          "RF",
+          "2",
+          "-",
+          "2",
+          "0",
+          "F3庫存≤2不轉"
+        ],
+        [
+          "HD004",
+          "ND",
+          "5",
+          "-",
+          "5",
+          "5",
+          "ND全轉"
+        ],
+        [
+          "HD005",
+          "RF",
+          "5",
+          "8",
+          "-",
+          "-",
+          "Target保護不轉"
+        ]
+      ]
+    },
+    "extra_notes": "F3 = F2 + RF轉出保留2件 + RF最高庫存優先轉出 + RF跨OM不降級。HD轉出選項、Windy目標優先同F2。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。",
+    "diff_table": {
+      "headers": [
+        "對比項",
+        "F2",
+        "F3"
+      ],
+      "rows": [
+        [
+          "RF轉出量",
+          "net_stock全轉",
+          "max(net_stock-2, 0)"
+        ],
+        [
+          "RF排序",
+          "銷量低優先",
+          "最高庫存優先→銷量低"
+        ],
+        [
+          "RF跨OM",
+          "降級(tier+1)",
+          "不降級(同OM同等)"
+        ],
+        [
+          "Target接收",
+          "僅Target",
+          "僅Target"
+        ],
+        [
+          "HD轉出選項",
+          "可設定",
+          "可設定"
+        ],
+        [
+          "Windy目標優先",
+          "是",
+          "是"
+        ]
+      ]
+    }
+  }
+]

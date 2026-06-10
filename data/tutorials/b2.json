@@ -1,0 +1,373 @@
+[
+  {
+    "code": "B2",
+    "name": "附加B特別模式",
+    "risk": "中",
+    "scenario": "有 Type=L 特殊店舖需優先清出，接收端需依遊客區/混合型店舖優先排序",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "ND 店舖",
+            "color": "blue"
+          },
+          {
+            "type": "node",
+            "text": "Type=L 且銷量&#8804;2<br>&#10132; 全數轉出",
+            "color": "orange"
+          },
+          {
+            "type": "node",
+            "text": "其他 RF<br>&#10132; 50%上限",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "1&#65039;&#8419; Type T<br>高銷量優先",
+            "color": "purple"
+          },
+          {
+            "type": "node",
+            "text": "2&#65039;&#8419; Type M<br>高銷量優先",
+            "color": "purple"
+          },
+          {
+            "type": "node",
+            "text": "3&#65039;&#8419; Type T<br>Safety優先",
+            "color": "green"
+          },
+          {
+            "type": "node",
+            "text": "4&#65039;&#8419; Type M<br>Safety優先",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "match_order": [
+      [
+        "ND轉出",
+        "緊急缺貨"
+      ],
+      [
+        "ND轉出",
+        "潛在缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "緊急缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "潛在缺貨"
+      ],
+      [
+        "Local店舖全轉出",
+        "緊急缺貨"
+      ],
+      [
+        "Local店舖全轉出",
+        "潛在缺貨"
+      ],
+      [
+        "RF加強轉出",
+        "緊急缺貨"
+      ],
+      [
+        "RF加強轉出",
+        "潛在缺貨"
+      ]
+    ],
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "Type",
+        "Net Stock",
+        "Safety",
+        "銷量",
+        "角色",
+        "調撥量"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "L",
+          "8",
+          "4",
+          "1",
+          "轉出(Local全轉出)",
+          "8"
+        ],
+        [
+          "HD002",
+          "T",
+          "0",
+          "4",
+          "6",
+          "接收(T高銷量)",
+          "+3"
+        ],
+        [
+          "HD003",
+          "M",
+          "2",
+          "4",
+          "4",
+          "接收(M高銷量)",
+          "+3"
+        ],
+        [
+          "HD004",
+          "RF",
+          "10",
+          "4",
+          "5",
+          "轉出(RF過剩)",
+          "5"
+        ]
+      ]
+    },
+    "extra_notes": "Mix 店舖保護：若出貨店 Type=M 且總銷量 &gt; 目標店總銷量，該配對被取消。接收上限 Safety&#215;2",
+    "diff_table": {
+      "headers": [
+        "對比項",
+        "B2",
+        "B2a",
+        "B2L",
+        "B2La"
+      ],
+      "rows": [
+        [
+          "Type=L低銷量",
+          "全數轉出",
+          "全數轉出",
+          "保留2件後轉出",
+          "保留2件後轉出"
+        ],
+        [
+          "Type=T出貨",
+          "可",
+          "不可",
+          "可",
+          "不可"
+        ],
+        [
+          "Mix保護",
+          "有",
+          "有",
+          "有",
+          "有"
+        ]
+      ]
+    }
+  },
+  {
+    "code": "B2a",
+    "name": "附加B2a特別模式（T遊客鋪不出貨）",
+    "risk": "中",
+    "scenario": "與 B2 相同場景，但額外要求 Type=T（遊客鋪）不可作為出貨來源",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "Type=T？<br>&#10132; 不可出貨",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "ND 店舖",
+            "color": "blue"
+          },
+          {
+            "type": "node",
+            "text": "Type=L 且銷量&#8804;2<br>&#10132; 全數轉出",
+            "color": "orange"
+          },
+          {
+            "type": "node",
+            "text": "其他 RF<br>&#10132; 50%上限",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 B2 接收優先級",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": null,
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "Type",
+        "Net Stock",
+        "角色",
+        "說明"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "T",
+          "10",
+          "不出貨",
+          "Type=T 被排除"
+        ],
+        [
+          "HD002",
+          "L",
+          "8",
+          "轉出(Local全轉出)",
+          "Type=L 銷量&#8804;2"
+        ],
+        [
+          "HD003",
+          "T",
+          "0",
+          "接收(T高銷量)",
+          "遊客區接收優先"
+        ]
+      ]
+    },
+    "extra_notes": "B2a 在 B2 基礎上唯一差異：Type=T 店舖不可作為 source",
+    "diff_table": null
+  },
+  {
+    "code": "B2L",
+    "name": "附加B2L特別模式（Type=L保留2件）",
+    "risk": "中",
+    "scenario": "與 B2 相同場景，但 Type=L 低銷量店舖不全轉出，改為保留 2 件",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "ND 店舖",
+            "color": "blue"
+          },
+          {
+            "type": "node",
+            "text": "Type=L 且銷量&#8804;2<br>&#10132; 保留2件後轉出<br>max(Net-2, 0)",
+            "color": "orange"
+          },
+          {
+            "type": "node",
+            "text": "其他 RF<br>&#10132; 50%上限",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 B2 接收優先級",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": null,
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "Type",
+        "Net Stock",
+        "銷量",
+        "B2 轉出量",
+        "B2L 轉出量"
+      ],
+      "rows": [
+        [
+          "HD001",
+          "L",
+          "8",
+          "1",
+          "8(全轉)",
+          "6(保留2)"
+        ],
+        [
+          "HD002",
+          "L",
+          "2",
+          "0",
+          "2(全轉)",
+          "0(不轉)"
+        ]
+      ]
+    },
+    "extra_notes": "B2L 與 B2 差異僅在 Type=L 低銷量規則：B2 全轉出，B2L 保留 2 件後才轉出",
+    "diff_table": null
+  },
+  {
+    "code": "B2La",
+    "name": "附加B2La特別模式（Type=L保留2件 + T不出貨）",
+    "risk": "中",
+    "scenario": "結合 B2L（Type=L 保留 2 件）和 B2a（Type=T 不出貨）的限制",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "Type=T？<br>&#10132; 不可出貨",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "ND 店舖",
+            "color": "blue"
+          },
+          {
+            "type": "node",
+            "text": "Type=L 且銷量&#8804;2<br>&#10132; 保留2件後轉出",
+            "color": "orange"
+          },
+          {
+            "type": "node",
+            "text": "其他 RF<br>&#10132; 50%上限",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "同 B2 接收優先級",
+            "color": "purple"
+          }
+        ]
+      }
+    ],
+    "match_order": null,
+    "scenario_table": null,
+    "extra_notes": "B2La = B2L + B2a 的限制合併：Type=L 保留 2 件 + Type=T 不可出貨",
+    "diff_table": null
+  }
+]

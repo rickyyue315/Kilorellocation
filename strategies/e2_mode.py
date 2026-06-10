@@ -11,12 +11,12 @@ from strategies.predicates import validate_pair, is_hd_to_hk_restricted
 
 
 def _make_source(row, transferable_qty: int, priority: int, source_type: str, **extra) -> Dict:
-    from business_logic import _make_source as _bl_make_source
+    from services.source_dest_factory import make_source as _bl_make_source
     return _bl_make_source(row, transferable_qty, priority, source_type, **extra)
 
 
 def _compute_max_protected_sold(df) -> float:
-    from business_logic import _compute_max_protected_sold as _bl_compute
+    from services.source_dest_factory import compute_max_protected_sold as _bl_compute
     return _bl_compute(df)
 
 
@@ -24,6 +24,14 @@ class E2ModeStrategy(BaseMatchStrategy):
     def __init__(self, create_note=None, max_receive_sites_per_source=None):
         super().__init__(create_note)
         self._max_receive_sites_per_source = max_receive_sites_per_source
+
+    def identify_sources(self, group_df, mode, protected_sites=None):
+        from strategies.e1_mode import identify_sources_e_mode
+        return identify_sources_e_mode(group_df)
+
+    def identify_destinations(self, group_df, mode):
+        from strategies.e1_mode import identify_destinations_e_mode
+        return identify_destinations_e_mode(group_df, mode, mode_e1b="強制轉出(優先類型接收)")
 
     def match(
         self,
