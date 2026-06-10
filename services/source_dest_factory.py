@@ -28,6 +28,7 @@ def make_source(row, transferable_qty: int, priority: int, source_type: str, **e
         'last_month_sold_qty': int(row['Last Month Sold Qty']) if pd.notna(row.get('Last Month Sold Qty', 0)) else 0,
         'mtd_sold_qty': int(row['MTD Sold Qty']) if pd.notna(row.get('MTD Sold Qty', 0)) else 0,
         'last_2_month_sold_qty': safe_get_last2m(row),
+        'safety_stock': int(row['Safety Stock']) if pd.notna(row.get('Safety Stock', 0)) else 0,
         'supply_source': row.get('Supply source'),
     }
     source.update(extra)
