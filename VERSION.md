@@ -1,5 +1,33 @@
 # 版本更新記錄
 
+## v2.24.0 (2026-06-10)
+
+### C1 模式新增每店轉出件數上限滑塊（3~10 件，自選）
+
+#### 變更說明
+- C1 模式新增 UI 滑塊：可在側邊欄設定每間 RF 源店的轉出件數上限（`c1_ceiling`，範圍 3~10，預設 3）
+- 原本轉出上限固定為 3 件（30% total_available 比例上限不變），現改為可調
+- 提高每店轉出上限可直接減少調出店舖總數量（source 越少，拆單越集中）
+- 預設值 3 完整向後兼容原有行為
+
+#### 修改檔案
+- `config.py` — 新增 `C1_MODE_DEFAULT_CEILING = 3`；版本號 bump 至 v2.24.0
+- `models/mode_registry.py` — C1 ModeDef extra_ui_options 新增 `c1_ceiling`
+- `ui/sidebar.py` — 新增 C1 件數上限滑塊（st.slider, 3~10, 預設 3），更新 C1 描述文字、return dict
+- `app.py` — 提取 `c1_ceiling` 選項、傳入 `TransferLogic` 建構子、加入 run_key
+- `business_logic.py` — 新增 `c1_ceiling` 參數（預設 3），`_compute_rf_transferable` 中 C1 模式 `C_MODE_ABS_CAP` 改為 `self.c1_ceiling`
+
+#### 文件同步
+- `README.md` — 模式列表、功能亮點、模式對照表更新
+- `VERSION.md` — 本版本記錄
+- `config.py` — 版本號 bump 至 v2.24.0
+- `app.py` — docstring 版本更新
+- `ui/tutorial.py` — C1 教學內容更新（流程圖文字、extra_notes、diff_table）
+- `調貨模式詳解.txt` — C1 轉出規則更新、關鍵差異對比表更新
+- `transfer_logic_ai_brief.md` — C1 模式說明更新
+
+---
+
 ## v2.23.0 (2026-06-09)
 
 ### F/F2/F3 模式 Target 達成改善（優先滿足小型目標 + 配對後缺口填補 + Target達成分析）

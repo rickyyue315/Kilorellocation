@@ -1,5 +1,5 @@
 """
-業務邏輯模組 v2.21.0
+業務邏輯模組 v2.22.0
 實現調貨規則、源/目的地識別和匹配算法
 支持二十七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 """
@@ -13,7 +13,7 @@ from config import (
     A_MODE_PERCENTAGE_CAP, A_MODE_MIN_TRANSFER,
     B_MODE_PERCENTAGE_CAP, B_MODE_MIN_TRANSFER,
     C_MODE_PERCENTAGE_CAP, C_MODE_ABS_CAP,
-    C1_MODE_MIN_TRANSFER,
+    C1_MODE_MIN_TRANSFER, C1_MODE_DEFAULT_CEILING,
     SAFETY_RECEIVE_MULTIPLIER, MIN_RECEIVE_FLOOR,
     F_TARGET_MULTIPLIER, F_TARGET_FLOOR,
     SIMPLIFIED_SKU_RECEIVE_MULTIPLIER,
@@ -60,12 +60,13 @@ logger = logging.getLogger(__name__)
 
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.21.0"""
+    """調貨業務邏輯類 v2.22.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False,
                  d2_enable_2site_limit: bool = False,
                  c1_threshold: int = 1,
+                 c1_ceiling: int = C1_MODE_DEFAULT_CEILING,
                  f_fulfill_small_first: bool = False):
         self.transfer_recommendations = []
         self.quality_check_passed = True
@@ -78,6 +79,7 @@ class TransferLogic:
         self.f2_allow_hd_transfer = f2_allow_hd_transfer
         self.d2_enable_2site_limit = d2_enable_2site_limit
         self.c1_threshold = c1_threshold
+        self.c1_ceiling = c1_ceiling
         self.f_fulfill_small_first = f_fulfill_small_first
         self._mode_by_name = {d.name: d for d in MODE_DEFS}
         self._mode_by_code = {d.code: d for d in MODE_DEFS}
@@ -225,7 +227,7 @@ class TransferLogic:
                 return None
 
             ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
-            abs_cap = C_MODE_ABS_CAP
+            abs_cap = self.c1_ceiling if mode == self.mode_c1 else C_MODE_ABS_CAP
             capped_ratio = max(ratio_cap, 0)
             raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
             upper_limit = max(2, raw_upper) if mode == self.mode_c1 else max(1, raw_upper)

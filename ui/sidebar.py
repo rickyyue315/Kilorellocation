@@ -182,12 +182,19 @@ def render_sidebar() -> Dict:
                 d2_enable_2site_limit = True
 
         c1_threshold = 1
+        c1_ceiling = 3
         if mode_code == "C1":
             c1_threshold = st.number_input(
                 "C1 補0門檻（補 total_available ≤ N 的店舖）",
                 min_value=0, max_value=100, value=1, step=1,
                 key='c1_threshold',
                 help="設定 C1 模式補0門檻：只補充總庫存（SaSa Net Stock + Pending Received）小於或等於此值的店舖。預設值 1 等同原有行為。"
+            )
+            c1_ceiling = st.slider(
+                "C1 每店轉出件數上限",
+                min_value=3, max_value=10, value=3, step=1,
+                key='c1_ceiling',
+                help="限制 C1 模式每間源店最多轉出的件數。提高此值可減少調出店舖總數量。預設 3 等同原有行為。"
             )
 
         st.caption(MODE_DESCRIPTIONS.get(transfer_mode, ""))
@@ -266,6 +273,7 @@ def render_sidebar() -> Dict:
             - 不回落到一般缺貨補貨（緊急缺貨、潛在缺貨）
             - 轉出門檻：淨庫存必須>2才可轉出
             - 轉出量下限：至少2件才參與配對
+            - 每店轉出上限可調（3~10件，預設3），提高上限可減少調出店舖總數
             - 優先使用可轉量較大的來源（減少拆單）
             
             **C2模式(附加C跨OM重點補0)**
@@ -386,7 +394,7 @@ def render_sidebar() -> Dict:
             
             **特殊條件:**
             - C/C2模式：當(SaSa Net Stock+Pending Received)≤1時,補充至Safety或MOQ+1(取最低值)
-            - C1模式：僅處理total_available≤N的店舖（N可於側邊欄設定），不回落一般缺貨補貨
+            - C1模式：僅處理total_available≤N的店舖（N可於側邊欄設定），每店轉出上限可調3~10件，不回落一般缺貨補貨
             - D/D2模式：避免1件餘貨規則(D2僅ND清貨轉出，RF不轉出)
             - E1模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM)
             - E1b模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM，優先Type=T/M)
@@ -410,5 +418,6 @@ def render_sidebar() -> Dict:
         'f2_allow_hd_transfer': f2_allow_hd_transfer,
         'd2_enable_2site_limit': d2_enable_2site_limit,
         'c1_threshold': c1_threshold,
+        'c1_ceiling': c1_ceiling,
         'f_fulfill_small_first': f_fulfill_small_first,
     }

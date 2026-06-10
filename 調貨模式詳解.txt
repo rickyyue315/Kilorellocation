@@ -307,7 +307,7 @@ upper_limit = max(1, min(ratio_cap, abs_cap))
 
 **轉出規則（與 C 模式的差異）：**
 1. 前置條件：`SaSa Net Stock > 2`（C 模式僅要求 `total_available > Safety Stock`）
-2. 上限：30% total_available，最多 3 件，**最少 2 件**（C 模式最少 1 件）
+2. 上限：30% total_available，**最多 N 件（可於側邊欄設定 3~10，預設 3）**，最少 2 件（C 模式最少 1 件）
 3. 過濾：`actual_transferable < 2` 的來源直接跳過
 4. 排序：優先選用可轉量較大的來源（按 transferable_qty 降序）
 
@@ -845,7 +845,7 @@ statistics = {
 | 9 | B3L | 附加B3L(跨OM+L保留2件) | ✅ | 同B3 | Type=L保留2件 | 可下探 | 同B3 | Safety×2 | B3+Type=L保留2件+Mix保護 | 跨OM特殊Type(L保留2件) | 跨OM(HD/Windy) |
 | 10 | B3La | 附加B3La(跨OM+L保留2+T不出貨) | ✅ | 同B3L | 同B3L | 可下探 | 同B3 | Safety×2 | B3L+Type=T不出貨+Mix保護 | 跨OM(L保留2+排除T) | 跨OM(HD/Windy) |
 | 11 | C | 重點補0 | ❌ | 30% | 最多3件 | 可下探 | RF過剩+RF加強轉出 | Safety Stock | 累計接收追蹤 | 重點補貨 | 標準配對 |
-| 12 | C1 | 重點補0-只補0/1 | ❌ | 30% | 最多3件 | 可下探 | RF過剩+RF加強轉出 | Safety Stock | 僅補≤N+不回落（N可自訂） | 精準補零庫存/低庫存 | 標準配對 |
+| 12 | C1 | 重點補0-只補0/1 | ❌ | 30% | 最多3-10件（可自訂） | 可下探 | RF過剩+RF加強轉出 | Safety Stock | 僅補≤N+不回落（N可自訂） | 精準補零庫存/低庫存 | 標準配對 |
 | 13 | C2 | 附加C2(跨OM重點補0) | ✅ | 30% | 最多3件 | 可下探 | RF過剩+RF加強轉出 | Safety Stock | 跨OM+HD/Windy限制 | 跨OM重點補貨 | 跨OM(HD/Windy) |
 | 14 | D | 清貨轉貨 | ❌ | 無限制 | 全部庫存 | 不適用(ND) | ND清貨轉出 | Safety Stock | 避免1件餘貨 | 清貨處理 | 標準配對 |
 | 15 | D2 | 清貨轉貨(ND限定) | ❌ | 無限制 | 全部庫存 | 不適用(ND) | ND清貨轉出 | Safety Stock | 僅ND清貨+避免1件餘貨 | 僅ND清貨 | 標準配對 |

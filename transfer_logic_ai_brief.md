@@ -135,19 +135,23 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Track cumulative received to reach targets
 - Goal: focus on near-zero stock stores
 
-## Mode C1: Priority Zero Stock (Configurable Threshold)
+## Mode C1: Priority Zero Stock (Configurable Threshold + Ceiling)
 - Source rules: same as Mode C (RF Surplus + RF Enhanced), but stricter:
   - Pre-condition: `SaSa Net Stock > 2` (vs C's `total_available > Safety Stock`)
   - Minimum transferable: 2 units (vs C's 1 unit)
   - Sources with transferable qty < 2 are skipped
   - Source priority: sorted by transferable qty descending (largest sources first)
+- Transferable qty cap per source:
+  - Ratio cap: 30% of Total Available
+  - Absolute cap: configurable via sidebar slider (3~10, default 3)
+  - Upper limit = max(2, min(30% × TA, configurable_ceiling))
 - Destination rules: **only** total_available <= threshold (configurable via sidebar, default=1)
   - Threshold N is set via UI (st.number_input, range 0-100, default 1)
   - Does NOT fall back to Emergency or Potential Replenishment
   - Target Qty = max(Safety Stock * 0.5, 3)
   - Needed Qty = Target Qty - Total Available
 - Grouping: by Article + OM (same as C)
-- Goal: precise zero/low-stock replenishment only, without triggering general shortage logic
+- Goal: precise zero/low-stock replenishment only, without triggering general shortage logic. Higher ceiling = fewer source stores required per SKU.
 
 ## Mode C2: Cross-OM Priority Zero
 - Same source/destination logic as Mode C

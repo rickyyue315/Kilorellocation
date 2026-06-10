@@ -66,7 +66,7 @@ MODE_DEFS: List[ModeDef] = [
     ModeDef("C1", "重點補0-只補0/1 (或自選數量)", "僅補total_available≤N（N可自訂），不回落一般缺貨",
             attr_name="mode_c1",
             dest_method='_dests_c1_mode', source_filter=False,
-            extra_ui_options=frozenset({'c1_threshold'})),
+            extra_ui_options=frozenset({'c1_threshold', 'c1_ceiling'})),
     ModeDef("C2", "附加C2(跨OM重點補0)", "C模式 + 跨OM配對",
             attr_name="mode_c2",
             cross_om_grouping=True, cross_om_matching=True, source_filter=True,
