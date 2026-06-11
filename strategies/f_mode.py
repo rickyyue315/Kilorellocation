@@ -88,6 +88,8 @@ def identify_destinations_f_mode(
     destinations: List[Dict] = []
     target_series = parse_target_series(group_df)
 
+    seen_target_sites = set()
+
     for idx, row in group_df.iterrows():
         total_available = row['SaSa Net Stock'] + row['Pending Received']
         target_value = target_series.loc[idx]
@@ -95,6 +97,10 @@ def identify_destinations_f_mode(
 
         if pd.notna(target_value) and target_value > 0:
             target_qty = int(target_value)
+            site_key = str(row['Site']).strip().upper()
+            if site_key in seen_target_sites:
+                continue
+            seen_target_sites.add(site_key)
             dest_type = 'F指定模式目標接收' if mode in (mode_f_target_only, mode_f3) else 'F模式目標接收'
             destinations.append(make_dest(row, target_qty, 1, dest_type, target_qty))
             continue
@@ -183,6 +189,8 @@ class FModeStrategy(BaseMatchStrategy):
             windy_penalty = 0
             if dest_om == 'Windy' and src.get('om') != 'Windy':
                 windy_penalty = 5
+            if is_f3:
+                return (tier + hd_penalty + windy_penalty, -src.get('original_stock', 0), src.get('effective_sold_qty', 0))
             if self._f_fulfill_small_first:
                 return (tier + hd_penalty + windy_penalty, -src.get('transferable_qty', 0))
             return (tier + hd_penalty + windy_penalty, src.get('effective_sold_qty', 0))
@@ -248,21 +256,18 @@ class FModeStrategy(BaseMatchStrategy):
 
         self._log_match_stats(recommendations, temp_sources, temp_destinations, article, mode)
 
-        self._post_match_gap_fill(recommendations, temp_sources, temp_destinations, article, product_desc, mode, received_qty_by_site)
+        self._post_match_gap_fill(recommendations, temp_sources, temp_destinations, article, product_desc, mode, received_qty_by_site, transfer_sites)
 
         return recommendations
 
     def _post_match_gap_fill(self, recommendations, temp_sources, temp_destinations,
-                              article, product_desc, mode, received_qty_by_site):
+                              article, product_desc, mode, received_qty_by_site, transfer_sites):
         gap_dests = [d for d in temp_destinations
-                     if d.get('target_qty') is not None and d.get('target_qty', 0) > 0
+                     if d.get('priority') == 1
+                     and d.get('target_qty') is not None and d.get('target_qty', 0) > 0
                      and d.get('needed_qty', 0) > 0]
 
         if not gap_dests:
-            return
-
-        leftover_sources = [s for s in temp_sources if s.get('transferable_qty', 0) > 0]
-        if not leftover_sources:
             return
 
         is_f2 = (mode == "F指定模式")
@@ -273,12 +278,28 @@ class FModeStrategy(BaseMatchStrategy):
             if dest['needed_qty'] <= 0:
                 continue
 
+            receive_site_key = f"{dest['site']}_{article}"
+            current_received = received_qty_by_site.get(receive_site_key, 0)
+            if current_received >= dest['target_qty']:
+                dest['needed_qty'] = 0
+                continue
+
+            leftover_sources = [s for s in temp_sources if s.get('transferable_qty', 0) > 0]
+
             for src in sorted(leftover_sources, key=lambda s: -s['transferable_qty']):
                 if src['transferable_qty'] <= 0 or dest['needed_qty'] <= 0:
                     continue
 
-                transfer_qty = min(src['transferable_qty'], dest['needed_qty'])
-                if transfer_qty <= 0:
+                if src['site'] == dest['site']:
+                    continue
+
+                if dest['site'] in transfer_sites:
+                    continue
+
+                if not validate_pair(src, dest, transfer_sites,
+                                     check_nd_receive=False,
+                                     check_source_in_receive_sites=False,
+                                     cross_om=False):
                     continue
 
                 if is_hd_to_hk_restricted(src['site'], dest['site']):
@@ -288,8 +309,9 @@ class FModeStrategy(BaseMatchStrategy):
                 if src.get('om') == 'Windy' and dest.get('om') != 'Windy':
                     continue
 
-                receive_site_key = f"{dest['site']}_{article}"
-                current_received = received_qty_by_site.get(receive_site_key, 0)
+                transfer_qty = min(src['transferable_qty'], dest['needed_qty'])
+                if transfer_qty <= 0:
+                    continue
 
                 notes = (self._create_note(src, dest, current_received, transfer_qty, mode)
                          if self._create_note else "")
@@ -298,12 +320,8 @@ class FModeStrategy(BaseMatchStrategy):
                 )
                 recommendations.append(recommendation)
 
-                src['transferable_qty'] -= transfer_qty
-                src['total_transferred'] = src.get('total_transferred', 0) + transfer_qty
-                dest['needed_qty'] -= transfer_qty
-                dest['received_qty'] = dest.get('received_qty', 0) + transfer_qty
-                received_qty_by_site[receive_site_key] = current_received + transfer_qty
+                apply_transfer(src, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received)
+                current_received = received_qty_by_site[receive_site_key]
 
-                if (dest.get('target_qty') is not None
-                        and received_qty_by_site[receive_site_key] >= dest['target_qty']):
+                if dest.get('target_qty') is not None and current_received >= dest['target_qty']:
                     dest['needed_qty'] = 0

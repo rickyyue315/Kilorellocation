@@ -34,7 +34,7 @@ class TestHighPriority:
         assert assign_priority(_make_rec({'Source Priority': 1})) == '🔴高優先'
 
     def test_source_priority_2(self):
-        assert assign_priority(_make_rec({'Source Priority': 2})) == '🔴高優先'
+        assert assign_priority(_make_rec({'Source Priority': 2})) == '🟢低優先'
 
     def test_dest_priority_1(self):
         assert assign_priority(_make_rec({'Destination Priority': 1})) == '🔴高優先'
@@ -103,7 +103,7 @@ class TestEdgeCases:
         assert assign_priority(_make_rec({
             'Source Priority': 2,
             'Transfer Qty': 10,
-        })) == '🔴高優先'
+        })) == '🟢低優先'
 
     def test_medium_beats_low_on_qty(self):
         assert assign_priority(_make_rec({'Transfer Qty': 30})) != '🟢低優先'

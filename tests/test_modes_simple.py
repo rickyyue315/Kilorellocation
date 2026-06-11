@@ -32,6 +32,8 @@ def _build_mock_df() -> pd.DataFrame:
         'MOQ': [1, 1, 1, 1, 1, 1] * 2,
         'Article Description': ['Test Product A'] * 6 + ['Test Product B'] * 6,
         'Type': ['L', 'L', 'R', 'R', 'M', 'T'] * 2,
+        'ALL': [''] * 12,
+        'Target': [''] * 12,
     }
     return pd.DataFrame(data)
 

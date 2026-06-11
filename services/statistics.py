@@ -108,7 +108,7 @@ def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]],
         target_qty = rec.get('Target Qty')
         if target_qty is None or target_qty <= 0:
             continue
-        key = (rec['Article'], rec['Receive Site'])
+        key = (rec['Article'], str(rec.get('Receive Site', '')).strip().upper())
         entry = fulfillment_map[key]
         entry['brand'] = rec.get('Brand') or rec.get('Product Hierarchy', '')
         entry['product_desc'] = rec.get('Product Desc', '')

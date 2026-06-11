@@ -25,7 +25,7 @@ class C2ModeStrategy(BaseMatchStrategy):
 
         temp_sources, temp_destinations = prep_temp_lists(sources, destinations)
 
-        transfer_sites = set([s['site'] for s in temp_sources if s['transferable_qty'] > 0])
+        transfer_sites = set()
         receive_sites = set()
         received_qty_by_site = {}
 
@@ -101,12 +101,23 @@ class C2ModeStrategy(BaseMatchStrategy):
                 receive_site_key = f"{dest['site']}_{article}"
                 current_received_qty = received_qty_by_site.get(receive_site_key, 0)
 
+                if dest.get('dest_type') == '重點補0' and 'target_qty' in dest:
+                    transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
+                    if transfer_qty <= 0:
+                        continue
+
+                if transfer_qty == 1 and source['transferable_qty'] >= 2:
+                    if source['source_type'] in ('ND轉出', 'ND清貨轉出', 'RF加強轉出', 'RF過剩轉出'):
+                        if dest['needed_qty'] >= 2:
+                            transfer_qty = 2
+
                 notes = _make_c2_note(source, dest, current_received_qty, transfer_qty)
                 recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received_qty)
                 recommendations.append(recommendation)
 
                 apply_transfer(source, dest, transfer_qty, received_qty_by_site, receive_site_key, current_received_qty)
 
+                transfer_sites.add(source['site'])
                 receive_sites.add(dest['site'])
 
                 if dest.get('dest_type') == '重點補0' and 'target_qty' in dest:

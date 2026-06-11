@@ -51,12 +51,19 @@ class SimplifiedSKUReturnD001Strategy(BaseMatchStrategy):
                 continue
 
             # RF僅1件不退回，避免浪費人力
-            if remaining == 1 and source['source_type'] == '精簡SKU RF轉出':
+            if remaining == 1 and source['source_type'] in ('精簡SKU RF轉出', '精簡SKU ND轉出'):
                 continue
 
             supply_source = source.get('supply_source')
-            if supply_source is not None and pd.notna(supply_source) and int(supply_source) in (1, 4):
-                continue
+            if supply_source is not None and pd.notna(supply_source):
+                try:
+                    supply_num = pd.to_numeric(supply_source, errors='coerce')
+                    if pd.notna(supply_num):
+                        supply_val = int(supply_num)
+                        if supply_val in (1, 4):
+                            continue
+                except (ValueError, TypeError):
+                    pass
 
             notes = f"精簡SKU(退D001)模式：{source['site']}轉出{remaining}件退回D001"
             rec = build_recommendation(

@@ -30,7 +30,7 @@ class TestModeDef:
 
 class TestModeDefsList:
     def test_count(self):
-        assert len(MODE_DEFS) == 26
+        assert len(MODE_DEFS) == 27
 
     def test_unique_codes(self):
         codes = [d.code for d in MODE_DEFS]
@@ -47,7 +47,7 @@ class TestModeDefsList:
 
 class TestRegistry:
     def test_registry_keyed_by_name(self):
-        assert len(REGISTRY) == 26
+        assert len(REGISTRY) == 27
         assert "保守轉貨" in REGISTRY
         assert "精簡SKU(跨OM)" in REGISTRY
 
@@ -74,7 +74,7 @@ class TestRegistry:
 class TestDerivedQueries:
     def test_get_all_mode_names(self):
         names = get_all_mode_names()
-        assert len(names) == 26
+        assert len(names) == 27
         assert "保守轉貨" in names
         assert "精簡SKU(限同OM)" in names
 
@@ -91,13 +91,13 @@ class TestDerivedQueries:
         assert 'd_family' in families
         assert len(families['d_family']) == 2
         assert 'nd_transfer' in families
-        assert len(families['nd_transfer']) == 2
+        assert len(families['nd_transfer']) == 3
         assert 'simplified_sku' in families
         assert len(families['simplified_sku']) == 3
 
     def test_get_ui_options(self):
         opts = get_ui_options()
-        assert len(opts) == 26
+        assert len(opts) == 27
         assert opts[0] == "A: 保守轉貨"
 
     def test_get_receive_limit_codes(self):
@@ -133,7 +133,7 @@ class TestDerivedQueries:
         assert "保守轉貨" not in names
         assert "強制轉出" in names
         assert "精簡SKU(限同OM)" in names
-        assert len(names) == 20
+        assert len(names) == 21
 
     def test_get_codes_needing_column(self):
         e_modes = get_codes_needing_column('ALL')
@@ -143,7 +143,7 @@ class TestDerivedQueries:
 
 class TestBackwardCompatModePy:
     def test_mode_name_map_count(self):
-        assert len(MODE_NAME_MAP) == 26
+        assert len(MODE_NAME_MAP) == 27
 
     def test_mode_name_map_a(self):
         assert MODE_NAME_MAP["A"] == "保守轉貨"
@@ -152,7 +152,7 @@ class TestBackwardCompatModePy:
         assert MODE_NAME_MAP["精簡SKU(限同OM)"] == "精簡SKU(限同OM)"
 
     def test_mode_descriptions_count(self):
-        assert len(MODE_DESCRIPTIONS) == 26
+        assert len(MODE_DESCRIPTIONS) == 27
 
     def test_receive_site_limit_codes(self):
         assert len(RECEIVE_SITE_LIMIT_MODE_CODES) == len(get_receive_limit_codes())

@@ -21,9 +21,10 @@ def _compute_max_protected_sold(df) -> float:
 
 
 class E2ModeStrategy(BaseMatchStrategy):
-    def __init__(self, create_note=None, max_receive_sites_per_source=None):
+    def __init__(self, create_note=None, max_receive_sites_per_source=None, c1_ceiling: int = C_MODE_ABS_CAP):
         super().__init__(create_note)
         self._max_receive_sites_per_source = max_receive_sites_per_source
+        self._c1_ceiling = c1_ceiling
 
     def identify_sources(self, group_df, mode, protected_sites=None):
         from strategies.e1_mode import identify_sources_e_mode
@@ -103,12 +104,10 @@ class E2ModeStrategy(BaseMatchStrategy):
                     continue
                 if not validate_pair(source, dest, transfer_sites,
                                      check_nd_receive=True,
-                                     check_source_in_receive_sites=False,
-                                     cross_om=False,
+                                     check_source_in_receive_sites=True,
+                                     cross_om=(source['om'] != dest['om']),
                                      source_to_receive_sites=source_to_receive_sites,
                                      max_receive_sites_per_source=max_receive_sites_per_source):
-                    continue
-                if is_hd_to_hk_restricted(source['site'], dest['site']):
                     continue
 
                 transfer_qty = min(source['transferable_qty'], dest['needed_qty'])
@@ -182,7 +181,7 @@ class E2ModeStrategy(BaseMatchStrategy):
                     continue
 
                 ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
-                abs_cap = C_MODE_ABS_CAP
+                abs_cap = self._c1_ceiling
                 capped_ratio = max(ratio_cap, 0)
                 raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
                 upper_limit = max(1, raw_upper)
@@ -205,9 +204,7 @@ class E2ModeStrategy(BaseMatchStrategy):
                 if not validate_pair(source, dest, transfer_sites, receive_sites,
                                      check_nd_receive=True,
                                      check_source_in_receive_sites=True,
-                                     cross_om=False):
-                    continue
-                if is_hd_to_hk_restricted(source['site'], dest['site']):
+                                     cross_om=(source['om'] != dest['om'])):
                     continue
 
                 receive_site_key = f"{dest['site']}_{article}"

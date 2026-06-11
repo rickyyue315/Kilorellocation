@@ -179,19 +179,21 @@ class TestSourcesGeneralRefactoring:
         assert len(type_l_sources) >= 0  # 可能有也可能沒有，取決於銷量
 
     def test_identify_nd_sources_method(self, sample_data):
-        """測試 _identify_nd_sources 方法"""
-        logic = TransferLogic()
-        nd_sources = logic._identify_nd_sources(sample_data, '保守轉貨', None)
+        """測試 identify_nd_sources 函數"""
+        from strategies.b_special import identify_nd_sources
+        import pandas as pd
+        type_series = pd.Series("", index=sample_data.index)
+        nd_sources = identify_nd_sources(sample_data, '保守轉貨', type_series, False, False, '')
         
         assert len(nd_sources) == 1
         assert nd_sources[0]['site'] == 'ND01'
 
     def test_identify_b_special_type_l_sources(self, sample_data):
-        """測試 _identify_b_special_type_l_sources 方法"""
-        logic = TransferLogic()
+        """測試 identify_b_special_type_l_sources 函數"""
+        from strategies.b_special import identify_b_special_type_l_sources
         type_series = sample_data['Type'].astype(str).str.upper()
-        type_l_sources = logic._identify_b_special_type_l_sources(
-            sample_data, '附加B(特別模式)', type_series
+        type_l_sources = identify_b_special_type_l_sources(
+            sample_data, '附加B(特別模式)', type_series, False
         )
         
         # RF03 是 Type=L，檢查是否被識別

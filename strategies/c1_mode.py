@@ -26,6 +26,8 @@ def identify_destinations_c1_mode(group_df: pd.DataFrame, threshold: int = 1) ->
             continue
         needed_qty = int(needed_qty)
         if needed_qty < 2:
+            if int(target_qty) - needed_qty < 2:
+                continue
             needed_qty = 2
         destinations.append(make_dest(row, needed_qty, 1, '重點補0', int(target_qty)))
     destinations.sort(key=lambda x: x['priority'])

@@ -49,12 +49,11 @@ def identify_destinations_nd_mode(group_df: pd.DataFrame) -> List[Dict]:
     nd_stores = group_df[group_df['RP Type'] == 'ND']
 
     for _, row in rf_stores.iterrows():
-        is_no_stock = int(row['SaSa Net Stock']) == 0
+        total_available = int(row['SaSa Net Stock']) + int(row['Pending Received'])
         has_sales = int(row['Effective Sold Qty']) > 0
-        if is_no_stock and has_sales:
-            needed_qty = int(row['Safety Stock'])
-            if needed_qty <= 0:
-                needed_qty = 2
+        if total_available == 0 and has_sales:
+            safety_stock = int(row['Safety Stock'])
+            needed_qty = safety_stock if safety_stock > 0 else 2
             destinations.append(make_dest(row, needed_qty, 1, 'RF緊急缺貨補貨', needed_qty,
                                            max_receive_qty=needed_qty,
                                            total_sales=int(row['Last Month Sold Qty']) + int(row['MTD Sold Qty'])))

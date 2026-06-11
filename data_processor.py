@@ -134,9 +134,15 @@ class DataProcessor:
             except Exception:
                 df = pd.read_excel(file_path_or_buffer, dtype=dtype_dict)
             
-            # 確保Article欄位為12位文本格式（補零不足12位；截斷超過12位）
+            # 驗證Article欄位為有效數字格式（1-12位數字）
             if 'Article' in df.columns:
-                df['Article'] = df['Article'].astype(str).str.zfill(12).str[-12:]
+                df['Article'] = df['Article'].astype(str).str.strip()
+                article_mask = df['Article'].str.match(r'^\d{1,12}$')
+                if not article_mask.all():
+                    invalid_articles = df.loc[~article_mask, 'Article'].unique()
+                    bad_count = int((~article_mask).sum())
+                    raise ValueError(f"Article欄位包含無效值（須為1-12位純數字），共 {bad_count} 筆。範例: {list(invalid_articles[:5])}")
+                df['Article'] = df['Article'].str.zfill(12)
             
             # 處理*ALL*欄位：無論大小寫，都轉換為標準化的'ALL'欄位
             all_column_names = [col for col in df.columns if col.upper() == 'ALL']
@@ -266,7 +272,10 @@ class DataProcessor:
         Returns:
             處理後的DataFrame
         """
-        df_processed = df
+        df_processed = df.copy()
+        
+        if 'Notes' not in df_processed.columns:
+            df_processed['Notes'] = ""
         
         # 處理整數欄位
         for col in self.integer_columns:
@@ -280,26 +289,28 @@ class DataProcessor:
                 # 填充空值為空字符串，並去除前後空白
                 df_processed[col] = df_processed[col].fillna("").astype(str).str.strip()
         
-        # 驗證RP Type欄位值
+        # 驗證RP Type欄位值（大小寫不敏感，先正規化再檢查）
         if 'RP Type' in df_processed.columns:
-            invalid_rp_types = ~df_processed['RP Type'].isin(['ND', 'RF'])
+            normalized_rp = df_processed['RP Type'].fillna("").astype(str).str.strip().str.upper()
+            invalid_rp_types = ~normalized_rp.isin(['ND', 'RF'])
             if invalid_rp_types.any():
+                blank_mask = normalized_rp == ''
                 invalid_values = df_processed.loc[invalid_rp_types, 'RP Type'].unique()
                 invalid_count = int(invalid_rp_types.sum())
-                logger.warning(f"發現無效的RP Type值: {invalid_values}，請檢查原始數據，已自動修正為RF")
-                df_processed.loc[invalid_rp_types, 'RP Type'] = 'RF'  # 默認設為RF
-                # 記錄至 Notes 欄位（供後續 preprocess_data 回傳 stats 並於界面顯示）
-                if 'Notes' in df_processed.columns:
-                    df_processed.loc[invalid_rp_types, 'Notes'] = (
-                        df_processed.loc[invalid_rp_types, 'Notes'].astype(str)
-                        + f"RP Type無效已修正為RF;"
-                    )
+                if blank_mask.any():
+                    blank_values = df_processed.loc[blank_mask, 'RP Type'].unique()
+                    logger.warning(f"發現空白的RP Type值，已排除該行數據")
+                    df_processed = df_processed[~blank_mask]
+                non_blank_invalid = invalid_rp_types & ~blank_mask
+                if non_blank_invalid.any():
+                    logger.warning(f"發現無效的RP Type值: {invalid_values}，請檢查原始數據")
                 # 將無效值列表和計數存入實例屬性，供呼叫方讀取
                 self._invalid_rp_type_values = list(invalid_values)
                 self._invalid_rp_type_count = invalid_count
             else:
                 self._invalid_rp_type_values = []
                 self._invalid_rp_type_count = 0
+            df_processed['RP Type'] = normalized_rp
         
         logger.info("數據類型轉換完成")
         return df_processed
@@ -372,6 +383,22 @@ class DataProcessor:
                     df_processed.loc[mask_negative, col] = 0
                     df_processed.loc[mask_negative, 'Notes'] = (
                         df_processed.loc[mask_negative, 'Notes'].astype(str) + f"{col}負值已校正為0;"
+                    )
+        
+        # SaSa Net Stock 和 Pending Received 負值/超限校正
+        for col in ['SaSa Net Stock', 'Pending Received']:
+            if col in df_processed.columns:
+                mask_negative = df_processed[col] < 0
+                if mask_negative.any():
+                    df_processed.loc[mask_negative, col] = 0
+                    df_processed.loc[mask_negative, 'Notes'] = (
+                        df_processed.loc[mask_negative, 'Notes'].astype(str) + f"{col}負值已校正為0;"
+                    )
+                mask_outlier = df_processed[col] > OUTLIER_CAP
+                if mask_outlier.any():
+                    df_processed.loc[mask_outlier, col] = OUTLIER_CAP
+                    df_processed.loc[mask_outlier, 'Notes'] = (
+                        df_processed.loc[mask_outlier, 'Notes'].astype(str) + f"{col}超出範圍;"
                     )
         
         logger.info("異常值校正完成")
@@ -447,6 +474,12 @@ class DataProcessor:
         
         # 計算有效銷量
         df = self.calculate_effective_sold_qty(df)
+        
+        # 檢查重複 (Article, Site) 行
+        dup_mask = df.duplicated(['Article', 'Site'], keep=False)
+        if dup_mask.any():
+            dup_rows = df.loc[dup_mask, ['Article', 'Site']].head(10).values.tolist()
+            raise ValueError(f"數據包含重複的(Article, Site)行，共 {int(dup_mask.sum())} 筆。前10組: {dup_rows}")
         
         # 記錄處理後統計
         processed_stats = {

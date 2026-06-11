@@ -58,9 +58,8 @@ class TestReadExcelFile:
     def test_article_truncation(self, processor):
         df = _make_minimal_df(Article="1234567890123")
         buf = _df_to_excel_bytes(df)
-        result = processor.read_excel_file(io.BytesIO(buf))
-        assert len(result["Article"].iloc[0]) == 12
-        assert result["Article"].iloc[0] == "234567890123"
+        with pytest.raises(ValueError, match="Article"):
+            processor.read_excel_file(io.BytesIO(buf))
 
     def test_column_case_insensitive_all(self, processor):
         df = _make_minimal_df()
@@ -167,7 +166,8 @@ class TestConvertDataTypes:
     def test_invalid_rp_type_auto_corrected(self, processor):
         df = _make_minimal_df(**{"RP Type": "XX"})
         result = processor.convert_data_types(df)
-        assert result["RP Type"].iloc[0] == "RF"
+        assert result["RP Type"].iloc[0] == "XX"
+        assert processor._invalid_rp_type_count == 1
         assert processor._invalid_rp_type_count == 1
 
     def test_valid_rp_type_unchanged(self, processor):

@@ -15,9 +15,13 @@ def make_df(rows):
     """建立測試用 DataFrame"""
     df = pd.DataFrame(rows)
     # 補齊必要欄位
-    for col in ['Pending Received', 'Safety Stock', 'MOQ', 'Effective Sold Qty']:
+    for col in ['Pending Received', 'Safety Stock', 'MOQ']:
         if col not in df.columns:
             df[col] = 0
+        else:
+            df[col] = df[col].fillna(0).astype(int)
+    if 'Effective Sold Qty' not in df.columns:
+        df['Effective Sold Qty'] = 0
     if 'Article Description' not in df.columns:
         df['Article Description'] = 'Test Product'
     if 'ALL' not in df.columns:
@@ -26,10 +30,10 @@ def make_df(rows):
         df['Target'] = ''
     if 'Type' not in df.columns:
         df['Type'] = ''
-    # 計算 Effective Sold Qty
-    df['Effective Sold Qty'] = df.apply(
-        lambda r: r['Last Month Sold Qty'] if r['Last Month Sold Qty'] > 0 else r['MTD Sold Qty'],
-        axis=1
+    # 計算 Effective Sold Qty (上月 + MTD)
+    df['Effective Sold Qty'] = (
+        df['Last Month Sold Qty'].fillna(0).astype(int)
+        + df['MTD Sold Qty'].fillna(0).astype(int)
     )
     return df
 

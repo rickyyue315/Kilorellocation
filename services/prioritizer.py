@@ -18,7 +18,7 @@ def assign_priority(rec: Dict[str, Any]) -> str:
 
     if qty >= 100:
         return '🔴高優先'
-    if src_pri <= 2:
+    if src_pri <= 1:
         return '🔴高優先'
     if dst_pri <= 1:
         return '🔴高優先'

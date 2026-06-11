@@ -76,6 +76,33 @@ def optimize_single_piece_transfers(recommendations: List[Dict], mode: str, crea
     if mode in D_FAMILY_MODES:
         return recommendations
 
+    receive_totals: Dict[Tuple[str, str], Dict] = {}
+    for rec in recommendations:
+        if int(rec.get('Transfer Qty', 0) or 0) <= 0:
+            continue
+        dest_key = (str(rec.get('Article', '')), str(rec.get('Receive Site', '')).strip().upper())
+        if dest_key not in receive_totals:
+            receive_totals[dest_key] = {'received': 0, 'target': rec.get('Target Qty')}
+        receive_totals[dest_key]['received'] += int(rec.get('Transfer Qty', 0) or 0)
+
+    def _can_add_to_dest(rec, delta):
+        if delta <= 0:
+            return True
+        dest_key = (str(rec.get('Article', '')), str(rec.get('Receive Site', '')).strip().upper())
+        info = receive_totals.get(dest_key)
+        if info is None or info['target'] is None:
+            return True
+        return info['received'] + delta <= info['target']
+
+    def _apply_qty_change(rec, old_qty, new_qty):
+        if old_qty == new_qty:
+            return
+        dest_key = (str(rec.get('Article', '')), str(rec.get('Receive Site', '')).strip().upper())
+        delta = new_qty - old_qty
+        rec['Transfer Qty'] = new_qty
+        if dest_key in receive_totals:
+            receive_totals[dest_key]['received'] += delta
+
     groups: Dict[Tuple[str, str, str], List[Dict]] = {}
     for rec in recommendations:
         key = (
@@ -122,8 +149,11 @@ def optimize_single_piece_transfers(recommendations: List[Dict], mode: str, crea
                             get_record_sales_total(r, 'Receive Site'),
                         ),
                     )
-                    donor['Transfer Qty'] = int(donor.get('Transfer Qty', 0) or 0) - 1
-                    single_rec['Transfer Qty'] = 2
+                    if not _can_add_to_dest(single_rec, 1):
+                        continue
+                    _apply_qty_change(donor, int(donor.get('Transfer Qty', 0) or 0),
+                                      int(donor.get('Transfer Qty', 0) or 0) - 1)
+                    _apply_qty_change(single_rec, 1, 2)
                     group_changed = True
                     has_change = True
                     continue
@@ -141,16 +171,24 @@ def optimize_single_piece_transfers(recommendations: List[Dict], mode: str, crea
                     target_sales = get_record_sales_total(best_target, 'Receive Site')
 
                     if len(group_recs) == 2 or single_sales <= target_sales:
-                        best_target['Transfer Qty'] = int(best_target.get('Transfer Qty', 0) or 0) + 1
-                        single_rec['Transfer Qty'] = 0
+                        if not _can_add_to_dest(best_target, 1):
+                            continue
+                        _apply_qty_change(best_target,
+                                          int(best_target.get('Transfer Qty', 0) or 0),
+                                          int(best_target.get('Transfer Qty', 0) or 0) + 1)
+                        _apply_qty_change(single_rec, 1, 0)
                         group_changed = True
                         has_change = True
                     else:
-                        donor_ge2 = [r for r in other_recs if int(r.get('Transfer Qty', 0) or 0) >= 2]
-                        if donor_ge2 and len(group_recs) >= 3:
-                            donor = max(donor_ge2, key=lambda r: int(r.get('Transfer Qty', 0) or 0))
-                            donor['Transfer Qty'] = int(donor.get('Transfer Qty', 0) or 0) - 1
-                            single_rec['Transfer Qty'] = 2
+                        donor_ge3_for_boost = [r for r in other_recs if int(r.get('Transfer Qty', 0) or 0) >= 3]
+                        if donor_ge3_for_boost and len(group_recs) >= 3:
+                            donor = max(donor_ge3_for_boost, key=lambda r: int(r.get('Transfer Qty', 0) or 0))
+                            if not _can_add_to_dest(single_rec, 1):
+                                continue
+                            _apply_qty_change(donor,
+                                              int(donor.get('Transfer Qty', 0) or 0),
+                                              int(donor.get('Transfer Qty', 0) or 0) - 1)
+                            _apply_qty_change(single_rec, 1, 2)
                             group_changed = True
                             has_change = True
 
