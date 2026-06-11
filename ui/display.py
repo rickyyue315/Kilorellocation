@@ -130,11 +130,16 @@ def render_data_preview(df: pd.DataFrame, processing_stats: dict):
 
 
 def render_kpi_cards(statistics: dict):
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("調貨建議", f"{statistics.get('total_recommendations', 0):,}")
-    col2.metric("調貨件數", f"{statistics.get('total_transfer_qty', 0):,}")
-    col3.metric("產品數量", f"{statistics.get('unique_articles', 0):,}")
-    col4.metric("OM數量", f"{statistics.get('unique_oms', 0):,}")
+    cols = st.columns(4)
+    metrics = [
+        ("調貨建議", f"{statistics.get('total_recommendations', 0):,}", "📦"),
+        ("調貨件數", f"{statistics.get('total_transfer_qty', 0):,}", "🔢"),
+        ("產品數量", f"{statistics.get('unique_articles', 0):,}", "🏷️"),
+        ("OM 數量", f"{statistics.get('unique_oms', 0):,}", "🗺️"),
+    ]
+    for col, (label, value, icon) in zip(cols, metrics):
+        with col:
+            st.metric(label=f"{icon} {label}", value=value)
     st.markdown("")
 
 

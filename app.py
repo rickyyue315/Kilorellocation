@@ -68,15 +68,11 @@ c1_ceiling = sidebar_result['c1_ceiling']
 f_fulfill_small_first = sidebar_result['f_fulfill_small_first']
 
 st.markdown(f"""
-<div style="display: flex; align-items: center; gap: 20px; margin: 8px 0 28px 0; padding-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.06);">
-    <div style="background: #1A2332; border: 2px solid rgba(245, 158, 11, 0.4); width: 96px; height: 82px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 52px;">
-        📦
-    </div>
+<div class="app-header fade-in">
+    <div class="app-header__logo">📦</div>
     <div>
-        <h1 style="margin: 0 !important; font-size: 2.2rem !important; font-weight: 900; background: linear-gradient(135deg, #F59E0B, #FBBF24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.1; letter-spacing: -0.5px; text-shadow: none;">庫存調貨建議系統</h1>
-        <p style="margin: 5px 0 0 0 !important; color: #94A3B8; font-size: 1.0rem; font-weight: 500; letter-spacing: 0.5px;">
-            {VERSION} · Intelligent Inventory Reallocation System
-        </p>
+        <h1 class="app-header__title">庫存調貨建議系統</h1>
+        <p class="app-header__subtitle">{VERSION} · Intelligent Inventory Reallocation System</p>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -87,17 +83,16 @@ with tab_tutorial:
     render_tutorial_page()
 
 with tab_system:
-    st.markdown("---")
+    with st.container():
+        st.markdown("### 📂 資料上傳")
 
-    st.markdown("### 📂 資料上傳")
+        render_upload_requirements(mode_code)
 
-    render_upload_requirements(mode_code)
-
-    uploaded_file = st.file_uploader(
-        "拖放或點擊上傳 Excel 文件",
-        type=["xlsx", "xls"],
-        help="支援 .xlsx 和 .xls 格式",
-    )
+        uploaded_file = st.file_uploader(
+            "拖放或點擊上傳 Excel 文件",
+            type=["xlsx", "xls"],
+            help="支援 .xlsx 和 .xls 格式",
+        )
 
     if uploaded_file is not None:
         progress_bar = st.progress(0, text="準備開始處理文件...")
@@ -161,10 +156,14 @@ with tab_system:
 
             render_data_preview(df, processing_stats)
 
-            st.markdown("---")
-            st.markdown("### 🚀 分析與建議")
+            with st.container():
+                st.markdown("### 🚀 分析與建議")
 
-            st.info(f"當前模式:**{transfer_mode}**")
+                st.markdown(f"""
+                <div class="surface-card">
+                    <strong>當前模式</strong> · {transfer_mode}
+                </div>
+                """, unsafe_allow_html=True)
 
             current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{d2_enable_2site_limit}_{c1_threshold}_{c1_ceiling}_{f_fulfill_small_first}_{uploaded_file.name}_{uploaded_file.size}"
             if st.session_state.get('_run_key') != current_run_key:
@@ -218,19 +217,20 @@ with tab_system:
                             st.error(error)
 
             if recommendations:
-                st.markdown("---")
-                st.markdown("### 📈 分析結果")
+                with st.container():
+                    st.markdown("### 📈 分析結果")
 
-                render_kpi_cards(statistics)
+                    render_kpi_cards(statistics)
 
-                render_results_by_priority(recommendations, df, current_run_key, st.session_state.get('active_mode_name', ''))
+                    render_results_by_priority(recommendations, df, current_run_key, st.session_state.get('active_mode_name', ''))
 
-                render_statistics(statistics)
+                    render_statistics(statistics)
 
-                render_ai_executive_summary_button(recommendations, statistics, st.session_state.get('active_mode_name', ''))
+                    render_ai_executive_summary_button(recommendations, statistics, st.session_state.get('active_mode_name', ''))
 
-                st.markdown("---")
-                st.success("✅ 分析完成!")
+                    with st.container():
+                        st.markdown("---")
+                        st.success("✅ 分析完成!")
 
                 _ai_summary = st.session_state.get('ai_executive_summary', '')
                 _excel_cache_key = f"{current_run_key}_{hash(_ai_summary)}" if _ai_summary else current_run_key
@@ -265,12 +265,8 @@ with tab_system:
                 progress_bar.progress(100, text="處理失敗!")
 
     st.markdown(f"""
-    <div style="text-align: center; color: #888899; padding: 40px 0 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 50px;">
-        <p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; color: #B0B0C0;">
-            📦 庫存調貨建議系統 <span style="color: #00d4ff; font-weight: 700;">{VERSION}</span>
-        </p>
-        <p style="margin: 6px 0 0 0; font-size: 13px; color: #888899; font-family: 'Inter';">
-            Intelligent Inventory Reallocation System (2026) | Developed by Ricky Yue. 只限RP Team使用.
-        </p>
+    <div class="app-footer">
+        <p>📦 庫存調貨建議系統 <strong>{VERSION}</strong></p>
+        <p>Intelligent Inventory Reallocation System (2026) · Developed by Ricky Yue · 只限 RP Team 使用</p>
     </div>
     """, unsafe_allow_html=True)

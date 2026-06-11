@@ -1,11 +1,11 @@
 [server]
-# 停用檔案監聽器，減少容器 CPU 用量（Zeabur/雲端部署適用）
 fileWatcherType = "none"
-# 雲端環境必須設為 headless
 headless = true
+enableCORS = false
+enableXsrfProtection = true
+maxUploadSize = 200
 
 [browser]
-# 停用使用統計上報，避免啟動時外部網路請求
 gatherUsageStats = false
 
 [theme]
@@ -13,5 +13,5 @@ base = "dark"
 primaryColor = "#F59E0B"
 backgroundColor = "#0B0F19"
 secondaryBackgroundColor = "#111827"
-textColor = "#F1F5F9"
+textColor = "#F8FAFC"
 font = "sans serif"

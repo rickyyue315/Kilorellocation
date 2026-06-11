@@ -21,27 +21,17 @@ _GROUP_DEFS = [
 
 
 def _flow_node(text, color="blue", width="auto"):
-    colors = {
-        "blue": ("#0F1E3D", "#60A5FA", "#2563EB"),
-        "green": ("#052E16", "#34D399", "#059669"),
-        "red": ("#450A0A", "#FCA5A5", "#DC2626"),
-        "yellow": ("#3D1D06", "#FCD34D", "#D97706"),
-        "gray": ("#1E1E2E", "#E0E0F0", "#8080A0"),
-        "purple": ("#250E4A", "#C4B5FD", "#7C3AED"),
-        "orange": ("#431407", "#FDBA74", "#EA580C"),
-    }
-    bg, border, accent = colors.get(color, colors["blue"])
+    color_class = f"flow-node--{color}"
     w = f"width:{width};" if width != "auto" else ""
     return (
-        f'<div style="background:{bg};border:2px solid {border};border-radius:8px;'
-        f'padding:8px 12px;text-align:center;font-size:13px;{w}">'
+        f'<div class="flow-node {color_class}" style="{w}">'
         f'{text}</div>'
     )
 
 
 def _flow_arrow(label=""):
-    lbl = f'<span style="font-size:11px;color:#C0C0D0;">{label}</span><br>' if label else ""
-    return f'<div style="text-align:center;margin:2px 0;">{lbl}<span style="font-size:18px;color:#909090;">&#8595;</span></div>'
+    lbl = f'<span style="font-size:11px;color:var(--text-muted);">{label}</span><br>' if label else ""
+    return f'<div class="flow-arrow">{lbl}&#8595;</div>'
 
 
 def _flow_row(items, gap="12px"):
@@ -67,9 +57,11 @@ def _scenario_table(headers, rows):
 
 
 def _risk_badge(level):
-    colors = {"低": "#10B981", "中": "#F5A623", "高": "#EF4444"}
-    c = colors.get(level, "#71717A")
-    return f'<span style="background:{c};color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;">風險：{level}</span>'
+    return (
+        f'<span class="risk-badge risk-badge--'
+        f'{"low" if level == "低" else "medium" if level == "中" else "high"}">'
+        f'風險：{level}</span>'
+    )
 
 
 def _build_match_rows(match_order):

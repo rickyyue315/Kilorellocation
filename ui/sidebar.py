@@ -36,14 +36,14 @@ def render_sidebar() -> Dict:
     with st.sidebar:
         st.markdown("### 📦 系統資訊")
         st.markdown(f"""
-        <div class="info-card" style="margin-top: -10px; padding: 12px 16px; background: rgba(255, 255, 255, 0.02); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="color: #C0C0D0; font-size: 13px; font-weight: 500;">系統版本</span>
-                <span style="color: #00d4ff; font-size: 13px; font-weight: 700; font-family: monospace;">{VERSION}</span>
+        <div class="surface-card" style="margin-top: -8px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                <span style="color:var(--text-muted);font-size:13px;">系統版本</span>
+                <span style="color:var(--accent-cyan);font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;">{VERSION}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: #C0C0D0; font-size: 13px; font-weight: 500;">開發者</span>
-                <span style="color: #FFFFFF; font-size: 13px; font-weight: 600; font-family: 'Inter';">Ricky Yue</span>
+            <div style="display:flex;justify-content:space-between;">
+                <span style="color:var(--text-muted);font-size:13px;">開發者</span>
+                <span style="color:var(--text-primary);font-size:13px;font-weight:600;">Ricky Yue</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -118,10 +118,7 @@ def render_sidebar() -> Dict:
 
         st.markdown("---")
 
-        st.markdown(
-            '<div style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin-bottom: 0.5rem;">⚙️ 選擇轉貨模式</div>',
-            unsafe_allow_html=True
-        )
+        st.markdown("### ⚙️ 選擇轉貨模式")
         transfer_mode = st.radio(
             "選擇轉貨模式",
             _MODE_OPTIONS,
