@@ -382,6 +382,5 @@ def render_download_button(excel_data: bytes, excel_filename: str, current_run_k
         mime=_mime,
         type="primary",
         use_container_width=True,
-        on_click="ignore",
         key=f"download_excel_{current_run_key}",
     )
