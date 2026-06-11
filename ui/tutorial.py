@@ -1,5 +1,5 @@
 """
-教學分頁 — 27 種調貨模式圖例教學（數據驅動版本）
+教學分頁 — 28 種調貨模式圖例教學（數據驅動版本）
 """
 
 import json
@@ -265,7 +265,7 @@ def render_tutorial_page():
     _render_global_rules()
 
     st.markdown("---")
-    st.markdown("### 27 種模式教學")
+    st.markdown("### 28 種模式教學")
     st.markdown("按業務場景分為 8 組，展開查看詳細教學。")
 
     for group_key, group_title, icon in _GROUP_DEFS:

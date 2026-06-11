@@ -151,6 +151,13 @@ MODE_DEFS: List[ModeDef] = [
             cross_om_matching=True,
             strategy_key='simplified_sku_return_d001',
             source_method='_sources_simplified_sku'),
+    ModeDef("NST", "New Shop Target調貨",
+            "僅Target門市可接收，RF轉出保留≥2件且上限75%庫存，庫存<3不轉出，可設定HD轉出選項及同一SKU轉出店數上限；目標可能未達100%",
+            attr_name="mode_nst",
+            cross_om_grouping=True, cross_om_matching=True, source_filter=True,
+            strategy_key='nst_mode',
+            source_method='_sources_f_mode', dest_method='_dests_f_mode',
+            extra_ui_options=frozenset({'f2_hd_transfer', 'f_fulfill_small_first', 'nst_shop_limit'})),
 ]
 
 

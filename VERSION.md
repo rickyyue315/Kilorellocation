@@ -1,5 +1,42 @@
 # 版本更新記錄
 
+## v2.25.0 (2026-06-11)
+
+### 新增 NST 模式：New Shop Target調貨（第28個模式）
+
+#### 模式說明
+- **NST（New Shop Target調貨）**：基於 F2 架構（僅 Target > 0 店舖接收），RF 轉出有更嚴格的限制
+- **核心差異**：
+  - RF 轉出後保留 ≥2 件（轉出量 = min(net_stock × 0.75, net_stock - 2)）
+  - RF 轉出上限為庫存的 75%
+  - RF 庫存 < 3 件不轉出
+  - 可設定同一 SKU 轉出店舖數量上限（10 間 / 20 間 / 不限制）
+  - 因 RF 轉出限制，目標可能未達 100%，此為預期行為
+- ND 店舖全數轉出（與 F2 相同）
+- 繼承 F2 的 HD 轉出選項、Windy 目標優先、優先滿足小型目標、配對後缺口填補
+
+#### 新增檔案
+- `strategies/nst_mode.py` — NewShopTargetStrategy 策略類別（轉出/接收識別 + 匹配邏輯）
+
+#### 修改檔案
+- `config.py` — 新增 `NST_RF_RETAIN_STOCK`、`NST_RF_TRANSFER_CAP`、`NST_RF_MIN_STOCK_TO_SOURCE` 常數；版本號 bump 至 v2.25.0
+- `models/mode_registry.py` — MODE_DEFS 新增 NST ModeDef，含 `nst_shop_limit` extra_ui_options
+- `business_logic.py` — 新增 `nst_max_source_shops` 參數、NST 策略路由、target_stores 保護、skip_nd_check
+- `ui/sidebar.py` — 新增 NST 專屬 UI（同一SKU轉出店數上限 radio）、NST加入HD轉出及優先滿足小型目標選項
+- `app.py` — 提取 `nst_max_source_shops`、傳入 TransferLogic、更新 run_key 及 docstring
+
+#### 文件同步
+- `README.md` — 模式列表、核心規則、模式對照表、功能亮點、介面流程、教學分組更新
+- `VERSION.md` — 本版本記錄
+- `config.py` — 版本號 bump 至 v2.25.0
+- `app.py` — docstring 版本更新、模式數更新為 28
+- `ui/tutorial.py` — 目標優化系列新增 NST 教學內容
+- `data/tutorials/f.json` — 新增 NST 教學 JSON 資料
+- `調貨模式詳解.txt` — 新增 NST 詳細規則
+- `transfer_logic_ai_brief.md` — 新增 NST 模式說明
+
+---
+
 ## v2.24.2 (2026-06-11)
 
 ### C/C1/C2 模式新增每店轉出件數上限滑塊（原僅 C1 可用）

@@ -4,7 +4,7 @@
 
 import os
 
-VERSION = "v2.24.3"
+VERSION = "v2.25.0"
 
 ZEABUR_ENV_KEYS = [
     'ZEABUR',
@@ -73,6 +73,10 @@ ND3_KEEP_STOCK = 3
 
 D2_MAX_RECEIVE_SITES_PER_SOURCE = 2
 D2_NEEDED_QTY_MULTIPLIER = 2
+
+NST_RF_RETAIN_STOCK = 2
+NST_RF_TRANSFER_CAP = 0.75
+NST_RF_MIN_STOCK_TO_SOURCE = 3
 
 # ── Magic Numbers (data_processor.py) ──────────────────────────────
 

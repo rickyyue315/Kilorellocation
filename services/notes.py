@@ -34,6 +34,10 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
         return f"剩{remaining}件(F-RF轉)"
     if src_type == 'F3模式RF轉出(保留2件)':
         return f"剩{remaining}件(F3-RF保留2)"
+    if src_type == 'NST模式ND轉出':
+        return f"剩{remaining}件(NST-ND全轉)"
+    if src_type == 'NST模式RF轉出':
+        return f"剩{remaining}件(NST-RF保留2+75%上限)"
     if src_type == 'E模式強制轉出':
         rp_type = source.get('rp_type', '')
         is_cross_om = mode == mode_info['mode_e2'] and source['om'] != dest['om']
@@ -59,7 +63,7 @@ def _note_dest_analysis(dest, current_received_qty, transfer_qty):
     dest_type = dest['dest_type']
     cumulative = current_received_qty + transfer_qty
 
-    if dest_type in ('F模式目標接收', 'F指定模式目標接收'):
+    if dest_type in ('F模式目標接收', 'F指定模式目標接收', 'NST模式目標接收'):
         target_qty = dest.get('target_qty', 0)
         return f"目標{target_qty},已收{cumulative}"
     if dest_type == 'E模式接收' or str(dest_type).startswith('E1b'):

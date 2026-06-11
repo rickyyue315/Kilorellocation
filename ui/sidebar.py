@@ -50,7 +50,7 @@ def render_sidebar() -> Dict:
 
         with st.expander("💡 核心功能", expanded=False):
             st.markdown("""
-            **二十七模式智能調貨系統:**
+            **二十八模式智能調貨系統:**
             - ✅ A模式(保守轉貨) / B模式(加強轉貨)
             - ✅ B2模式(附加B特別模式) / B2a模式(B2+T遊客鋪不出貨)
             - ✅ B2L模式(附加B2L:Type=L保留2件) / B2La模式(B2L+T遊客鋪不出貨)
@@ -59,7 +59,7 @@ def render_sidebar() -> Dict:
             - ✅ C模式(重點補0) / C1模式(重點補0-只補0/1(或自選數量)) / C2模式(附加C跨OM重點補0)
             - ✅ D模式(清貨轉貨) / D2模式(清貨轉貨ND限定)
             - ✅ E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM)
-            - ✅ F模式(目標優化) / F2模式(F指定模式) / F3模式(目標性補0)
+            - ✅ F模式(目標優化) / F2模式(F指定模式) / F3模式(目標性補0) / NST模式(New Shop Target調貨)
             - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨) / ND3模式(ND限同OM轉貨-補0)
             - ✅ 精簡SKU(限同OM) / 精簡SKU(跨OM) / 精簡SKU(退D001)
             
@@ -77,6 +77,7 @@ def render_sidebar() -> Dict:
             - ✅ F模式：Target目標接收優先
             - ✅ F2模式：僅Target店舖可接收，集中優先補貨；Windy目標店優先從同OM無Target店提取
             - ✅ F3模式：同F2 + RF轉出保留2件 + RF按最高庫存優先轉出 + RF跨OM不降級
+            - ✅ NST模式：同F2 + RF轉出保留≥2件 + RF轉出上限75%庫存 + 庫存<3不轉出 + 可設定同一SKU轉出店數上限(10/20/不限)
             - ✅ B2/B2a模式：接收端依遊客區/混合型店舖優先排序
             - ✅ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式：Mix店舖若總銷量高於目標店，禁止出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
             - ✅ B2a/B2La/B3a/B3La模式：T遊客鋪不作為出貨來源
@@ -99,9 +100,10 @@ def render_sidebar() -> Dict:
                - 確保包含所有必需欄位
             
              2. **選擇轉貨模式**
-                   - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C1/C2/D/D2/E1/E1b/E2/F/F2/F3/ND1/ND2/ND3/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001))
-               - 查看模式說明了解各模式特點
-                      - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
+                   - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C1/C2/D/D2/E1/E1b/E2/F/F2/F3/NST/ND1/ND2/ND3/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001))
+                - 查看模式說明了解各模式特點
+                       - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
+                       - 若選擇 NST，可設定「HD店舖轉出」及「同一SKU轉出店舖數量上限：10間/20間/不限制」
             
             3. **啟動分析**
                - 點擊「生成調貨建議」按鈕開始處理
@@ -148,13 +150,13 @@ def render_sidebar() -> Dict:
             st.session_state.pop('b_special_receive_site_limit_option', None)
 
         f2_allow_hd_transfer = False
-        if mode_code in ("F2", "F3"):
+        if mode_code in ("F2", "F3", "NST"):
             f2_hd_option = st.radio(
                 "HD 店舖轉出設定",
                 ["HD 不能轉出（預設）", "HD 可轉出（最後優先）"],
                 index=0,
                 key='f2_hd_transfer_option',
-                help="F2/F3模式下控制HD店舖是否可轉貨到HA/HB/HC店舖。選擇「可轉出」時，HD來源會排在最低優先級，僅在其他來源不足時才使用。"
+                help="控制HD店舖是否可轉貨到HA/HB/HC店舖。選擇「可轉出」時，HD來源會排在最低優先級，僅在其他來源不足時才使用。"
             )
             if f2_hd_option == "HD 可轉出（最後優先）":
                 f2_allow_hd_transfer = True
@@ -162,7 +164,7 @@ def render_sidebar() -> Dict:
             st.session_state.pop('f2_hd_transfer_option', None)
 
         f_fulfill_small_first = False
-        if mode_code in ("F", "F2", "F3"):
+        if mode_code in ("F", "F2", "F3", "NST"):
             f_fulfill_small_first = st.checkbox(
                 "優先滿足小型目標",
                 value=False,
@@ -171,6 +173,22 @@ def render_sidebar() -> Dict:
             )
         else:
             st.session_state.pop('f_fulfill_small_first', None)
+
+        nst_max_source_shops = None
+        if mode_code == "NST":
+            nst_shop_limit_option = st.radio(
+                "同一SKU轉出店舖數量上限",
+                ["10 間", "20 間", "不限制"],
+                index=2,
+                key='nst_shop_limit_option',
+                help="控制同一SKU最多可由多少間店舖轉出。因NST模式RF每店轉出有75%上限，可能需要多間店舖共同出貨。選擇「不限制」時不套用此限制。"
+            )
+            if nst_shop_limit_option == "10 間":
+                nst_max_source_shops = 10
+            elif nst_shop_limit_option == "20 間":
+                nst_max_source_shops = 20
+        else:
+            st.session_state.pop('nst_shop_limit_option', None)
 
         d2_enable_2site_limit = False
         if mode_code == "D2":
@@ -346,6 +364,16 @@ def render_sidebar() -> Dict:
             - **RF最高庫存優先**：轉出時最高庫存店舖優先轉出（同優先級內銷量低優先）
             - **RF跨OM不降級**：RF跨OM配對與同OM配對同等優先（無tier懲罰）
 
+            **NST模式(New Shop Target調貨)**
+            - 繼承F2全部規則（僅Target接收、HD轉出選項、Windy目標優先）
+            - **RF轉出保留≥2件**：RF店舖轉出後淨庫存不低於2件
+            - **RF轉出上限75%**：RF店舖轉出量不超過淨庫存的75%（net_stock × 0.75）
+            - **庫存<3不轉出**：RF店舖淨庫存少於3件時不參與轉出
+            - **同一SKU轉出店數上限**：可設定10間/20間/不限制，控制每SKU最多多少間店舖可同時轉出
+            - **目標可能未達100%**：因RF轉出限制，Target目標可能未能完全滿足，此為預期行為
+            - 允許跨OM配對，HD轉出選項同F2
+            - 配對後剩餘來源會自動填補尚未滿足的目標
+
             **ND1模式(ND同OM轉貨)**
             - 打破「ND不可接收」全局限制，ND店舖可互相調貨
             - **限制同OM**：轉出與接收店舖須屬同一OM組別
@@ -355,6 +383,15 @@ def render_sidebar() -> Dict:
             - 接收上限：2×(Last Month Sold Qty + MTD Sold Qty)
             - 過去2個月銷量=0的ND店舖不可接收
             - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
+
+            **NST模式(New Shop Target調貨)**
+            - 繼承F2全部規則（僅Target接收、HD轉出選項、Windy目標優先）
+            - **RF轉出保留≥2件**：RF店舖轉出後淨庫存不低於2件
+            - **RF轉出上限75%**：RF店舖轉出量不超過淨庫存的75%（net_stock × 0.75）
+            - **庫存<3不轉出**：RF店舖淨庫存少於3件時不參與轉出
+            - **同一SKU轉出店數上限**：可設定10間/20間/不限制，控制每SKU最多多少間店舖可同時轉出
+            - **目標可能未達100%**：因RF轉出限制，Target目標可能未能完全滿足，此為預期行為
+            - 允許跨OM配對，HD轉出選項同F2
 
             **ND2模式(ND混合OM轉貨)**
             - 同ND1模式規則，但允許**跨OM**配對
@@ -410,6 +447,7 @@ def render_sidebar() -> Dict:
             - E1b模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM，優先Type=T/M)
             - E2模式：所有RF店舖可接收,上限為Safety Stock的2倍(可跨OM)
             - B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式：接收上限為Safety Stock的2倍,並累計追蹤接收量
+            - NST模式：可設定同一SKU轉出店舖數量上限：10間 / 20間 / 不限制
             - ND1/ND2模式：可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
             - ND3模式：僅零庫存ND店舖可接收，目標=max(Safety×0.5, 3)，轉出店保留3件
             - 接收優先級(B2/B2a/B2L/B2La/B3/B3a/B3L/B3La):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
@@ -430,4 +468,5 @@ def render_sidebar() -> Dict:
         'c1_threshold': c1_threshold,
         'c1_ceiling': c1_ceiling,
         'f_fulfill_small_first': f_fulfill_small_first,
+        'nst_max_source_shops': nst_max_source_shops,
     }

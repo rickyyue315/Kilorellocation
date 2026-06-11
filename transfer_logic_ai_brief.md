@@ -57,6 +57,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - Type T Safety, Type M Safety
 - E Mode Reception: RF stores, cap = Safety Stock * 2 (E1/E1b/E2 modes)
 - F Mode Target Reception: Target priority (F/F2/F3 modes, ND/RF can receive)
+- NST Mode Target Reception: Target priority (NST mode, ND/RF can receive)
 - ND Emergency Replenishment (ND1/ND2 mode)
 - ND Potential Replenishment (ND1/ND2 mode)
 - ND3 Zero-Fill Reception (ND3 mode)
@@ -71,6 +72,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - B2/B3 extra: Local Store Full Transfer (Type L with low sales)
 - E Mode Forced Transfer (E1/E1b/E2 modes)
 - F Mode ND Transfer / F Mode RF Transfer / F3 Mode RF Transfer(Retain 2) (F/F3 mode)
+- NST Mode ND Transfer / NST Mode RF Transfer (NST mode)
 - ND Smart Transfer (ND1/ND2 mode)
 - ND3 Smart Transfer (Retain 3) (ND3 mode)
 - 精簡SKU ND轉出 / 精簡SKU RF轉出 (Simplified SKU modes)
@@ -78,7 +80,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 ---
 
-# Mode Overview (27 Modes: A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, ND1, ND2, ND3, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001))
+# Mode Overview (28 Modes: A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, NST, ND1, ND2, ND3, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001))
 
 ## Mode A: Conservative
 - Source rules: RF only, Surplus Transfer
@@ -273,6 +275,36 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - **New v2.23.0**: Optional "fulfill small targets first" checkbox — when checked, Priority-1 destinations are sorted by needed_qty ASC; post-match gap filling allocates leftover source stock to still-unfilled destinations; Excel output includes a "Target達成分析" sheet
 - Goal: Target-only allocation with RF minimum stock preservation and cross-OM fairness
 
+## Mode NST: New Shop Target Transfer (New Shop Target調貨)
+- Inherits all F2 rules (Target-only reception, HD transfer option, Windy target priority)
+- Source rules:
+  - ND: full transfer (unless Target > 0 set for that site)
+  - RF: strict new constraints:
+    - **Retain ≥2**: transferable_qty = min(int(net_stock * 0.75), net_stock - 2)
+    - **75% cap**: max transfer is 75% of net_stock
+    - **Min stock 3**: skip if net_stock < 3 (not qualified to be a source)
+    - Protect highest sales store (same as F2)
+    - Sort by lowest effective_sold_qty first (same as F2)
+- Destination priority:
+  1. Sites with Target > 0: receive exactly Target Qty (cross-OM allowed; regardless of ND/RF type, regardless of current stock or pending received)
+  2. Non-Target sites do not receive
+- **New UI option**: Per-SKU source shop limit (10/20/unlimited)
+  - Limits the total number of distinct source stores that can transfer out for a given Article
+  - Enforced during matching: once N unique source sites are used, new sources are skipped
+  - Already-admitted sources can continue transferring to new destinations
+- Grouping: by Article only (allow cross-OM)
+- Extra constraints:
+  - HD source cannot transfer to HA/HB/HC destinations (default behavior)
+  - **HD transfer option (configurable)**: when enabled, HD sources CAN transfer to HA/HB/HC at lowest priority (hd_penalty=10)
+  - Windy source can only transfer to Windy destinations
+  - Windy target priority: Windy sources without Target are prioritized over non-Windy sources (windy_penalty=5)
+- Optional "fulfill small targets first" checkbox — when checked, Priority-1 destinations sorted by needed_qty ASC
+- Post-match gap filling allocates leftover source stock to still-unfilled destinations
+- **Key difference from F2/F3**: Target fulfillment not guaranteed at 100% due to strict RF constraints; this is accepted behavior
+- Source labels: NST模式ND轉出, NST模式RF轉出
+- Dest labels: NST模式目標接收
+- Goal: Target-only allocation with tightly controlled RF transfer limits, multi-store per SKU support
+
 ## Mode ND1: ND Same-OM Transfer
 - Breaks global "ND cannot receive" rule: ND stores can transfer to each other
 - Same OM only (grouped by Article + OM)
@@ -335,7 +367,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 1. Start block: Input Excel -> Data validation -> Compute derived fields
 2. Common Rules block (ND only source, protect highest RF, no dual role)
-3. Split into modes A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, ND1, ND2, ND3, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001) (parallel columns)
+3. Split into modes A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, NST, ND1, ND2, ND3, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001) (parallel columns)
 4. For each mode, show:
    - Source criteria
    - Transfer caps

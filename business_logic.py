@@ -1,7 +1,7 @@
 """
-業務邏輯模組 v2.24.3
+業務邏輯模組 v2.25.0
 實現調貨規則、源/目的地識別和匹配算法
-支持二十七模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
+支持二十八模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/NST(New Shop Target調貨)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 """
 
 import pandas as pd
@@ -60,14 +60,15 @@ logger = logging.getLogger(__name__)
 
 
 class TransferLogic:
-    """調貨業務邏輯類 v2.24.3"""
+    """調貨業務邏輯類 v2.25.0"""
     
     def __init__(self, b_special_max_receive_sites_per_source: Optional[int] = None,
                  f2_allow_hd_transfer: bool = False,
                  d2_enable_2site_limit: bool = False,
                  c1_threshold: int = 1,
                  c1_ceiling: int = C1_MODE_DEFAULT_CEILING,
-                 f_fulfill_small_first: bool = False):
+                 f_fulfill_small_first: bool = False,
+                 nst_max_source_shops: Optional[int] = None):
         self.transfer_recommendations = []
         self.quality_check_passed = True
         self.quality_errors = []
@@ -81,6 +82,11 @@ class TransferLogic:
         self.c1_threshold = c1_threshold
         self.c1_ceiling = c1_ceiling
         self.f_fulfill_small_first = f_fulfill_small_first
+        self.nst_max_source_shops = (
+            nst_max_source_shops
+            if isinstance(nst_max_source_shops, int) and nst_max_source_shops > 0
+            else None
+        )
         self._mode_by_name = {d.name: d for d in MODE_DEFS}
         self._mode_by_code = {d.code: d for d in MODE_DEFS}
         for d in MODE_DEFS:
@@ -117,6 +123,7 @@ class TransferLogic:
         from strategies.simplified_sku_return_d001 import SimplifiedSKUReturnD001Strategy
         from strategies.c2_mode import C2ModeStrategy
         from strategies.f_mode import FModeStrategy
+        from strategies.nst_mode import NewShopTargetStrategy
         from strategies.e1_mode import E1ModeStrategy
         from strategies.e2_mode import E2ModeStrategy
         from strategies.nd_mode import NDModeStrategy
@@ -129,6 +136,12 @@ class TransferLogic:
                 create_note=self._create_recommendation_note,
                 f2_allow_hd_transfer=self.f2_allow_hd_transfer,
                 f_fulfill_small_first=self.f_fulfill_small_first,
+            ),
+            'nst_mode': NewShopTargetStrategy(
+                create_note=self._create_recommendation_note,
+                nst_allow_hd_transfer=self.f2_allow_hd_transfer,
+                f_fulfill_small_first=self.f_fulfill_small_first,
+                nst_max_source_shops=self.nst_max_source_shops,
             ),
             'e1_mode': E1ModeStrategy(
                 create_note=self._create_recommendation_note,
@@ -412,7 +425,9 @@ class TransferLogic:
         if self._is_b_special_mode(mode):
             return self._strategies['b_special'].match(sources, destinations, article, product_desc, mode)
 
-        if mode in (self.mode_f, self.mode_f_target_only, self.mode_f3):
+        if mode in (self.mode_f, self.mode_f_target_only, self.mode_f3, self.mode_nst):
+            if mode == self.mode_nst:
+                return self._strategies['nst_mode'].match(sources, destinations, article, product_desc, mode)
             return self._strategies['f_mode'].match(sources, destinations, article, product_desc, mode)
         
         if mode == self.mode_c2:
@@ -470,7 +485,7 @@ class TransferLogic:
         
         Args:
             df: 預處理後的DataFrame
-            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)、F模式(目標優化)、F2模式(F指定模式)、F3模式(目標性補0)、ND1模式(ND同OM轉貨)、ND2模式(ND混合OM轉貨)、ND3模式(ND限同OM轉貨補0)、精簡SKU模式
+            mode: A模式(保守轉貨)、B模式(加強轉貨)、B2模式(附加B特別模式)、B3模式(附加B跨OM特別模式)、C模式(重點補0)、D模式(清貨轉貨)、E1模式(強制轉出)、E1b模式(強制轉出優先類型接收)、E2模式(強制轉出跨OM)、F模式(目標優化)、F2模式(F指定模式)、F3模式(目標性補0)、NST模式(New Shop Target調貨)、ND1模式(ND同OM轉貨)、ND2模式(ND混合OM轉貨)、ND3模式(ND限同OM轉貨補0)、精簡SKU模式
             
         Returns:
             調貨建議列表
@@ -506,7 +521,7 @@ class TransferLogic:
         
         # F2模式：預先計算全域有Target>0的店舖集合，避免Target店舖任何Article成為轉出源
         target_stores = set()
-        if mode in (self.mode_f_target_only, self.mode_f3):
+        if mode in (self.mode_f_target_only, self.mode_f3, self.mode_nst):
             target_series_full = self._parse_target_series(df)
             if 'Target' in df.columns:
                 target_mask = target_series_full > 0
@@ -532,7 +547,7 @@ class TransferLogic:
             # 識別轉出候選店鋪
             sources = self.identify_sources(
                 group_df, mode,
-                protected_sites=target_stores if mode in (self.mode_f_target_only, self.mode_f3) else None
+                protected_sites=target_stores if mode in (self.mode_f_target_only, self.mode_f3, self.mode_nst) else None
             )
             
             # 識別接收候選店鋪
@@ -601,7 +616,7 @@ class TransferLogic:
     def perform_quality_checks(self, df: pd.DataFrame, mode: str = '') -> bool:
         from services.quality_checks import run_quality_checks
         logger.info("開始執行質量檢查")
-        skip_nd_check = self._is_nd_transfer_mode(mode) or mode in (self.mode_f, self.mode_f_target_only, self.mode_f3)
+        skip_nd_check = self._is_nd_transfer_mode(mode) or mode in (self.mode_f, self.mode_f_target_only, self.mode_f3, self.mode_nst)
         passed, errors = run_quality_checks(self.transfer_recommendations, df, skip_nd_check)
         self.quality_check_passed = passed
         self.quality_errors = errors
