@@ -590,6 +590,8 @@ class TransferLogic:
             )
         )
 
+        self._refresh_recommendation_fields(all_recommendations, mode)
+
         logger.info(f"共生成 {len(all_recommendations)} 條調貨建議")
         
         self.transfer_recommendations = all_recommendations
