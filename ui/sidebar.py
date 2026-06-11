@@ -190,11 +190,12 @@ def render_sidebar() -> Dict:
                 key='c1_threshold',
                 help="設定 C1 模式補0門檻：只補充總庫存（SaSa Net Stock + Pending Received）小於或等於此值的店舖。預設值 1 等同原有行為。"
             )
+        if mode_code in ("C", "C1", "C2"):
             c1_ceiling = st.slider(
-                "C1 每店轉出件數上限",
+                "每店轉出件數上限",
                 min_value=3, max_value=10, value=3, step=1,
                 key='c1_ceiling',
-                help="限制 C1 模式每間源店最多轉出的件數。提高此值可減少調出店舖總數量。預設 3 等同原有行為。"
+                help="限制每間源店最多轉出的件數。提高此值可減少調出店舖總數量。預設 3 等同原有行為。"
             )
 
         st.caption(MODE_DESCRIPTIONS.get(transfer_mode, ""))

@@ -227,7 +227,7 @@ class TransferLogic:
                 return None
 
             ratio_cap = int(total_available * C_MODE_PERCENTAGE_CAP)
-            abs_cap = self.c1_ceiling if mode == self.mode_c1 else C_MODE_ABS_CAP
+            abs_cap = self.c1_ceiling if mode in (self.mode_c, self.mode_c1, self.mode_c2) else C_MODE_ABS_CAP
             capped_ratio = max(ratio_cap, 0)
             raw_upper = min(capped_ratio, abs_cap) if capped_ratio > 0 else abs_cap
             upper_limit = max(2, raw_upper) if mode == self.mode_c1 else max(1, raw_upper)

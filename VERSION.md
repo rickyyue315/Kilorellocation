@@ -1,5 +1,31 @@
 # 版本更新記錄
 
+## v2.24.2 (2026-06-11)
+
+### C/C1/C2 模式新增每店轉出件數上限滑塊（原僅 C1 可用）
+
+#### 變更說明
+- 將 C1 模式的「每店轉出件數上限」滑塊（c1_ceiling, 3~10, 預設 3）擴展至 C 和 C2 模式
+- C 和 C2 模式原先使用硬編碼常數 `C_MODE_ABS_CAP = 3`，現改為可調
+- C/C1/C2 三模式共用同一側邊欄滑塊，預設值 3 完整向後兼容
+- C1 模式的補0門檻（c1_threshold）仍為 C1 獨有
+
+#### 修改檔案
+- `business_logic.py` — `_compute_rf_transferable` 中 abs_cap 條件從 `mode == self.mode_c1` 擴展為 `mode in (self.mode_c, self.mode_c1, self.mode_c2)`
+- `models/mode_registry.py` — C 和 C2 ModeDef 的 `extra_ui_options` 新增 `c1_ceiling`
+- `ui/sidebar.py` — 將 ceiling 滑塊從 `if mode_code == "C1"` 移至 `if mode_code in ("C", "C1", "C2")`；threshold number_input 保持 C1 獨有；UI 標籤改為「每店轉出件數上限」
+- `config.py` — 版本號 bump 至 v2.24.2
+- `app.py` — docstring 版本更新
+
+#### 文件同步
+- `README.md` — 模式列表、功能亮點、模式對照表更新
+- `VERSION.md` — 本版本記錄
+- `data/tutorials/c.json` — C/C2 教學內容更新（流程圖文字、extra_notes、diff_table）
+- `調貨模式詳解.txt` — C/C2 轉出規則更新
+- `transfer_logic_ai_brief.md` — C/C2 模式說明更新
+
+---
+
 ## v2.24.1 (2026-06-10)
 
 ### Bug fixes & Zeabur deployment hardening

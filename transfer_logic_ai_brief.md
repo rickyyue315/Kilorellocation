@@ -130,7 +130,9 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Special destination trigger: Total Available <= 1
   - Target Qty = max(Safety Stock * 0.5, 3)
   - Needed Qty = Target Qty - Total Available
-- Transferable qty cap: 30% of Total Available, max 3 units, min 1
+- Transferable qty cap: 30% of Total Available
+  - Absolute cap: configurable via sidebar slider (3~10, default 3), shared with C1/C2
+  - Upper limit = max(1, min(30% × TA, configurable_ceiling))
 - Destination rules: Priority Zero + Emergency + Potential
 - Track cumulative received to reach targets
 - Goal: focus on near-zero stock stores
@@ -154,7 +156,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Goal: precise zero/low-stock replenishment only, without triggering general shortage logic. Higher ceiling = fewer source stores required per SKU.
 
 ## Mode C2: Cross-OM Priority Zero
-- Same source/destination logic as Mode C
+- Same source/destination logic as Mode C (including configurable ceiling via sidebar slider)
 - Grouping differs: group by Article only (allow cross OM matching)
 - Extra constraints:
   - HD source cannot transfer to HA/HB/HC destinations
