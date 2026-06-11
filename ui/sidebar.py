@@ -147,6 +147,8 @@ def render_sidebar() -> Dict:
                 b_special_max_receive_sites_per_source = 1
             elif b_special_receive_site_limit_option == "最多 2 間":
                 b_special_max_receive_sites_per_source = 2
+        else:
+            st.session_state.pop('b_special_receive_site_limit_option', None)
 
         f2_allow_hd_transfer = False
         if mode_code in ("F2", "F3"):
@@ -159,6 +161,8 @@ def render_sidebar() -> Dict:
             )
             if f2_hd_option == "HD 可轉出（最後優先）":
                 f2_allow_hd_transfer = True
+        else:
+            st.session_state.pop('f2_hd_transfer_option', None)
 
         f_fulfill_small_first = False
         if mode_code in ("F", "F2", "F3"):
@@ -168,6 +172,8 @@ def render_sidebar() -> Dict:
                 key='f_fulfill_small_first',
                 help="勾選後，需Target的店舖按需求量由小到大排序分配，讓更多小型目標能被完全滿足。預設為大目標優先（現有行為）。"
             )
+        else:
+            st.session_state.pop('f_fulfill_small_first', None)
 
         d2_enable_2site_limit = False
         if mode_code == "D2":
@@ -180,6 +186,8 @@ def render_sidebar() -> Dict:
             )
             if d2_option == "限制2間店舖接收（優化版）":
                 d2_enable_2site_limit = True
+        else:
+            st.session_state.pop('d2_site_limit_option', None)
 
         c1_threshold = 1
         c1_ceiling = 3
@@ -190,6 +198,8 @@ def render_sidebar() -> Dict:
                 key='c1_threshold',
                 help="設定 C1 模式補0門檻：只補充總庫存（SaSa Net Stock + Pending Received）小於或等於此值的店舖。預設值 1 等同原有行為。"
             )
+        else:
+            st.session_state.pop('c1_threshold', None)
         if mode_code in ("C", "C1", "C2"):
             c1_ceiling = st.slider(
                 "每店轉出件數上限",
@@ -197,6 +207,8 @@ def render_sidebar() -> Dict:
                 key='c1_ceiling',
                 help="限制 C/C1/C2 模式每間源店最多轉出的件數。提高此值可減少調出店舖總數量。預設 3 等同原有行為。"
             )
+        else:
+            st.session_state.pop('c1_ceiling', None)
 
         st.caption(MODE_DESCRIPTIONS.get(transfer_mode, ""))
 
