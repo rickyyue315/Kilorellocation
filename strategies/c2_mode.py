@@ -110,6 +110,8 @@ class C2ModeStrategy(BaseMatchStrategy):
                     if source['source_type'] in ('ND轉出', 'ND清貨轉出', 'RF加強轉出', 'RF過剩轉出'):
                         if dest['needed_qty'] >= 2:
                             transfer_qty = 2
+                            if dest.get('dest_type') == '重點補0' and 'target_qty' in dest:
+                                transfer_qty = min(transfer_qty, max(dest['target_qty'] - current_received_qty, 0))
 
                 notes = _make_c2_note(source, dest, current_received_qty, transfer_qty)
                 recommendation = build_recommendation(article, product_desc, source, dest, transfer_qty, notes, current_received_qty)

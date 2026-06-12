@@ -295,21 +295,24 @@ class DataProcessor:
             invalid_rp_types = ~normalized_rp.isin(['ND', 'RF'])
             if invalid_rp_types.any():
                 blank_mask = normalized_rp == ''
-                invalid_values = df_processed.loc[invalid_rp_types, 'RP Type'].unique()
-                invalid_count = int(invalid_rp_types.sum())
+                non_blank_invalid = invalid_rp_types & ~blank_mask
+                invalid_values = df_processed.loc[non_blank_invalid, 'RP Type'].unique()
+                invalid_count = int(non_blank_invalid.sum())
+                blank_count = int(blank_mask.sum())
                 if blank_mask.any():
                     blank_values = df_processed.loc[blank_mask, 'RP Type'].unique()
                     logger.warning(f"發現空白的RP Type值，已排除該行數據")
                     df_processed = df_processed[~blank_mask]
-                non_blank_invalid = invalid_rp_types & ~blank_mask
                 if non_blank_invalid.any():
                     logger.warning(f"發現無效的RP Type值: {invalid_values}，請檢查原始數據")
                 # 將無效值列表和計數存入實例屬性，供呼叫方讀取
                 self._invalid_rp_type_values = list(invalid_values)
                 self._invalid_rp_type_count = invalid_count
+                self._blank_rp_type_count = blank_count
             else:
                 self._invalid_rp_type_values = []
                 self._invalid_rp_type_count = 0
+                self._blank_rp_type_count = 0
             df_processed['RP Type'] = normalized_rp
         
         logger.info("數據類型轉換完成")
@@ -489,7 +492,8 @@ class DataProcessor:
             'fill_stats': self.fill_stats,  # 添加填充統計
             # 無效 RP Type 修正資訊（供界面顯示警告）
             'invalid_rp_types': getattr(self, '_invalid_rp_type_values', []),
-            'invalid_rp_type_count': getattr(self, '_invalid_rp_type_count', 0)
+            'invalid_rp_type_count': getattr(self, '_invalid_rp_type_count', 0),
+            'blank_rp_type_count': getattr(self, '_blank_rp_type_count', 0),
         }
         
         logger.info("數據預處理完成")

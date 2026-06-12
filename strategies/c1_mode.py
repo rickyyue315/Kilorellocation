@@ -25,7 +25,9 @@ def identify_destinations_c1_mode(group_df: pd.DataFrame, threshold: int = 1) ->
         if needed_qty <= 0:
             continue
         needed_qty = int(needed_qty)
-        if needed_qty < 2:
+        # C1 模式：確保補貨後至少達到 min(target, 2) 的下限，
+        # 同時不讓補貨量超過 target 超過 1 件以上（避免小店反拿過多庫存）。
+        if needed_qty < 2 and target_qty >= 2:
             if int(target_qty) - needed_qty < 2:
                 continue
             needed_qty = 2
