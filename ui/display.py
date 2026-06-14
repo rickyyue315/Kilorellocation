@@ -143,13 +143,22 @@ def render_kpi_cards(statistics: dict):
     st.markdown("")
 
 
-def _build_display_data(recommendations: list, df: pd.DataFrame, mode: str = None) -> list:
-    _stock_lookup = (
+def _build_stock_lookup(df: pd.DataFrame) -> dict:
+    """建立 (Article, Site) → 庫存字典，供顯示層查詢。
+
+    抽出為獨立函式以便多個優先級群組共用同一份查詢表，避免重複建構。
+    """
+    return (
         df[['Article', 'Site', 'SaSa Net Stock', 'Safety Stock', 'MOQ']]
         .set_index(['Article', 'Site'])
         .rename(columns={'SaSa Net Stock': 'stock', 'Safety Stock': 'safety', 'MOQ': 'moq'})
         .to_dict('index')
     )
+
+
+def _build_display_data(recommendations: list, df: pd.DataFrame, mode: str = None,
+                        stock_lookup: dict = None) -> list:
+    _stock_lookup = stock_lookup if stock_lookup is not None else _build_stock_lookup(df)
 
     display_data = []
     cumulative_transfers = {}
@@ -251,6 +260,9 @@ def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_
     col2.metric("🟡 中優先", f"{len(groups['🟡中優先']):,}")
     col3.metric("🟢 低優先", f"{len(groups['🟢低優先']):,}")
 
+    # 只建立一次 stock lookup，三個優先級群組共用
+    stock_lookup = _build_stock_lookup(df)
+
     for priority_label, color, default_expanded in [
         ('🔴高優先', '#FF4444', True),
         ('🟡中優先', '#FFAA00', False),
@@ -266,7 +278,9 @@ def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_
         ):
             cache_key = f"_display_priority_df_{current_run_key}_{priority_label}"
             if cache_key not in st.session_state:
-                st.session_state[cache_key] = pd.DataFrame(_build_display_data(items, df, mode))
+                st.session_state[cache_key] = pd.DataFrame(
+                    _build_display_data(items, df, mode, stock_lookup=stock_lookup)
+                )
             st.dataframe(st.session_state[cache_key], use_container_width=True)
 
 

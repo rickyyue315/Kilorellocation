@@ -43,6 +43,13 @@ htmlcov/
 *_output.txt
 *_report.txt
 *_result.txt
+stderr*.txt
+
+# Stray redirect artifacts
+/1
+
+# Agent Manager worktrees (local only)
+.kilo/worktrees/
 
 # Archived/debug scripts
 archive/

@@ -113,8 +113,8 @@ AI_REQUEST_TIMEOUT=30
 
 ## 系統需求
 
-- Python 3.8+
-- 依賴：`pandas`、`openpyxl`、`streamlit`、`numpy`、`xlsxwriter`、`ftfy`、`httpx`
+- Python 3.13（見 `runtime.txt`，部署與本機需一致）
+- 依賴（版本見 `requirements.txt`）：`pandas`、`numpy`、`openpyxl`、`python-calamine`、`streamlit`、`xlsxwriter`、`ftfy`、`httpx`
 - AI 功能（可選）：OpenRouter API key（見下方 AI 功能說明）
 
 ## 安裝與執行
@@ -159,6 +159,30 @@ streamlit run app.py
 ```
 
 預設網址：`http://localhost:8501`
+
+## Zeabur 部署
+
+專案內含 `Dockerfile`、`Procfile` 與 `.dockerignore`，Zeabur 會自動偵測並以明確的啟動命令運行：
+
+```bash
+streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.headless=true
+```
+
+### 部署設定建議
+
+1. **偵測方式**：Zeabur 會優先使用 `Dockerfile`（鎖定 Python 3.13、layer cache 加速重建）。
+2. **Port**：啟動命令已讀取 Zeabur 注入的 `PORT` 環境變數，無需手動設定。
+3. **Health Check**：在 Zeabur Service 的 Networking/Health Check 設定路徑為 `/_stcore/health`（Streamlit 內建健康端點，回傳 `ok`），避免部署後被誤判為 unhealthy 而重啟循環。
+4. **上傳大小**：`maxUploadSize` 已對齊應用層 50MB 上限（`.streamlit/config.toml`），防止小容器因大型暫存而 OOM。
+5. **環境變數**：
+
+   | 變數 | 預設 | 說明 |
+   | --- | --- | --- |
+   | `KILO_LOG_LEVEL` | `WARNING`（Zeabur）/ `INFO`（本機） | 日誌層級 |
+   | `KILO_ZEABUR_RESULT_PREVIEW_LIMIT` | `1000` | Zeabur 結果表預覽行數上限 |
+   | `KILO_FIX_MOJIBAKE` | `0` | 啟用亂碼修補 |
+   | `KILO_PERF_TIMING` | `0` | 啟用效能計時面板 |
+   | `AI_ENABLED` / `OPENROUTER_API_KEY` | – | 可選 AI 執行摘要（見 AI 功能說明） |
 
 ## 輸入資料欄位
 

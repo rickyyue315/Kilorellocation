@@ -1,0 +1,43 @@
+# 版本控制與環境
+.git
+.gitignore
+.venv
+venv
+env
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.coverage
+htmlcov
+
+# Kilo / IDE
+.kilo
+.vscode
+.idea
+.commandcode
+
+# 文件與封存
+archive
+legacy
+plans
+*.md
+!README.md
+調貨模式詳解.txt
+Old App chi text.txt
+
+# 測試與輸出
+tests
+stderr*.txt
+test_output.txt
+test_result.txt
+_run_tests.py
+install_dependencies.py
+DEBUG_CHECKLIST.md
+
+# 建構產物
+1
+*.tmp
+*.bak
+*.old
+*.log

@@ -39,7 +39,7 @@ def _cached_preprocess(file_bytes: bytes) -> tuple:
     return df, stats
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=os.getenv('KILO_LOG_LEVEL', 'WARNING' if IS_ZEABUR_RUNTIME else 'INFO').upper())
 logger = logging.getLogger(__name__)
 
 

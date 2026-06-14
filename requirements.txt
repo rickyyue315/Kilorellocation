@@ -1,9 +1,12 @@
-pandas>=2.0.0
-openpyxl>=3.1.0
-python-calamine>=0.1.0
-streamlit==1.38.0
-numpy>=1.24.0
-xlsxwriter>=3.1.0
-ftfy>=6.2.0
-httpx>=0.27.0
-pytest>=8.0.0
+# ── 執行期依賴（鎖定為已通過 354 項測試的版本，確保 Zeabur 部署與本機一致）──
+pandas==2.3.3
+numpy==2.4.2
+openpyxl==3.1.5
+python-calamine==0.6.2
+xlsxwriter==3.2.9
+streamlit==1.54.0
+ftfy==6.3.1
+httpx==0.28.1
+
+# ── 開發/測試 ──
+pytest==9.0.2
