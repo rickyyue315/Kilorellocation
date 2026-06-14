@@ -65,6 +65,12 @@ class TestValidatePair:
         dest = {'site': 'HA01', 'om': 'OM2', 'rp_type': 'RF'}
         assert not validate_pair(source, dest, set(), cross_om=True)
 
+    def test_cross_om_hd_allowed_when_explicitly_enabled(self):
+        """跨 OM 時若顯式 allow_hd_to_hk=True，HD 可轉 HA/HB/HC"""
+        source = {'site': 'HD01', 'om': 'OM1', 'rp_type': 'RF'}
+        dest = {'site': 'HA01', 'om': 'OM2', 'rp_type': 'RF'}
+        assert validate_pair(source, dest, set(), cross_om=True, allow_hd_to_hk=True)
+
     def test_cross_om_hd_to_other_allowed(self):
         """跨 OM 時 HD 轉非 HA/HB/HC 允許"""
         source = {'site': 'HD01', 'om': 'OM1', 'rp_type': 'RF'}

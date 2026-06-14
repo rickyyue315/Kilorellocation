@@ -22,6 +22,7 @@ def validate_pair(
     check_nd_receive: bool = True,
     check_source_in_receive_sites: bool = True,
     cross_om: bool = False,
+    allow_hd_to_hk: bool = False,
     source_to_receive_sites: Optional[Dict[str, Set[str]]] = None,
     max_receive_sites_per_source: Optional[int] = None,
 ) -> bool:
@@ -38,6 +39,7 @@ def validate_pair(
         check_nd_receive: If True, block ND stores from receiving
         check_source_in_receive_sites: If True, block sources that are already destinations
         cross_om: If True, apply cross-OM constraints (Windy→Windy, HD→HK)
+        allow_hd_to_hk: If True and cross_om is True, allow HD→HA/HB/HC transfers
         source_to_receive_sites: Dict tracking which sites each source has sent to
         max_receive_sites_per_source: Max number of distinct destinations per source
     """
@@ -56,7 +58,7 @@ def validate_pair(
     if cross_om:
         if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
             return False
-        if is_hd_to_hk_restricted(source['site'], dest['site']):
+        if not allow_hd_to_hk and is_hd_to_hk_restricted(source['site'], dest['site']):
             return False
     
     if max_receive_sites_per_source is not None and source_to_receive_sites is not None:

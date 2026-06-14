@@ -98,6 +98,24 @@ section[data-testid="stSidebar"] .block-container {
     padding: var(--space-5) !important;
 }
 
+/* 側邊欄文字自動換行 */
+section[data-testid="stSidebar"] .stMarkdown,
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+section[data-testid="stSidebar"] .stCaption,
+section[data-testid="stSidebar"] [data-testid="stCaption"] {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+section[data-testid="stSidebar"] .stMarkdown p,
+section[data-testid="stSidebar"] .stMarkdown li,
+section[data-testid="stSidebar"] .stCaption p,
+section[data-testid="stSidebar"] .stCaption span {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
 /* ── 4. Typography Hierarchy ── */
 h1, h2, h3, h4, h5, h6 {
     color: var(--text-primary) !important;
@@ -281,6 +299,16 @@ div[data-testid="stRadio"] div[role="radiogroup"] label {
     border: 1px solid transparent;
     transition: all var(--dur-fast) var(--ease-out);
     margin-bottom: 2px !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    display: flex;
+    align-items: flex-start;
+}
+div[data-testid="stRadio"] div[role="radiogroup"] label span {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
 }
 div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
     background: rgba(245, 158, 11, 0.06);

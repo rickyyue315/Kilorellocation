@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Set
 import pandas as pd
 
 from strategies.base import BaseMatchStrategy
-from strategies.predicates import validate_pair, is_hd_to_hk_restricted
+from strategies.predicates import validate_pair
 from services.recommendation_factory import build_recommendation, apply_transfer
 from services.matching_engine import prep_temp_lists
 from services.source_dest_factory import make_source, make_dest, compute_max_protected_sold
@@ -216,23 +216,18 @@ class FModeStrategy(BaseMatchStrategy):
                     if source['transferable_qty'] <= 0 or dest['needed_qty'] <= 0 or remaining_demand <= 0:
                         continue
 
+                    allow_hd_to_hk = is_f_mode and self._f2_allow_hd_transfer
                     if not validate_pair(source, dest, transfer_sites,
                                          check_nd_receive=False,
                                          check_source_in_receive_sites=False,
-                                         cross_om=False):
+                                         cross_om=True,
+                                         allow_hd_to_hk=allow_hd_to_hk):
                         continue
 
                     if priority_level == 2:
                         if dest.get('rp_type') == 'ND':
                             continue
                         if source['om'] != dest['om']:
-                            continue
-
-                    if source.get('om') == 'Windy' and dest.get('om') != 'Windy':
-                        continue
-
-                    if is_hd_to_hk_restricted(source['site'], dest['site']):
-                        if not (is_f_mode and self._f2_allow_hd_transfer):
                             continue
 
                     transfer_qty = min(source['transferable_qty'], dest['needed_qty'], remaining_demand)
@@ -296,17 +291,12 @@ class FModeStrategy(BaseMatchStrategy):
                 if dest['site'] in transfer_sites:
                     continue
 
+                allow_hd_to_hk = is_f_mode and self._f2_allow_hd_transfer
                 if not validate_pair(src, dest, transfer_sites,
                                      check_nd_receive=False,
                                      check_source_in_receive_sites=False,
-                                     cross_om=False):
-                    continue
-
-                if is_hd_to_hk_restricted(src['site'], dest['site']):
-                    if not (is_f_mode and self._f2_allow_hd_transfer):
-                        continue
-
-                if src.get('om') == 'Windy' and dest.get('om') != 'Windy':
+                                     cross_om=True,
+                                     allow_hd_to_hk=allow_hd_to_hk):
                     continue
 
                 transfer_qty = min(src['transferable_qty'], dest['needed_qty'])

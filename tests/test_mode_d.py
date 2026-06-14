@@ -4,10 +4,6 @@
 驗證 ND 店鋪無銷售記錄時的清貨邏輯，以及避免 1 件餘貨的功能
 """
 
-import sys
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-
 import pandas as pd
 from business_logic import TransferLogic
 

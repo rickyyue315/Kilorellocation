@@ -7,10 +7,6 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from typing import Any, Dict, List, Optional
-
-import pandas as pd
-
 from strategies.base import BaseMatchStrategy
 from strategies.simplified_sku import identify_sources_simplified_sku
 from services.recommendation_factory import build_recommendation
