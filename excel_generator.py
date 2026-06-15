@@ -452,6 +452,10 @@ class ExcelGenerator:
             'border': 1, 'font_name': 'Arial', 'font_size': 10,
             'font_color': '#9C0006', 'bg_color': '#FFC7CE',
         })
+        pct_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+            'align': 'right', 'num_format': '0.0"%"',
+        })
 
         row = 0
         worksheet.merge_range(row, 0, row, 13, 'Target 達成分析', title_fmt)
@@ -495,7 +499,7 @@ class ExcelGenerator:
             worksheet.write(row, 5, entry['target_qty'], data_fmt)
             worksheet.write(row, 6, entry['actual_received'], data_fmt)
             worksheet.write(row, 7, entry['gap'], fmt)
-            worksheet.write(row, 8, entry.get('fulfillment_pct', 0), data_fmt)
+            worksheet.write(row, 8, entry.get('fulfillment_pct', 0), pct_fmt)
             worksheet.write(row, 9, entry['status'], fmt)
             row += 1
 
