@@ -4,7 +4,7 @@
 
 import os
 
-VERSION = "v2.25.0"
+VERSION = "v2.26.0"
 
 ZEABUR_ENV_KEYS = [
     'ZEABUR',

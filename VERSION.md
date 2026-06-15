@@ -1,5 +1,35 @@
 # 版本更新記錄
 
+## v2.26.0 (2026-06-15)
+
+### D2 模式新增「限制2間店舖接收（原有設定）」選項（3選1）
+
+#### 變更說明
+- D2 模式接收策略從 2 選 1 擴展為 3 選 1：
+  1. **「不限店舖數量（原有設定）」**：每間 ND 源可配對任意數量 RF 接收店，target_qty 為正常值
+  2. **「限制2間店舖接收（原有設定）」**（新增）：每間 ND 源最多配對 2 間 RF 接收店，target_qty 為正常值
+  3. **「限制2間店舖接收（優化版）」**：每間 ND 源最多配對 2 間 RF 接收店，target_qty 放大至 200%
+- 遷移 `d2_enable_2site_limit`（bool）→ `d2_site_limit_mode`（str），支援 3 種狀態
+
+#### 修改檔案
+- `ui/sidebar.py` — 新增第 3 個 radio 選項及對應註解；D2 詳細模式說明更新
+- `config.py` — 版本號 bump 至 v2.26.0
+- `app.py` — `d2_enable_2site_limit` 改為 `d2_site_limit_mode`；docstring 版本更新
+- `business_logic.py` — `d2_site_limit_mode` 參數（預設 "unlimited"）；dest/matching 三路路由
+- `services/notes.py` — 三種模式的 note suffix 邏輯
+
+#### 文件同步
+- `README.md` — D2 模式描述、核心規則、功能亮點、模式對照表更新
+- `VERSION.md` — 本版本記錄
+- `config.py` — 版本號 bump 至 v2.26.0
+- `app.py` — docstring 版本更新
+- `ui/tutorial.py` — D2 教學內容更新（3 選 1 說明）
+- `data/tutorials/d.json` — D2 extra_notes 更新
+- `調貨模式詳解.txt` — D2 新增「原有設定」優化版說明
+- `transfer_logic_ai_brief.md` — D2 模式說明更新
+
+---
+
 ## v2.25.0 (2026-06-11)
 
 ### 新增 NST 模式：New Shop Target調貨（第28個模式）

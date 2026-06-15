@@ -190,17 +190,31 @@ def render_sidebar() -> Dict:
         else:
             st.session_state.pop('nst_shop_limit_option', None)
 
-        d2_enable_2site_limit = False
+        # ── D2 模式接收店舖數量限制（3選1）─────────────────────────────
+        # 選項1「不限店舖數量（原有設定）」：無限制，target_qty 為正常值
+        #  - 沿用 identify_destinations_d_mode() + match_general_mode()
+        #  - 每個 ND 源可配對任意數量 RF 接收店，每間 RF target_qty 為正常值
+        # 選項2「限制2間店舖接收（原有設定）」：限 2 間，target_qty 為正常值
+        #  - 沿用 identify_destinations_d_mode() + match_d2_mode()
+        #  - 每個 ND 源最多配對 2 間 RF 接收店，每間 RF target_qty 為正常值
+        #  - 營運上打包更集中，但接收量無放大
+        # 選項3「限制2間店舖接收（優化版）」：限 2 間，target_qty × 2
+        #  - 沿用 identify_destinations_d2_mode() + match_d2_mode()
+        #  - 每個 ND 源最多配對 2 間 RF 接收店，每間 RF target_qty 放大至 200%
+        #  - 補償接收店數量減少對總調貨量的影響
+        d2_site_limit_mode = "unlimited"
         if mode_code == "D2":
             d2_option = st.radio(
                 "接收店舖數量限制",
-                ["不限店舖數量（原有設定）", "限制2間店舖接收（優化版）"],
+                ["不限店舖數量（原有設定）", "限制2間店舖接收（原有設定）", "限制2間店舖接收（優化版）"],
                 index=0,
                 key='d2_site_limit_option',
-                help="限制模式：同一SKU各ND轉出源最多配對2間RF接收店，並將接收量放大至200%。"
+                help="D2 模式的三種接收策略：1) 不限店舖數量 — 每個 ND 源可配對任意數量 RF 接收店，target_qty 為正常值（原有行為）；2) 限制 2 間（原有設定）— 每個 ND 源最多配對 2 間 RF 接收店，target_qty 為正常值（打包集中但無放大）；3) 限制 2 間（優化版）— 每個 ND 源最多配對 2 間 RF 接收店，target_qty 放大至 200%（補償接收店減少）。"
             )
-            if d2_option == "限制2間店舖接收（優化版）":
-                d2_enable_2site_limit = True
+            if d2_option == "限制2間店舖接收（原有設定）":
+                d2_site_limit_mode = "2site_original"
+            elif d2_option == "限制2間店舖接收（優化版）":
+                d2_site_limit_mode = "2site_optimized"
         else:
             st.session_state.pop('d2_site_limit_option', None)
 
@@ -323,7 +337,10 @@ def render_sidebar() -> Dict:
             - RF店舖只作為接收方(緊急缺貨/潛在缺貨)
             - 仍限制同一組OM內配對
             - 避免1件餘貨邏輯同D模式
-            - 可切換「限制2間店舖接收（優化版）」：限制每間ND轉出源最多配對2間RF接收店，接收量放大至200%
+            - 可切換接收策略（三選一）：
+              - 「不限店舖數量（原有設定）」：每間ND源可配對任意RF接收店，target_qty正常值
+              - 「限制2間店舖接收（原有設定）」：每間ND源最多配對2間RF接收店，target_qty正常值
+              - 「限制2間店舖接收（優化版）」：每間ND源最多配對2間RF接收店，target_qty放大至200%
             
             **E1模式(強制轉出)**
             - 針對標記為*ALL*的商品行,全數強制轉出
@@ -464,7 +481,7 @@ def render_sidebar() -> Dict:
         'b_special_max_receive_sites_per_source': b_special_max_receive_sites_per_source,
         'b_special_receive_site_limit_option': b_special_receive_site_limit_option,
         'f2_allow_hd_transfer': f2_allow_hd_transfer,
-        'd2_enable_2site_limit': d2_enable_2site_limit,
+        'd2_site_limit_mode': d2_site_limit_mode,
         'c1_threshold': c1_threshold,
         'c1_ceiling': c1_ceiling,
         'f_fulfill_small_first': f_fulfill_small_first,

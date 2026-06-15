@@ -585,23 +585,31 @@ if source['source_type'] == 'ND清貨轉出':
 - 如果轉出後會剩餘1件，則嘗試多轉1件（使剩餘為0件）
 - 若無法多轉1件，則少轉1件（使剩餘為2件）
 
-### 2a. 優化版：限制接收店舖數量（可選）
+### 2a. 接收店舖數量限制（可選，3 選 1）
 
-可在側邊欄選擇「限制2間店舖接收（優化版）」啟用以下優化：
+D2 模式可在側邊欄選擇以下 3 種接收策略：
 
-#### 限制配對數量
+#### 選項 A：不限店舖數量（原有設定）
+- 每間 ND 轉出源可配對任意數量 RF 接收店
+- target_qty 為正常值（緊急缺貨：`max(Safety, 2)`；潛在缺貨：`Safety Stock`）
+- 使用 `identify_destinations_d_mode()` 生成接收目標 + `match_general_mode()` 配對
+- **適合**：希望最大化總調貨量，不介意打包複雜度
+
+#### 選項 B：限制2間店舖接收（原有設定）（新增）
 - **每間ND轉出源**最多配對2間RF接收店（`max_receive_sites_per_source=2`）
 - 避免轉出店需為大量不同店舖打包，降低營運複雜度
+- target_qty 為正常值（不放大接收量）
+- 使用 `identify_destinations_d_mode()` 生成接收目標 + `match_d2_mode()` 配對
+- **注意**：因無放大接收量，在源頭庫存充足時總調貨量可能少於「不限店舖數量」
 
-#### 放大接收量至200%
-- 緊急缺貨補貨：`target_qty = max(Safety Stock × 2, 4)`
-- 潛在缺貨補貨：`target_qty = Safety Stock × 2`
+#### 選項 C：限制2間店舖接收（優化版）
+- **每間ND轉出源**最多配對2間RF接收店（`max_receive_sites_per_source=2`）
+- **放大接收量至200%**：
+  - 緊急缺貨補貨：`target_qty = max(Safety Stock × 2, 4)`
+  - 潛在缺貨補貨：`target_qty = Safety Stock × 2`
 - **原因**：限制接收店數量後，每間接收店需要吸收更多貨量，故放寬至原有的200%
-
-#### 技術實作
-- 透過獨立的 `_dests_d2_mode()` 方法生成放大後的接收目標
-- 匹配階段使用 `match_d2_mode()` 函式，每回合傳入 `max_receive_sites_per_source=2`
-- 若選擇「不限店舖數量」則沿用原有邏輯不變
+- 使用 `identify_destinations_d2_mode()` 生成放大後的接收目標 + `match_d2_mode()` 配對
+- **注意**：在源頭庫存充足時總調貨量可能比「不限店舖數量」更多（因每間接收店可吸收2倍貨量）
 
 ### 3. 接收規則
 

@@ -27,8 +27,12 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
     if source['rp_type'] == 'ND' and mode_info['is_d_family']:
         mode_label = 'D2' if mode == mode_info['mode_d2'] else 'D'
         suffix = ""
-        if mode == mode_info['mode_d2'] and mode_info.get('d2_enable_2site_limit'):
-            suffix = "(收≤2間,量×200%)"
+        if mode == mode_info['mode_d2']:
+            d2_mode = mode_info.get('d2_site_limit_mode', 'unlimited')
+            if d2_mode == "2site_original":
+                suffix = "(收≤2間)"
+            elif d2_mode == "2site_optimized":
+                suffix = "(收≤2間,量×200%)"
         return f"剩{remaining}件(ND清貨{mode_label}{suffix})"
     if src_type == 'F模式RF轉出':
         return f"剩{remaining}件(F-RF轉)"
