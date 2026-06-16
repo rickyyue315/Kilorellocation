@@ -1,6 +1,8 @@
 """
 Statistics service — computes aggregate stats from transfer recommendations.
 """
+from __future__ import annotations
+
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -172,5 +174,127 @@ def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]],
         'total_gap': total_gap,
         'total_target_qty': total_target_qty,
         'total_achieved_qty': total_achieved_qty,
+        'details': details,
+    }
+
+
+def compute_nd_clearance_stats(
+    recommendations: List[Dict[str, Any]],
+    df: Optional[pd.DataFrame] = None,
+) -> Dict[str, Any]:
+    """
+    D/D2 模式 — ND 清貨完成度分析。
+
+    統計 Source Type == 'ND清貨轉出' 的 recommendation，計算每家 ND 店舖
+    是否完全清出；若提供 df，則補上符合清貨條件但無任何 recommendation 的
+    店舖（完全未清出）。
+
+    Returns:
+        dict with:
+          - total_nd_sites
+          - fully_cleared_sites
+          - not_fully_cleared_sites
+          - total_remaining_qty
+          - article_summary (per-SKU aggregate)
+          - details (per-store detail)
+    """
+    from collections import defaultdict
+
+    # ── 從 recommendations 彙整 ──
+    nd_site_map = defaultdict(lambda: {
+        'article': '', 'brand': '', 'product_desc': '', 'transfer_om': '',
+        'transfer_site': '', 'original_stock': 0, 'total_transferred': 0,
+    })
+
+    for rec in recommendations:
+        if rec.get('Source Type') != 'ND清貨轉出':
+            continue
+        key = (rec['Article'], str(rec.get('Transfer Site', '')).strip().upper())
+        entry = nd_site_map[key]
+        entry['article'] = rec['Article']
+        entry['brand'] = rec.get('Brand') or rec.get('Product Hierarchy', '')
+        entry['product_desc'] = rec.get('Product Desc', '')
+        entry['transfer_om'] = rec.get('Transfer OM', '')
+        entry['transfer_site'] = rec.get('Transfer Site', '')
+        entry['original_stock'] = rec.get('Original Stock', 0)
+        entry['total_transferred'] += rec.get('Transfer Qty', 0)
+
+    # ── 若提供 df，補上無 recommendation 的 ND 清貨來源 ──
+    if df is not None and not df.empty:
+        nd_sources = df[
+            (df['RP Type'] == 'ND')
+            & (df['SaSa Net Stock'] > 0)
+            & (df['Last Month Sold Qty'] == 0)
+            & (df['MTD Sold Qty'] == 0)
+        ]
+        for _, row in nd_sources.iterrows():
+            site_key = str(row.get('Site', '')).strip().upper()
+            article = str(row.get('Article', ''))
+            detail_key = (article, site_key)
+            if detail_key in nd_site_map:
+                continue
+            nd_site_map[detail_key] = {
+                'article': article,
+                'brand': str(row.get('Product Hierarchy', row.get('Brand', ''))),
+                'product_desc': str(row.get('Article Description', '')),
+                'transfer_om': str(row.get('OM', '')),
+                'transfer_site': str(row.get('Site', '')),
+                'original_stock': int(row.get('SaSa Net Stock', 0)),
+                'total_transferred': 0,
+            }
+
+    # ── 計算明細與彙總 ──
+    details = []
+    article_agg: Dict[str, Dict] = {}
+
+    for entry in nd_site_map.values():
+        original = entry['original_stock']
+        transferred = entry['total_transferred']
+        remaining = original - transferred
+        is_fully_cleared = remaining <= 0
+
+        detail = {
+            'article': entry['article'],
+            'brand': entry['brand'],
+            'product_desc': entry['product_desc'],
+            'transfer_om': entry['transfer_om'],
+            'transfer_site': entry['transfer_site'],
+            'original_stock': original,
+            'total_transferred_qty': transferred,
+            'after_transfer_stock': max(remaining, 0),
+            'is_fully_cleared': is_fully_cleared,
+        }
+        details.append(detail)
+
+        # SKU 彙總
+        art = entry['article']
+        if art not in article_agg:
+            article_agg[art] = {
+                'article': art,
+                'brand': entry['brand'],
+                'product_desc': entry['product_desc'],
+                'total_nd_sites': 0,
+                'not_fully_cleared_site_count': 0,
+                'total_remaining_qty': 0,
+            }
+        article_agg[art]['total_nd_sites'] += 1
+        if not is_fully_cleared:
+            article_agg[art]['not_fully_cleared_site_count'] += 1
+            article_agg[art]['total_remaining_qty'] += max(remaining, 0)
+
+    total_nd_sites = len(details)
+    fully_cleared = sum(1 for d in details if d['is_fully_cleared'])
+    not_fully_cleared = total_nd_sites - fully_cleared
+    total_remaining_qty = sum(d['after_transfer_stock'] for d in details if not d['is_fully_cleared'])
+
+    article_summary = sorted(article_agg.values(), key=lambda x: -x['total_remaining_qty'])
+    details.sort(key=lambda x: (x['article'], x['transfer_site']))
+
+    return {
+        'total_nd_sites': total_nd_sites,
+        'fully_cleared_sites': fully_cleared,
+        'not_fully_cleared_sites': not_fully_cleared,
+        'total_remaining_qty': total_remaining_qty,
+        'article_summary': article_summary,
         'details': details,
     }

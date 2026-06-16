@@ -1,5 +1,5 @@
 """
-Excel輸出模組 v2.16.0
+Excel輸出模組 v2.27.0
 生成調貨建議和統計摘要的Excel文件
 支持二十八模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/NST(New Shop Target調貨)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 增加詳細Notes分類資訊
@@ -13,7 +13,7 @@ import xlsxwriter
 from typing import Dict, List, Optional
 import logging
 
-from services.statistics import compute_target_fulfillment_stats
+from services.statistics import compute_target_fulfillment_stats, compute_nd_clearance_stats
 
 # 設置日誌
 logger = logging.getLogger(__name__)
@@ -360,6 +360,8 @@ class ExcelGenerator:
             self.create_summary_dashboard_sheet(writer, statistics)
             if mode in ("目標優化", "F指定模式", "目標性補0", "New Shop Target調貨"):
                 self.create_target_fulfillment_sheet(writer, recommendations, df)
+            if mode in ("清貨轉貨", "清貨轉貨(ND限定)"):
+                self.create_nd_clearance_sheet(writer, recommendations, df)
             if ai_summary:
                 self.create_smart_summary_sheet(writer, ai_summary)
 
@@ -513,4 +515,116 @@ class ExcelGenerator:
         worksheet.set_column('H:H', 8)
         worksheet.set_column('I:I', 14)
         worksheet.set_column('J:J', 20)
+        worksheet.set_default_row(18)
+
+    def create_nd_clearance_sheet(self, writer, recommendations: List[Dict],
+                                   df: Optional[pd.DataFrame] = None):
+        """創建 ND 清貨完成分析工作表（僅 D/D2 模式）。"""
+        logger.info("創建ND清貨完成分析工作表")
+        stats = compute_nd_clearance_stats(recommendations, df)
+        details = stats.get('details', [])
+        if not details:
+            return
+
+        workbook = writer.book
+        worksheet = workbook.add_worksheet('ND清貨完成分析')
+
+        title_fmt = workbook.add_format({
+            'bold': True, 'font_size': 16, 'align': 'center',
+            'valign': 'vcenter', 'font_name': 'Arial',
+        })
+        kpi_label_fmt = workbook.add_format({
+            'bold': True, 'font_size': 11, 'bg_color': '#4472C4',
+            'font_color': 'white', 'align': 'center', 'valign': 'vcenter',
+            'border': 1, 'font_name': 'Arial',
+        })
+        kpi_value_fmt = workbook.add_format({
+            'bold': True, 'font_size': 11, 'bg_color': '#D7E4BC',
+            'align': 'center', 'valign': 'vcenter', 'border': 1,
+            'font_name': 'Arial',
+        })
+        header_fmt = workbook.add_format({
+            'bold': True, 'bg_color': '#D7E4BC', 'border': 1,
+            'font_name': 'Arial', 'font_size': 10, 'text_wrap': True,
+            'valign': 'vcenter',
+        })
+        data_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+        })
+        ok_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+            'font_color': '#006100', 'bg_color': '#C6EFCE',
+        })
+        fail_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+            'font_color': '#9C0006', 'bg_color': '#FFC7CE',
+        })
+
+        row = 0
+        worksheet.merge_range(row, 0, row, 9, 'ND 清貨完成分析', title_fmt)
+        row += 2
+
+        row1_kpis = [
+            ('ND 清貨店舖總數', stats['total_nd_sites']),
+            ('已完全清出店舖', stats['fully_cleared_sites']),
+            ('未完成清出店舖', stats['not_fully_cleared_sites']),
+            ('總剩餘件數', stats['total_remaining_qty']),
+        ]
+        for i, (label, value) in enumerate(row1_kpis):
+            worksheet.write(row, i * 2, label, kpi_label_fmt)
+            worksheet.write(row, i * 2 + 1, value, kpi_value_fmt)
+        row += 2
+
+        art_summary = stats.get('article_summary', [])
+        if art_summary:
+            worksheet.write(row, 0, 'SKU 彙總', title_fmt)
+            row += 1
+            art_headers = ['Brand', 'Article', 'Product Desc',
+                           'ND清貨店舖數', '未完成店舖數', '總剩餘件數']
+            for col, h in enumerate(art_headers):
+                worksheet.write(row, col, h, header_fmt)
+            row += 1
+            for entry in art_summary:
+                worksheet.write(row, 0, entry.get('brand', ''), data_fmt)
+                worksheet.write(row, 1, entry.get('article', ''), data_fmt)
+                worksheet.write(row, 2, entry.get('product_desc', ''), data_fmt)
+                worksheet.write(row, 3, entry['total_nd_sites'], data_fmt)
+                worksheet.write(row, 4, entry['not_fully_cleared_site_count'], data_fmt)
+                worksheet.write(row, 5, entry['total_remaining_qty'], data_fmt)
+                row += 1
+            row += 1
+
+        worksheet.write(row, 0, '店舖明細', title_fmt)
+        row += 1
+        detail_headers = ['Brand', 'Article', 'Product Desc', 'Transfer OM',
+                          'Transfer Site', 'Original Stock', 'Total Transferred',
+                          'After Transfer Stock', 'Status']
+        for col, h in enumerate(detail_headers):
+            worksheet.write(row, col, h, header_fmt)
+        row += 1
+
+        for entry in details:
+            is_ok = entry['is_fully_cleared']
+            fmt = ok_fmt if is_ok else fail_fmt
+            worksheet.write(row, 0, entry.get('brand', ''), data_fmt)
+            worksheet.write(row, 1, entry.get('article', ''), data_fmt)
+            worksheet.write(row, 2, entry.get('product_desc', ''), data_fmt)
+            worksheet.write(row, 3, entry.get('transfer_om', ''), data_fmt)
+            worksheet.write(row, 4, entry.get('transfer_site', ''), data_fmt)
+            worksheet.write(row, 5, entry['original_stock'], data_fmt)
+            worksheet.write(row, 6, entry['total_transferred_qty'], data_fmt)
+            worksheet.write(row, 7, entry['after_transfer_stock'], fmt)
+            status_text = '已完成' if is_ok else '未完成'
+            worksheet.write(row, 8, status_text, fmt)
+            row += 1
+
+        worksheet.set_column('A:A', 14)
+        worksheet.set_column('B:B', 12)
+        worksheet.set_column('C:C', 25)
+        worksheet.set_column('D:D', 12)
+        worksheet.set_column('E:E', 12)
+        worksheet.set_column('F:F', 14)
+        worksheet.set_column('G:G', 16)
+        worksheet.set_column('H:H', 18)
+        worksheet.set_column('I:I', 14)
         worksheet.set_default_row(18)

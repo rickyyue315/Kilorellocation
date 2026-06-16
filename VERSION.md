@@ -1,5 +1,34 @@
 # 版本更新記錄
 
+## v2.27.0 (2026-06-16)
+
+### D/D2 模式 Excel 報表新增「ND清貨完成分析」頁
+
+#### 變更說明
+- D 系列（`清貨轉貨`、`清貨轉貨(ND限定)`）Excel 報表新增第三張工作表 `ND清貨完成分析`
+- 仿照 F 系列 `Target達成分析` 頁面，彙整 ND 清貨來源的完成狀態
+- 提供每 SKU 的未完成剩餘件數與未完成店舖數彙總
+- 提供 per-store 明細（Original Stock / Total Transferred / After Transfer Stock / Status）
+- 若來源 ND 店舖完全未配對到接收店，仍會出現在統計中（需提供原始 df）
+
+#### 新增檔案
+- （無）
+
+#### 修改檔案
+- `services/statistics.py` — 新增 `compute_nd_clearance_stats()` 函式
+- `excel_generator.py` — 新增 `create_nd_clearance_sheet()` 方法；`generate_excel_file()` D/D2 分支
+- `config.py` — 版本號 bump 至 v2.27.0
+- `app.py` — docstring 版本更新
+- `VERSION.md` — 本版本記錄
+
+#### 文件同步
+- `README.md` — 輸出內容補充（D/D2 報表含 ND清貨完成分析頁）
+- `ui/tutorial.py` — D/D2 教學補充輸出結構說明
+- `調貨模式詳解.txt` — D/D2 輸出內容補充
+- `transfer_logic_ai_brief.md` — D/D2 輸出格式補充
+
+---
+
 ## v2.26.0 (2026-06-15)
 
 ### D2 模式新增「限制2間店舖接收（原有設定）」選項（3選1）

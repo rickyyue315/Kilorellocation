@@ -198,5 +198,73 @@ def test_mode_d_clearance():
     print("測試完成")
     print("=" * 60)
 
+
+def test_compute_nd_clearance_stats():
+    """Test compute_nd_clearance_stats with partial, fully cleared, and unmatched stores."""
+    from services.statistics import compute_nd_clearance_stats
+
+    recs = [
+        {
+            'Article': '100000000001',
+            'Brand': 'BrandA', 'Product Desc': 'Product A',
+            'Transfer OM': 'Ivy', 'Transfer Site': 'ND01',
+            'Receive OM': 'Ivy', 'Receive Site': 'RF01',
+            'Transfer Qty': 3, 'Original Stock': 5,
+            'After Transfer Stock': 2,
+            'Source Type': 'ND清貨轉出', 'Destination Type': '緊急缺貨補貨',
+            'Notes': '', 'Safety Stock': 0, 'MOQ': 1,
+            'Transfer Site Last Month Sold Qty': 0,
+            'Transfer Site MTD Sold Qty': 0,
+        },
+        {
+            'Article': '100000000001',
+            'Brand': 'BrandA', 'Product Desc': 'Product A',
+            'Transfer OM': 'Ivy', 'Transfer Site': 'ND02',
+            'Receive OM': 'Ivy', 'Receive Site': 'RF02',
+            'Transfer Qty': 5, 'Original Stock': 5,
+            'After Transfer Stock': 0,
+            'Source Type': 'ND清貨轉出', 'Destination Type': '緊急缺貨補貨',
+            'Notes': '', 'Safety Stock': 0, 'MOQ': 1,
+            'Transfer Site Last Month Sold Qty': 0,
+            'Transfer Site MTD Sold Qty': 0,
+        },
+    ]
+
+    stats = compute_nd_clearance_stats(recs)
+    assert stats['total_nd_sites'] == 2
+    assert stats['fully_cleared_sites'] == 1
+    assert stats['not_fully_cleared_sites'] == 1
+    assert stats['total_remaining_qty'] == 2
+    assert len(stats['article_summary']) == 1
+    assert stats['article_summary'][0]['total_remaining_qty'] == 2
+    assert stats['article_summary'][0]['not_fully_cleared_site_count'] == 1
+
+
+def test_compute_nd_clearance_stats_with_df_unmatched():
+    """Test that ND stores with zero recommendations but matching df are included."""
+    import pandas as pd
+    from services.statistics import compute_nd_clearance_stats
+
+    recs = []
+
+    df = pd.DataFrame([
+        {
+            'Article': '100000000001', 'Article Description': 'Product A',
+            'Product Hierarchy': 'BrandA', 'Brand': 'BrandA',
+            'OM': 'Ivy', 'RP Type': 'ND', 'Site': 'ND03',
+            'SaSa Net Stock': 10, 'Pending Received': 0,
+            'Safety Stock': 2, 'MOQ': 1,
+            'Last Month Sold Qty': 0, 'MTD Sold Qty': 0,
+            'Effective Sold Qty': 0,
+        },
+    ])
+
+    stats = compute_nd_clearance_stats(recs, df)
+    assert stats['total_nd_sites'] == 1
+    assert stats['fully_cleared_sites'] == 0
+    assert stats['not_fully_cleared_sites'] == 1
+    assert stats['total_remaining_qty'] == 10
+
+
 if __name__ == "__main__":
     test_mode_d_clearance()

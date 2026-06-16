@@ -164,3 +164,94 @@ class TestSmartSummarySheet:
         result = generator.generate_excel_file(recs, stats, ai_summary='')
         xl = pd.ExcelFile(io.BytesIO(result))
         assert '智能摘要' not in xl.sheet_names
+
+
+class TestNdClearanceSheet:
+    def _make_d_rec(self, source_type='ND清貨轉出', **kw):
+        """Helper: create a D-mode style recommendation."""
+        base = {
+            "Article": "000000000001",
+            "Product Desc": "Test Product",
+            "Transfer OM": "Ivy",
+            "Transfer Site": "ND01",
+            "Receive OM": "Ivy",
+            "Receive Site": "RF01",
+            "Transfer Qty": 3,
+            "Original Stock": 5,
+            "After Transfer Stock": 2,
+            "Safety Stock": 0,
+            "MOQ": 1,
+            "Source Type": source_type,
+            "Destination Type": "緊急缺貨補貨",
+            "Notes": "",
+            "Transfer Site Last Month Sold Qty": 0,
+            "Transfer Site MTD Sold Qty": 0,
+            "Receive Site Last Month Sold Qty": 2,
+            "Receive Site MTD Sold Qty": 1,
+            "Receive Original Stock": 0,
+            "Brand": "TestBrand",
+        }
+        base.update(kw)
+        return base
+
+    def test_d_mode_adds_nd_clearance_sheet(self, generator):
+        recs = [self._make_d_rec()]
+        stats = _make_statistics()
+        result = generator.generate_excel_file(recs, stats, mode='清貨轉貨')
+        xl = pd.ExcelFile(io.BytesIO(result))
+        assert 'ND清貨完成分析' in xl.sheet_names
+        assert len(xl.sheet_names) >= 3
+
+    def test_d2_mode_adds_nd_clearance_sheet(self, generator):
+        recs = [self._make_d_rec()]
+        stats = _make_statistics()
+        result = generator.generate_excel_file(recs, stats, mode='清貨轉貨(ND限定)')
+        xl = pd.ExcelFile(io.BytesIO(result))
+        assert 'ND清貨完成分析' in xl.sheet_names
+        assert len(xl.sheet_names) >= 3
+
+    def test_non_d_mode_no_nd_clearance_sheet(self, generator):
+        recs = [self._make_d_rec()]
+        stats = _make_statistics()
+        result = generator.generate_excel_file(recs, stats, mode='保守轉貨')
+        xl = pd.ExcelFile(io.BytesIO(result))
+        assert 'ND清貨完成分析' not in xl.sheet_names
+
+    def test_nd_clearance_sheet_values(self, generator):
+        """Verify the sheet exists for D mode with ND recs."""
+        r1 = self._make_d_rec(Article='000000000001', Brand='TestBrand')
+        r1.update({'Original Stock': 5, 'Transfer Qty': 3, 'After Transfer Stock': 2,
+                   'Transfer Site': 'ND01'})
+        r2 = self._make_d_rec(Article='000000000001', Brand='TestBrand')
+        r2.update({'Original Stock': 3, 'Transfer Qty': 3, 'After Transfer Stock': 0,
+                   'Transfer Site': 'ND02'})
+        recs = [r1, r2]
+        stats = _make_statistics()
+        result = generator.generate_excel_file(recs, stats, mode='清貨轉貨')
+        xl = pd.ExcelFile(io.BytesIO(result))
+        assert 'ND清貨完成分析' in xl.sheet_names
+        df = pd.read_excel(io.BytesIO(result), sheet_name='ND清貨完成分析', header=None)
+        all_text = df.to_string()
+        assert 'ND01' in all_text
+        assert 'ND02' in all_text
+        assert '未完成' in all_text
+        assert '已完成' in all_text
+
+    def test_nd_clearance_empty_no_details_skips_sheet(self, generator):
+        """No ND清貨轉出 recs → no ND清貨完成分析 sheet created."""
+        recs = [self._make_d_rec(source_type='RF過剩轉出')]
+        stats = _make_statistics()
+        result = generator.generate_excel_file(recs, stats, mode='清貨轉貨')
+        xl = pd.ExcelFile(io.BytesIO(result))
+        assert 'ND清貨完成分析' not in xl.sheet_names
+
+    def test_nd_clearance_with_empty_df_uses_only_recommendations(self, generator):
+        """Empty df should not crash; only recommendation data is used."""
+        r = self._make_d_rec(Article='000000000001', Brand='TestBrand')
+        r.update({'Original Stock': 5, 'Transfer Qty': 1, 'After Transfer Stock': 4,
+                   'Transfer Site': 'ND01'})
+        recs = [r]
+        stats = _make_statistics()
+        result = generator.generate_excel_file(recs, stats, mode='清貨轉貨', df=pd.DataFrame())
+        xl = pd.ExcelFile(io.BytesIO(result))
+        assert 'ND清貨完成分析' in xl.sheet_names
