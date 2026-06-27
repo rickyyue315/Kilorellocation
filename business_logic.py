@@ -37,6 +37,7 @@ from services.post_processing import (
     refresh_recommendation_fields as _refresh_recommendation_fields_impl,
     optimize_single_piece_transfers as _optimize_single_piece_transfers_impl,
 )
+from services.statistics import capture_pre_match_snapshot
 from strategies.predicates import is_hd_to_hk_restricted
 from models.mode_registry import (
     MODE_DEFS,
@@ -575,7 +576,6 @@ class TransferLogic:
                 article, om = group_keys
             
             # 拍攝 pre-match 快照（用於缺口報表）
-            from services.statistics import capture_pre_match_snapshot
             snap = capture_pre_match_snapshot(sources, destinations, article, mode)
             self._pre_match_snapshots.append(snap)
 

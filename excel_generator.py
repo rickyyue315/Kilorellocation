@@ -737,6 +737,7 @@ class ExcelGenerator:
         worksheet.set_column('H:H', 22)
         worksheet.set_column('I:I', 14)
         worksheet.set_column('J:J', 18)
+        worksheet.set_column('K:K', 22)
         worksheet.set_default_row(18)
 
     def _write_gap_detail_section(self, worksheet, start_row, mode_details,
