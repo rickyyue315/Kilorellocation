@@ -3,6 +3,8 @@ Statistics service — computes aggregate stats from transfer recommendations.
 """
 from __future__ import annotations
 
+from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -297,4 +299,226 @@ def compute_nd_clearance_stats(
         'total_remaining_qty': total_remaining_qty,
         'article_summary': article_summary,
         'details': details,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Post-transfer gap report (store × SKU)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class PreMatchSnapshot:
+    """Pre-match snapshot for one article group — captures source/dest data before matching starts."""
+    article: str = ''
+    mode: str = ''
+    destinations: List[Dict] = field(default_factory=list)
+    sources: List[Dict] = field(default_factory=list)
+
+
+def capture_pre_match_snapshot(sources: List[Dict], destinations: List[Dict],
+                                article: str, mode: str) -> PreMatchSnapshot:
+    """Capture a snapshot of source and destination data before matching."""
+    dest_snapshots = []
+    for d in destinations:
+        dest_snapshots.append({
+            'site': d['site'],
+            'om': d['om'],
+            'article': article,
+            'mode': mode,
+            'needed_qty': int(d.get('needed_qty', 0)),
+            'target_qty': int(d.get('target_qty', 0)),
+            'dest_type': d.get('dest_type', ''),
+            'priority': int(d.get('priority', 0)),
+            'current_stock': int(d.get('current_stock', 0)),
+            'safety_stock': int(d.get('safety_stock', 0)),
+        })
+
+    source_snapshots = []
+    for s in sources:
+        source_snapshots.append({
+            'site': s['site'],
+            'om': s['om'],
+            'article': article,
+            'mode': mode,
+            'transferable_qty': int(s.get('transferable_qty', 0)),
+            'original_stock': int(s.get('original_stock', 0)),
+            'source_type': s.get('source_type', ''),
+            'priority': int(s.get('priority', 0)),
+            'safety_stock': int(s.get('safety_stock', 0)),
+        })
+
+    return PreMatchSnapshot(
+        article=article,
+        mode=mode,
+        destinations=dest_snapshots,
+        sources=source_snapshots,
+    )
+
+
+def compute_gap_report(snapshots: List[PreMatchSnapshot],
+                       recommendations: List[Dict]) -> Dict[str, Any]:
+    """
+    Compute post-transfer gap report from pre-match snapshots and actual recommendations.
+
+    For each (article, site) pair, computes:
+      - Destination role: needed_qty vs actual_received → gap (缺口)
+      - Source role: transferable_qty vs actual_transferred_out → remaining (剩餘)
+
+    Returns:
+        dict with:
+          - summary: top-level KPIs
+          - details: per-(article, site, role) detail rows
+          - by_mode: mode-grouped breakdown
+    """
+    if not snapshots:
+        return {'summary': {
+            'total_dest_gaps': 0, 'total_gap_qty': 0,
+            'total_source_remaining': 0, 'total_remaining_qty': 0,
+            'fulfillment_rate': 0.0, 'total_dest_count': 0, 'total_source_count': 0,
+        }, 'details': [], 'by_mode': {}}
+
+    # E-mode name prefix check (強制轉出 does not have meaningful destination gaps)
+    def _is_e_mode(mode_name: str) -> bool:
+        return mode_name.startswith('強制轉出')
+
+    # ── 1. Aggregate pre-match data ──
+    dest_pre_match: Dict[Tuple[str, str], Dict] = {}
+    source_pre_match: Dict[Tuple[str, str], Dict] = {}
+    for snap in snapshots:
+        for d in snap.destinations:
+            key = (d['article'], d['site'])
+            if key not in dest_pre_match:
+                dest_pre_match[key] = d
+        for s in snap.sources:
+            key = (s['article'], s['site'])
+            if key not in source_pre_match:
+                source_pre_match[key] = s
+
+    # ── 2. Aggregate recommendation totals ──
+    received_total: Dict[Tuple[str, str], int] = defaultdict(int)
+    transferred_total: Dict[Tuple[str, str], int] = defaultdict(int)
+    for rec in recommendations:
+        art = rec['Article']
+        recv_site = str(rec.get('Receive Site', '')).strip().upper()
+        trans_site = str(rec.get('Transfer Site', '')).strip().upper()
+        qty = int(rec.get('Transfer Qty', 0))
+        received_total[(art, recv_site)] += qty
+        transferred_total[(art, trans_site)] += qty
+
+    # ── 3. Build details ──
+    details: List[Dict] = []
+    total_gap_qty = 0
+    total_dest_gaps = 0
+    total_dest_count = 0
+    total_remaining_qty = 0
+    total_source_remaining = 0
+    total_source_count = 0
+    total_fulfilled_dest = 0
+
+    # Destination-side gaps
+    for key, d in dest_pre_match.items():
+        art, site = key
+        actual = received_total.get(key, 0)
+        is_e = _is_e_mode(d['mode'])
+        if is_e:
+            gap = 0
+            status = '不適用(強制調撥)'
+            gap_pct = 0.0
+        else:
+            gap = max(d['needed_qty'] - actual, 0)
+            gap_pct = round(gap / d['needed_qty'] * 100, 1) if d['needed_qty'] > 0 else 0.0
+            status = '已滿足' if gap <= 0 else f'未滿足(缺口{gap}件)'
+        if gap > 0:
+            total_dest_gaps += 1
+            total_gap_qty += gap
+        if gap <= 0:
+            total_fulfilled_dest += 1
+        total_dest_count += 1
+
+        details.append({
+            'article': art,
+            'site': site,
+            'om': d['om'],
+            'role': '目的地',
+            'mode': d['mode'],
+            'original_need_or_surplus': d['needed_qty'],
+            'actual_qty': actual,
+            'gap_or_remaining': gap,
+            'gap_pct': gap_pct,
+            'type_label': d.get('dest_type', ''),
+            'status': status,
+        })
+
+    # Source-side remaining
+    for key, s in source_pre_match.items():
+        art, site = key
+        actual = transferred_total.get(key, 0)
+        remaining = max(s['transferable_qty'] - actual, 0)
+        rem_pct = round(remaining / s['transferable_qty'] * 100, 1) if s['transferable_qty'] > 0 else 0.0
+        status = '已配完' if remaining <= 0 else f'尚有剩餘(剩{remaining}件)'
+        if remaining > 0:
+            total_source_remaining += 1
+            total_remaining_qty += remaining
+        total_source_count += 1
+
+        details.append({
+            'article': art,
+            'site': site,
+            'om': s['om'],
+            'role': '來源',
+            'mode': s['mode'],
+            'original_need_or_surplus': s['transferable_qty'],
+            'actual_qty': actual,
+            'gap_or_remaining': remaining,
+            'gap_pct': rem_pct,
+            'type_label': s.get('source_type', ''),
+            'status': status,
+        })
+
+    # Sort: role first (目的地 before 來源), then mode, then article, then site
+    details.sort(key=lambda x: (0 if x['role'] == '目的地' else 1,
+                                 x['mode'], x['article'], x['site']))
+
+    fulfillment_rate = round(
+        total_fulfilled_dest / total_dest_count * 100, 1
+    ) if total_dest_count > 0 else 0.0
+
+    # ── 4. by-mode breakdown ──
+    by_mode: Dict[str, Dict] = {}
+    for d in details:
+        mode = d['mode']
+        if mode not in by_mode:
+            by_mode[mode] = {'details': [], 'summary': {
+                'total_dest_gaps': 0, 'total_gap_qty': 0,
+                'total_source_remaining': 0, 'total_remaining_qty': 0,
+                'total_dest_count': 0, 'total_fulfilled_dest': 0,
+                'total_source_count': 0,
+            }}
+        by_mode[mode]['details'].append(d)
+        sm = by_mode[mode]['summary']
+        if d['role'] == '目的地':
+            sm['total_dest_count'] += 1
+            if d['gap_or_remaining'] > 0:
+                sm['total_dest_gaps'] += 1
+                sm['total_gap_qty'] += d['gap_or_remaining']
+            if d['gap_or_remaining'] <= 0:
+                sm['total_fulfilled_dest'] += 1
+        else:
+            sm['total_source_count'] += 1
+            if d['gap_or_remaining'] > 0:
+                sm['total_source_remaining'] += 1
+                sm['total_remaining_qty'] += d['gap_or_remaining']
+
+    return {
+        'summary': {
+            'total_dest_gaps': total_dest_gaps,
+            'total_gap_qty': total_gap_qty,
+            'total_source_remaining': total_source_remaining,
+            'total_remaining_qty': total_remaining_qty,
+            'fulfillment_rate': fulfillment_rate,
+            'total_dest_count': total_dest_count,
+            'total_source_count': total_source_count,
+        },
+        'details': details,
+        'by_mode': by_mode,
     }

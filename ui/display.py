@@ -392,6 +392,85 @@ def render_statistics(statistics: dict):
                 st.dataframe(dest_df, use_container_width=True)
 
 
+def render_gap_report(gap_report: dict):
+    """Render the post-transfer gap report in an expandable section."""
+    if not gap_report or not gap_report.get('details'):
+        return
+
+    summary = gap_report.get('summary', {})
+    details = gap_report.get('details', [])
+
+    with st.expander("📊 調貨缺口分析", expanded=False):
+        # KPI row
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("未滿足店數", summary.get('total_dest_gaps', 0))
+        k2.metric("缺口件數", summary.get('total_gap_qty', 0))
+        k3.metric("剩餘店數", summary.get('total_source_remaining', 0))
+        k4.metric("剩餘件數", summary.get('total_remaining_qty', 0))
+
+        k5, k6, k7, _ = st.columns(4)
+        k5.metric("目的地總數", summary.get('total_dest_count', 0))
+        k6.metric("滿足率", f"{summary.get('fulfillment_rate', 0)}%")
+        k7.metric("來源總數", summary.get('total_source_count', 0))
+
+        st.markdown("")
+
+        # Build DataFrame for display
+        rows = []
+        for d in details:
+            rows.append({
+                'Article': d.get('article', ''),
+                'Site': d.get('site', ''),
+                'OM': d.get('om', ''),
+                '角色': d.get('role', ''),
+                '模式': d.get('mode', ''),
+                '原始需求/可轉量': d.get('original_need_or_surplus', 0),
+                '實際收/轉量': d.get('actual_qty', 0),
+                '缺口/剩餘': d.get('gap_or_remaining', 0),
+                '缺口%': f"{d.get('gap_pct', 0)}%",
+                '類型': d.get('type_label', ''),
+                '狀態': d.get('status', ''),
+            })
+
+        gap_df = pd.DataFrame(rows)
+
+        # Mode filter
+        by_mode = gap_report.get('by_mode', {})
+        mode_options = ['全部'] + sorted(by_mode.keys())
+        selected_mode = st.selectbox(
+            "篩選模式",
+            options=mode_options,
+            key="gap_report_mode_filter",
+        )
+
+        if selected_mode != '全部':
+            filtered_df = gap_df[gap_df['模式'] == selected_mode]
+        else:
+            filtered_df = gap_df
+
+        # Role filter
+        role_options = ['全部', '目的地', '來源']
+        selected_role = st.selectbox(
+            "篩選角色",
+            options=role_options,
+            key="gap_report_role_filter",
+        )
+        if selected_role != '全部':
+            filtered_df = filtered_df[filtered_df['角色'] == selected_role]
+
+        # Status filter
+        status_options = ['全部'] + sorted(gap_df['狀態'].unique())
+        selected_status = st.selectbox(
+            "篩選狀態",
+            options=status_options,
+            key="gap_report_status_filter",
+        )
+        if selected_status != '全部':
+            filtered_df = filtered_df[filtered_df['狀態'] == selected_status]
+
+        st.dataframe(filtered_df, use_container_width=True)
+
+
 def render_download_button(excel_data: bytes, excel_filename: str, current_run_key: str):
     _mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     st.download_button(

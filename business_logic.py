@@ -70,6 +70,7 @@ class TransferLogic:
                  f_fulfill_small_first: bool = False,
                  nst_max_source_shops: Optional[int] = None):
         self.transfer_recommendations = []
+        self._pre_match_snapshots = []
         self.quality_check_passed = True
         self.quality_errors = []
         self.b_special_max_receive_sites_per_source = (
@@ -516,6 +517,7 @@ class TransferLogic:
             grouped = df.groupby(['Article', 'OM'])
         
         all_recommendations = []
+        self._pre_match_snapshots = []
 
         # 預先建立全局 (Article, Site) → Safety Stock / MOQ 索引，避免迴圈內重複建立（效能優化）
         _index_cols = [c for c in ['Safety Stock', 'MOQ'] if c in df.columns]
@@ -565,13 +567,19 @@ class TransferLogic:
                 source_sites = set([s['site'] for s in sources])
                 destinations = [d for d in destinations if d['site'] not in source_sites]
             
-            # 執行匹配
+            # 解析 article 和 om（快照和匹配都需要用到 article）
             if mode in self._CROSS_OM_MATCHING_MODES:
                 article = group_keys[0] if isinstance(group_keys, (list, tuple)) else group_keys
                 om = "Multiple"  # 跨OM模式下OM由source/dest決定
             else:
                 article, om = group_keys
             
+            # 拍攝 pre-match 快照（用於缺口報表）
+            from services.statistics import capture_pre_match_snapshot
+            snap = capture_pre_match_snapshot(sources, destinations, article, mode)
+            self._pre_match_snapshots.append(snap)
+
+            # 執行匹配
             strategy_key = mode_def.strategy_key
             if strategy_key:
                 strategy = self._strategies[strategy_key]
@@ -638,6 +646,10 @@ class TransferLogic:
     def get_transfer_statistics(self) -> Dict:
         from services.statistics import compute_transfer_statistics
         return compute_transfer_statistics(self.transfer_recommendations)
+
+    def get_gap_report(self) -> Dict:
+        from services.statistics import compute_gap_report
+        return compute_gap_report(self._pre_match_snapshots, self.transfer_recommendations)
 
     def _create_recommendation_note(self, source: Dict, dest: Dict, current_received_qty: int, transfer_qty: int, mode: str) -> str:
         from services.notes import create_recommendation_note

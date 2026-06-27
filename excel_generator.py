@@ -334,7 +334,8 @@ class ExcelGenerator:
                            output_path: Optional[str] = None,
                            mode: str = None,
                            ai_summary: Optional[str] = None,
-                           df: Optional[pd.DataFrame] = None) -> bytes:
+                           df: Optional[pd.DataFrame] = None,
+                           gap_report: Optional[Dict] = None) -> bytes:
         """
         生成完整的Excel文件，返回 bytes（記憶體操作，無磁碟 I/O）
         
@@ -345,6 +346,7 @@ class ExcelGenerator:
             mode: 調貨模式名稱
             ai_summary: optional AI executive summary text
             df: optional raw DataFrame for computing full target fulfillment stats
+            gap_report: optional post-transfer gap report
         
         Returns:
             Excel 文件的 bytes 內容
@@ -364,6 +366,8 @@ class ExcelGenerator:
                 self.create_nd_clearance_sheet(writer, recommendations, df)
             if ai_summary:
                 self.create_smart_summary_sheet(writer, ai_summary)
+            if gap_report and gap_report.get('details'):
+                self.create_gap_analysis_sheet(writer, gap_report)
 
         logger.info("Excel文件生成完成（BytesIO）")
         return buf.getvalue()
@@ -628,3 +632,174 @@ class ExcelGenerator:
         worksheet.set_column('H:H', 18)
         worksheet.set_column('I:I', 14)
         worksheet.set_default_row(18)
+
+    def create_gap_analysis_sheet(self, writer, gap_report: Dict):
+        """Create the 調貨缺口分析 sheet (post-transfer gap report)."""
+        logger.info("創建調貨缺口分析工作表")
+        details = gap_report.get('details', [])
+        if not details:
+            return
+
+        workbook = writer.book
+        worksheet = workbook.add_worksheet('調貨缺口分析')
+
+        title_fmt = workbook.add_format({
+            'bold': True, 'font_size': 16, 'align': 'center',
+            'valign': 'vcenter', 'font_name': 'Arial',
+        })
+        kpi_label_fmt = workbook.add_format({
+            'bold': True, 'font_size': 11, 'bg_color': '#4472C4',
+            'font_color': 'white', 'align': 'center', 'valign': 'vcenter',
+            'border': 1, 'font_name': 'Arial',
+        })
+        kpi_value_fmt = workbook.add_format({
+            'bold': True, 'font_size': 11, 'bg_color': '#D7E4BC',
+            'align': 'center', 'valign': 'vcenter', 'border': 1,
+            'font_name': 'Arial',
+        })
+        header_fmt = workbook.add_format({
+            'bold': True, 'bg_color': '#D7E4BC', 'border': 1,
+            'font_name': 'Arial', 'font_size': 10, 'text_wrap': True,
+            'valign': 'vcenter',
+        })
+        data_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+        })
+        ok_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+            'font_color': '#006100', 'bg_color': '#C6EFCE',
+        })
+        fail_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+            'font_color': '#9C0006', 'bg_color': '#FFC7CE',
+        })
+        na_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+            'font_color': '#666666', 'bg_color': '#F2F2F2',
+        })
+        pct_fmt = workbook.add_format({
+            'border': 1, 'font_name': 'Arial', 'font_size': 10,
+            'align': 'right', 'num_format': '0.0"%"',
+        })
+
+        row = 0
+        worksheet.merge_range(row, 0, row, 9, '調貨缺口分析', title_fmt)
+        row += 2
+
+        summary = gap_report.get('summary', {})
+        row1_kpis = [
+            ('未滿足店數', summary.get('total_dest_gaps', 0)),
+            ('缺口件數', summary.get('total_gap_qty', 0)),
+            ('剩餘店數', summary.get('total_source_remaining', 0)),
+            ('剩餘件數', summary.get('total_remaining_qty', 0)),
+        ]
+        for i, (label, value) in enumerate(row1_kpis):
+            worksheet.write(row, i * 2, label, kpi_label_fmt)
+            worksheet.write(row, i * 2 + 1, value, kpi_value_fmt)
+        row += 1
+
+        row2_kpis = [
+            ('目的地總數', summary.get('total_dest_count', 0)),
+            ('滿足率', f"{summary.get('fulfillment_rate', 0)}%"),
+            ('來源總數', summary.get('total_source_count', 0)),
+        ]
+        for i, (label, value) in enumerate(row2_kpis):
+            worksheet.write(row, i * 2, label, kpi_label_fmt)
+            worksheet.write(row, i * 2 + 1, value, kpi_value_fmt)
+        row += 2
+
+        # Mode 分區
+        by_mode = gap_report.get('by_mode', {})
+        if by_mode and len(by_mode) > 1:
+            for mode_name in sorted(by_mode.keys()):
+                mode_details = by_mode[mode_name]['details']
+                mode_summary = by_mode[mode_name]['summary']
+                row = self._write_gap_mode_section(
+                    worksheet, row, mode_name, mode_details, mode_summary,
+                    header_fmt, data_fmt, ok_fmt, fail_fmt, na_fmt, pct_fmt,
+                )
+        else:
+            # Single mode — just write all details
+            mode_details = details
+            mode_name = details[0]['mode'] if details else ''
+            self._write_gap_detail_section(
+                worksheet, row, mode_details,
+                header_fmt, data_fmt, ok_fmt, fail_fmt, na_fmt, pct_fmt,
+            )
+
+        worksheet.set_column('A:A', 12)
+        worksheet.set_column('B:B', 12)
+        worksheet.set_column('C:C', 12)
+        worksheet.set_column('D:D', 10)
+        worksheet.set_column('E:E', 22)
+        worksheet.set_column('F:F', 14)
+        worksheet.set_column('G:G', 14)
+        worksheet.set_column('H:H', 22)
+        worksheet.set_column('I:I', 14)
+        worksheet.set_column('J:J', 18)
+        worksheet.set_default_row(18)
+
+    def _write_gap_detail_section(self, worksheet, start_row, mode_details,
+                                   header_fmt, data_fmt, ok_fmt, fail_fmt, na_fmt, pct_fmt):
+        """Write the detail table for gap report."""
+        row = start_row
+        headers = ['Article', 'Site', 'OM', '角色', '模式',
+                    '原始需求/可轉量', '實際收/轉量', '缺口/剩餘',
+                    '缺口%', '類型', '狀態']
+        for col, h in enumerate(headers):
+            worksheet.write(row, col, h, header_fmt)
+        row += 1
+
+        for entry in mode_details:
+            gap = entry['gap_or_remaining']
+            status = entry['status']
+            is_ok = gap <= 0 and entry['role'] == '目的地'
+            is_na = status.startswith('不適用')
+
+            if is_na:
+                row_fmt = na_fmt
+                status_fmt = na_fmt
+            elif is_ok:
+                row_fmt = data_fmt
+                status_fmt = ok_fmt
+            else:
+                row_fmt = fail_fmt if gap > 0 else data_fmt
+                status_fmt = fail_fmt if gap > 0 else ok_fmt
+
+            worksheet.write(row, 0, entry.get('article', ''), data_fmt)
+            worksheet.write(row, 1, entry.get('site', ''), data_fmt)
+            worksheet.write(row, 2, entry.get('om', ''), data_fmt)
+            worksheet.write(row, 3, entry.get('role', ''), data_fmt)
+            worksheet.write(row, 4, entry.get('mode', ''), data_fmt)
+            worksheet.write(row, 5, entry.get('original_need_or_surplus', 0), data_fmt)
+            worksheet.write(row, 6, entry.get('actual_qty', 0), data_fmt)
+            worksheet.write(row, 7, gap, row_fmt)
+            worksheet.write(row, 8, entry.get('gap_pct', 0), pct_fmt)
+            worksheet.write(row, 9, entry.get('type_label', ''), data_fmt)
+            worksheet.write(row, 10, status, status_fmt)
+            row += 1
+
+        return row
+
+    def _write_gap_mode_section(self, worksheet, start_row, mode_name, mode_details,
+                                 mode_summary, header_fmt, data_fmt, ok_fmt, fail_fmt, na_fmt, pct_fmt):
+        """Write a mode-grouped section in the gap report."""
+        row = start_row
+        worksheet.merge_range(row, 0, row, 10, f'▸ {mode_name}', header_fmt)
+        row += 1
+
+        mini_kpis = [
+            ('未滿足', mode_summary.get('total_dest_gaps', 0)),
+            ('缺口件', mode_summary.get('total_gap_qty', 0)),
+            ('剩餘店', mode_summary.get('total_source_remaining', 0)),
+            ('剩餘件', mode_summary.get('total_remaining_qty', 0)),
+        ]
+        for i, (label, value) in enumerate(mini_kpis):
+            worksheet.write(row, i * 2, label, data_fmt)
+            worksheet.write(row, i * 2 + 1, value, data_fmt)
+        row += 1
+
+        return self._write_gap_detail_section(
+            worksheet, row, mode_details,
+            header_fmt, data_fmt, ok_fmt, fail_fmt, na_fmt, pct_fmt,
+        )

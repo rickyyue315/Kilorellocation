@@ -23,6 +23,7 @@ from ui.display import (
     render_statistics,
     render_download_button,
     render_ai_executive_summary_button,
+    render_gap_report,
 )
 from ui.tutorial import render_tutorial_page
 from data_processor import DataProcessor
@@ -168,7 +169,7 @@ with tab_system:
             nst_max_source_shops = sidebar_result.get('nst_max_source_shops')
             current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{d2_site_limit_mode}_{c1_threshold}_{c1_ceiling}_{f_fulfill_small_first}_{nst_max_source_shops}_{uploaded_file.name}_{uploaded_file.size}"
             if st.session_state.get('_run_key') != current_run_key:
-                for k in ['recommendations', 'statistics', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name',
+                for k in ['recommendations', 'statistics', 'gap_report', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name',
                           'ai_executive_summary']:
                     st.session_state.pop(k, None)
                 for k in [k for k in st.session_state if k.startswith('_display_df_')]:
@@ -195,9 +196,11 @@ with tab_system:
                     quality_passed = transfer_logic.perform_quality_checks(df, mode_name)
 
                     statistics = transfer_logic.get_transfer_statistics()
+                    gap_report = transfer_logic.get_gap_report()
 
                     st.session_state['recommendations'] = recommendations
                     st.session_state['statistics'] = statistics
+                    st.session_state['gap_report'] = gap_report
                     st.session_state['quality_passed'] = quality_passed
                     st.session_state['quality_errors'] = transfer_logic.quality_errors
                     st.session_state['active_mode_name'] = mode_name
@@ -228,6 +231,8 @@ with tab_system:
 
                     render_statistics(statistics)
 
+                    render_gap_report(st.session_state.get('gap_report', {}))
+
                     render_ai_executive_summary_button(recommendations, statistics, st.session_state.get('active_mode_name', ''))
 
                     with st.container():
@@ -239,12 +244,13 @@ with tab_system:
                 if st.session_state.get('excel_run_key') != _excel_cache_key or 'excel_data' not in st.session_state:
                     with st.spinner("生成 Excel 文件..."):
                         excel_generator = ExcelGenerator()
-                        st.session_state['excel_data'] = excel_generator.generate_excel_file(
+                        st.session_state['excel_data'] =                         excel_generator.generate_excel_file(
                             recommendations,
                             statistics,
                             mode=st.session_state.get('active_mode_name', ''),
                             ai_summary=_ai_summary or None,
                             df=df,
+                            gap_report=st.session_state.get('gap_report', {}),
                         )
                         st.session_state['excel_filename'] = excel_generator.output_filename
                         st.session_state['excel_run_key'] = _excel_cache_key
