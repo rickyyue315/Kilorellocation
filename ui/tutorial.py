@@ -31,7 +31,7 @@ def _flow_node(text, color="blue", width="auto"):
 
 def _flow_arrow(label=""):
     lbl = f'<span style="font-size:11px;color:var(--text-muted);">{label}</span><br>' if label else ""
-    return f'<div class="flow-arrow">{lbl}&#8595;</div>'
+    return f'<div class="flow-arrow">{lbl}&#9660;</div><div class="flow-arrow-line"></div>'
 
 
 def _flow_row(items, gap="12px"):
@@ -263,6 +263,19 @@ def _render_decision_guide():
 
 def render_tutorial_page():
     _render_global_rules()
+
+    st.markdown("---")
+
+    st.markdown("""
+    <div class="tutorial-toc fade-in">
+        <div class="tutorial-toc__title">📑 目錄 — 28 種模式</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    for group_key, group_title, icon in _GROUP_DEFS:
+        st.markdown(f'<div class="tutorial-toc__link" data-group="{group_key}">{icon} {group_title}</div>', unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("### 28 種模式教學")

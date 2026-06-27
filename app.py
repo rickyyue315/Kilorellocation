@@ -95,12 +95,43 @@ with tab_system:
             help="支援 .xlsx 和 .xls 格式",
         )
 
+    if uploaded_file is None:
+        st.markdown("""
+        <div class="hero-empty fade-in">
+            <div class="hero-empty__icon">📦</div>
+            <div class="hero-empty__title">開始第一次調貨分析</div>
+            <div class="hero-empty__desc">上傳庫存 Excel 檔案，系統將自動分析並產生最佳調貨建議。<br>支援 28 種調貨模式，適用各種業務場景。</div>
+        </div>
+        <div class="step-guide">
+            <div class="step-card">
+                <div class="step-card__n">1</div>
+                <div class="step-card__title">上傳檔案</div>
+                <div class="step-card__desc">拖放或點選上傳庫存 Excel</div>
+            </div>
+            <div class="step-card">
+                <div class="step-card__n">2</div>
+                <div class="step-card__title">選擇模式</div>
+                <div class="step-card__desc">28 種調貨模式任選</div>
+            </div>
+            <div class="step-card">
+                <div class="step-card__n">3</div>
+                <div class="step-card__title">產生建議</div>
+                <div class="step-card__desc">一鍵分析產生調貨清單</div>
+            </div>
+            <div class="step-card">
+                <div class="step-card__n">4</div>
+                <div class="step-card__title">下載報表</div>
+                <div class="step-card__desc">匯出完整 Excel 報告</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     if uploaded_file is not None:
         progress_bar = st.progress(0, text="準備開始處理文件...")
         try:
-            progress_bar.progress(10, text="正在驗證文件格式...")
+            progress_bar.progress(10, text="📄 正在驗證文件格式...")
 
-            progress_bar.progress(25, text="文件讀取成功!正在進行數據預處理...")
+            progress_bar.progress(25, text="📄 文件讀取成功!正在進行數據預處理...")
             processor = DataProcessor()
 
             file_valid, error_msg = processor.validate_file_format(uploaded_file)
@@ -122,7 +153,19 @@ with tab_system:
                     st.error("❌ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
                     st.stop()
 
-            st.success("檔案上傳與數據預處理成功!")
+            st.markdown(f"""
+            <div class="upload-success-card fade-in">
+                <div class="upload-success-card__icon">✅</div>
+                <div class="upload-success-card__body">
+                    <div class="upload-success-card__title">檔案上傳與數據預處理成功</div>
+                    <div class="upload-success-card__meta">
+                        <span class="upload-success-card__meta-item">📄 行數：{processing_stats['processed_stats']['total_rows']:,}</span>
+                        <span class="upload-success-card__meta-item">🏷️ 商品：{df['Article'].nunique():,}</span>
+                        <span class="upload-success-card__meta-item">🏪 店舖：{df['Site'].nunique():,}</span>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
             invalid_rp_count = processing_stats['processed_stats'].get('invalid_rp_type_count', 0)
             if invalid_rp_count > 0:
@@ -179,6 +222,15 @@ with tab_system:
             if st.button("🎯 生成調貨建議", type="primary", use_container_width=True):
                 progress_bar.progress(70, text="正在分析數據並生成建議...")
                 with st.spinner("演算法運行中,請稍候..."):
+                    st.markdown("""
+                    <div class="loading-state" id="loading-state">
+                        <div class="loading-state__spinner"></div>
+                        <div class="loading-state__title">演算法運行中</div>
+                        <div class="loading-state__steps">
+                            <div class="loading-state__step--active">▶ 正在分析庫存數據...</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
                     mode_name = MODE_NAME_MAP.get(mode_code, "目標優化")
 
                     transfer_logic = TransferLogic(
@@ -205,7 +257,7 @@ with tab_system:
                     st.session_state['quality_errors'] = transfer_logic.quality_errors
                     st.session_state['active_mode_name'] = mode_name
 
-                progress_bar.progress(90, text="分析完成!正在準備結果展示...")
+                progress_bar.progress(90, text="✅ 分析完成!正在準備結果展示...")
 
             recommendations = st.session_state.get('recommendations')
             statistics = st.session_state.get('statistics', {})
@@ -260,21 +312,29 @@ with tab_system:
 
                 render_download_button(_excel_bytes, _excel_filename, current_run_key)
 
-                progress_bar.progress(100, text="處理完畢!")
+                progress_bar.progress(100, text="✅ 處理完畢!")
             else:
                 st.info("根據當前規則，沒有生成任何調貨建議。")
-                progress_bar.progress(100, text="處理完畢!")
+                progress_bar.progress(100, text="✅ 處理完畢!")
 
         except Exception as e:
             st.error(f"處理文件時發生錯誤: {e}")
             if st.checkbox("顯示詳細錯誤追蹤"):
                 st.exception(e)
             if 'progress_bar' in locals():
-                progress_bar.progress(100, text="處理失敗!")
+                progress_bar.progress(100, text="❌ 處理失敗!")
 
     st.markdown(f"""
-    <div class="app-footer">
-        <p>📦 庫存調貨建議系統 <strong>{VERSION}</strong></p>
-        <p>Intelligent Inventory Reallocation System (2026) · Developed by Ricky Yue · 只限 RP Team 使用</p>
+    <div class="app-footer fade-in">
+        <div class="app-footer__inner">
+            <div class="app-footer__col">
+                <p style="margin:0;">📦 庫存調貨建議系統 <strong>{VERSION}</strong></p>
+            </div>
+            <div class="app-footer__col--right">
+                <p style="margin:0;"><a href="#top" onclick="window.scrollTo(0,0);return false;">回到頂部 ↑</a></p>
+            </div>
+        </div>
+        <hr class="app-footer__divider">
+        <p class="app-footer__copy">Intelligent Inventory Reallocation System (2026) · Developed by Ricky Yue · 只限 RP Team 使用</p>
     </div>
     """, unsafe_allow_html=True)
