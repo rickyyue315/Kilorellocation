@@ -32,7 +32,7 @@ def build_recommendation(
             - transfer_qty
         ),
         'Safety Stock': 0,
-        'MOQ': 0,
+        'Receive Safety Stock': 0,
         'Source Priority': source['priority'],
         'Destination Priority': (
             dest_priority_override

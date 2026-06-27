@@ -519,8 +519,8 @@ class TransferLogic:
         all_recommendations = []
         self._pre_match_snapshots = []
 
-        # 預先建立全局 (Article, Site) → Safety Stock / MOQ 索引，避免迴圈內重複建立（效能優化）
-        _index_cols = [c for c in ['Safety Stock', 'MOQ'] if c in df.columns]
+        # 預先建立全局 (Article, Site) → Safety Stock 索引，避免迴圈內重複建立（效能優化）
+        _index_cols = [c for c in ['Safety Stock'] if c in df.columns]
         if _index_cols:
             temp = df.copy()
             temp['_site_key'] = temp['Site'].astype(str).str.strip().str.upper()
@@ -597,15 +597,18 @@ class TransferLogic:
                 rec['Product Hierarchy'] = product_brand
                 rec['Brand'] = product_brand
 
-            # 更新安全庫存和MOQ信息（使用迴圈外預建索引，O(1) 查詢）
+            # 更新安全庫存信息（使用迴圈外預建索引，O(1) 查詢）
             if recommendations and not article_site_index.empty:
                 for rec in recommendations:
-                    key = (rec['Article'], str(rec['Transfer Site']).strip().upper())
-                    if key in article_site_index.index:
+                    transfer_key = (rec['Article'], str(rec['Transfer Site']).strip().upper())
+                    if transfer_key in article_site_index.index:
                         if 'Safety Stock' in article_site_index.columns:
-                            rec['Safety Stock'] = article_site_index.at[key, 'Safety Stock']
-                        if 'MOQ' in article_site_index.columns:
-                            rec['MOQ'] = article_site_index.at[key, 'MOQ']
+                            rec['Safety Stock'] = article_site_index.at[transfer_key, 'Safety Stock']
+                    # 查找接收店舖的 Safety Stock
+                    receive_key = (rec['Article'], str(rec['Receive Site']).strip().upper())
+                    if receive_key in article_site_index.index:
+                        if 'Safety Stock' in article_site_index.columns:
+                            rec['Receive Safety Stock'] = article_site_index.at[receive_key, 'Safety Stock']
             
             all_recommendations.extend(recommendations)
         

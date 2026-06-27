@@ -80,7 +80,7 @@ class ExcelGenerator:
                 'Transfer Original Stock': rec['Original Stock'],
                 'Transfer After Transfer Stock': rec['After Transfer Stock'],
                 'Transfer Safety Stock': rec['Safety Stock'],
-                'Transfer MOQ': rec['MOQ'],
+                'Receive Site Safety Stock': rec.get('Receive Safety Stock', 0),
                 'Remark': remark,
                 'Notes': rec.get('Notes', ''),
                 # 新增銷售數據欄位
@@ -117,7 +117,7 @@ class ExcelGenerator:
         worksheet.set_column('I:I', 18)  # Transfer Original Stock
         worksheet.set_column('J:J', 20)  # Transfer After Transfer Stock
         worksheet.set_column('K:K', 18)  # Transfer Safety Stock
-        worksheet.set_column('L:L', 12)  # Transfer MOQ
+        worksheet.set_column('L:L', 22)  # Receive Site Safety Stock
         worksheet.set_column('M:M', 25)  # Remark - 簡潔的轉出→接收映射
         worksheet.set_column('N:N', 75)  # Notes - 600像素約等於75字符
         worksheet.set_column('O:O', 18)  # Transfer Site Last Month Sold Qty
