@@ -321,6 +321,8 @@ def render_ai_executive_summary_button(recommendations: list, statistics: dict, 
             result = chat_completion(messages, model=AI_DEFAULT_MODEL, temperature=0.1, max_tokens=512)
             if result:
                 st.session_state['ai_executive_summary'] = result
+            else:
+                st.warning("AI 摘要生成失敗：API 返回空內容，請檢查模型設定或稍後再試。")
 
     summary = st.session_state.get('ai_executive_summary')
     if summary:

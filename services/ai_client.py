@@ -100,6 +100,8 @@ def chat_completion(
 
     if content:
         cache[cache_key] = content
+    else:
+        logger.warning("chat_completion returned empty for model %s", model_name)
     return content
 
 def _do_request(model_name: str, messages: list, temperature: float, max_tokens: int, api_key: str) -> str:
@@ -133,7 +135,11 @@ def _do_request(model_name: str, messages: list, temperature: float, max_tokens:
             logger.warning("OpenRouter response missing choices (%s)", model_name)
             return ''
 
-        return choices[0].get('message', {}).get('content', '')
+        message = choices[0].get('message', {}) or {}
+        content = (message.get('content') or '').strip()
+        if not content:
+            logger.warning("OpenRouter returned empty content (%s): %s", model_name, json.dumps(data, ensure_ascii=False)[:500])
+        return content
 
     except httpx.TimeoutException:
         logger.warning("OpenRouter request timed out after %ds (%s)", config.AI_REQUEST_TIMEOUT, model_name)
