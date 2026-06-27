@@ -130,21 +130,16 @@ def render_data_preview(df: pd.DataFrame, processing_stats: dict):
 
 
 def render_kpi_cards(statistics: dict):
-    st.markdown("##### 關鍵指標")
     cols = st.columns(4)
     metrics = [
-        ("調貨建議", f"{statistics.get('total_recommendations', 0):,}", "📦", "metric-accent--info"),
-        ("調貨件數", f"{statistics.get('total_transfer_qty', 0):,}", "🔢", ""),
-        ("產品數量", f"{statistics.get('unique_articles', 0):,}", "🏷️", "metric-accent--success"),
-        ("OM 數量", f"{statistics.get('unique_oms', 0):,}", "🗺️", "metric-accent--warning"),
+        ("調貨建議", f"{statistics.get('total_recommendations', 0):,}", "📦"),
+        ("調貨件數", f"{statistics.get('total_transfer_qty', 0):,}", "🔢"),
+        ("產品數量", f"{statistics.get('unique_articles', 0):,}", "🏷️"),
+        ("OM 數量", f"{statistics.get('unique_oms', 0):,}", "🗺️"),
     ]
-    for col, (label, value, icon, accent) in zip(cols, metrics):
+    for col, (label, value, icon) in zip(cols, metrics):
         with col:
-            if accent:
-                st.markdown(f'<div class="{accent}">', unsafe_allow_html=True)
             st.metric(label=f"{icon} {label}", value=value)
-            if accent:
-                st.markdown('</div>', unsafe_allow_html=True)
     st.markdown("")
 
 
@@ -332,38 +327,15 @@ def render_ai_executive_summary_button(recommendations: list, statistics: dict, 
     summary = st.session_state.get('ai_executive_summary')
     if summary:
         with st.expander("📊 AI 執行摘要", expanded=False):
-            st.markdown(f"""
-            <div class="ai-card">
-                <div class="ai-card__badge">🤖 AI 摘要</div>
-                <div class="ai-card__content">{summary}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(summary)
 
 
 def render_statistics(statistics: dict):
     with st.expander("📊 詳細統計", expanded=False):
-        st.markdown('<div class="chart-card"><div class="chart-card__title">按 OM 統計</div>', unsafe_allow_html=True)
-        om_stats = statistics.get('om_stats', {})
-        if om_stats:
-            om_df = pd.DataFrame([
-                {
-                    'OM': om,
-                    'Transfer Qty': stats.get('transfer_qty', stats.get('total_qty', 0)),
-                    'Receive Qty': stats.get('receive_qty', 0),
-                    'Count': stats['count'],
-                    'Article Count': stats['article_count'],
-                }
-                for om, stats in om_stats.items()
-            ])
-            if not om_df.empty:
-                st.bar_chart(om_df.set_index('OM')[['Transfer Qty', 'Receive Qty']], height=200)
-            st.dataframe(om_df, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown('<div class="chart-card"><div class="chart-card__title">按產品統計</div>', unsafe_allow_html=True)
+            st.markdown("**按產品統計**")
             article_stats = statistics.get('article_stats', {})
             if article_stats:
                 article_df = pd.DataFrame([
@@ -378,9 +350,8 @@ def render_statistics(statistics: dict):
                     for article, stats in article_stats.items()
                 ])
                 st.dataframe(article_df, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
 
-            st.markdown('<div class="chart-card"><div class="chart-card__title">轉出類型分佈</div>', unsafe_allow_html=True)
+            st.markdown("**轉出類型分佈**")
             source_type_stats = statistics.get('source_type_stats', {})
             if source_type_stats:
                 source_df = pd.DataFrame([
@@ -391,16 +362,13 @@ def render_statistics(statistics: dict):
                     }
                     for source_type, stats in source_type_stats.items()
                 ])
-                if not source_df.empty:
-                    st.bar_chart(source_df.set_index('Source Type')['Qty'], height=150)
                 st.dataframe(source_df, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
 
         with col2:
-            st.markdown('<div class="chart-card"><div class="chart-card__title">按 OM 統計</div>', unsafe_allow_html=True)
+            st.markdown("**按 OM 統計**")
             om_stats = statistics.get('om_stats', {})
             if om_stats:
-                om_df2 = pd.DataFrame([
+                om_df = pd.DataFrame([
                     {
                         'OM': om,
                         'Transfer Qty': stats.get('transfer_qty', stats.get('total_qty', 0)),
@@ -410,10 +378,9 @@ def render_statistics(statistics: dict):
                     }
                     for om, stats in om_stats.items()
                 ])
-                st.dataframe(om_df2, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+                st.dataframe(om_df, use_container_width=True)
 
-            st.markdown('<div class="chart-card"><div class="chart-card__title">接收類型分佈</div>', unsafe_allow_html=True)
+            st.markdown("**接收類型分佈**")
             dest_type_stats = statistics.get('dest_type_stats', {})
             if dest_type_stats:
                 dest_df = pd.DataFrame([
@@ -424,10 +391,7 @@ def render_statistics(statistics: dict):
                     }
                     for dest_type, stats in dest_type_stats.items()
                 ])
-                if not dest_df.empty:
-                    st.bar_chart(dest_df.set_index('Destination Type')['Qty'], height=150)
                 st.dataframe(dest_df, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_gap_report(gap_report: dict):
@@ -439,26 +403,17 @@ def render_gap_report(gap_report: dict):
     details = gap_report.get('details', [])
 
     with st.expander("📊 調貨缺口分析", expanded=False):
-        # KPI row with color coding
+        # KPI row
         k1, k2, k3, k4 = st.columns(4)
-
-        gap_qty = summary.get('total_gap_qty', 0)
-        gap_remaining = summary.get('total_remaining_qty', 0)
-        fulfillment = summary.get('fulfillment_rate', 0)
-
-        k1_class = "gap-metric--danger" if gap_qty > 100 else ("gap-metric--warning" if gap_qty > 0 else "gap-metric--good")
-        k4_class = "gap-metric--good" if gap_remaining == 0 else ("gap-metric--warning" if gap_remaining > 0 else "")
-        k6_class = "gap-metric--good" if fulfillment >= 90 else ("gap-metric--warning" if fulfillment >= 50 else "gap-metric--danger")
-
-        with k1: st.markdown(f'<div class="{k1_class}">', unsafe_allow_html=True); st.metric("未滿足店數", summary.get('total_dest_gaps', 0)); st.markdown('</div>', unsafe_allow_html=True)
-        with k2: st.metric("缺口件數", gap_qty)
-        with k3: st.metric("剩餘店數", summary.get('total_source_remaining', 0))
-        with k4: st.markdown(f'<div class="{k4_class}">', unsafe_allow_html=True); st.metric("剩餘件數", gap_remaining); st.markdown('</div>', unsafe_allow_html=True)
+        k1.metric("未滿足店數", summary.get('total_dest_gaps', 0))
+        k2.metric("缺口件數", summary.get('total_gap_qty', 0))
+        k3.metric("剩餘店數", summary.get('total_source_remaining', 0))
+        k4.metric("剩餘件數", summary.get('total_remaining_qty', 0))
 
         k5, k6, k7, _ = st.columns(4)
-        with k5: st.metric("目的地總數", summary.get('total_dest_count', 0))
-        with k6: st.markdown(f'<div class="{k6_class}">', unsafe_allow_html=True); st.metric("滿足率", f"{fulfillment}%"); st.markdown('</div>', unsafe_allow_html=True)
-        with k7: st.metric("來源總數", summary.get('total_source_count', 0))
+        k5.metric("目的地總數", summary.get('total_dest_count', 0))
+        k6.metric("滿足率", f"{summary.get('fulfillment_rate', 0)}%")
+        k7.metric("來源總數", summary.get('total_source_count', 0))
 
         st.markdown("")
 
@@ -520,14 +475,6 @@ def render_gap_report(gap_report: dict):
 
 def render_download_button(excel_data: bytes, excel_filename: str, current_run_key: str):
     _mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    st.markdown(f"""
-    <div class="download-bar fade-in">
-        <div class="download-bar__info">
-            <div class="download-bar__filename">📄 {excel_filename}</div>
-            <div class="download-bar__hint">報告包含完整調貨建議與統計資訊</div>
-        </div>
-        <div class="download-bar__button">
-    """, unsafe_allow_html=True)
     st.download_button(
         "📥 下載 Excel 報表",
         data=excel_data,
@@ -537,4 +484,3 @@ def render_download_button(excel_data: bytes, excel_filename: str, current_run_k
         use_container_width=True,
         key=f"download_excel_{current_run_key}",
     )
-    st.markdown('</div></div>', unsafe_allow_html=True)

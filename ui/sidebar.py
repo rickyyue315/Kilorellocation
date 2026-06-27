@@ -6,7 +6,7 @@ import streamlit as st
 from datetime import datetime
 from typing import Dict, Optional
 
-from config import VERSION, IS_ZEABUR_RUNTIME
+from config import VERSION
 from models.mode import MODE_DESCRIPTIONS
 from models.mode_registry import get_ui_options, get_receive_limit_codes
 from services.perf_timer import ENABLE_PERF, get_perf_records, clear_perf_records
@@ -24,19 +24,9 @@ def _render_perf_panel():
         return
     with st.expander("⏱ 效能面板", expanded=False):
         total = sum(r['elapsed'] for r in records)
-        st.markdown(f'<div class="perf-card">', unsafe_allow_html=True)
         st.markdown(f"**總耗時：{total:.3f}s**（共 {len(records)} 次呼叫）")
         for r in records:
-            pct = (r['elapsed'] / total * 100) if total > 0 else 0
-            st.markdown(
-                f"<div style='display:flex;justify-content:space-between;font-size:12px;'>"
-                f"<span>`{r['label']}`</span>"
-                f"<span>{r['elapsed']:.3f}s</span>"
-                f"</div>"
-                f"<div class='perf-bar'><div class='perf-bar__fill' style='width:{pct}%;'></div></div>",
-                unsafe_allow_html=True
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(f"- `{r['label']}` — {r['elapsed']:.3f}s")
         if st.button("清除效能記錄", key="_clear_perf"):
             clear_perf_records()
             st.rerun()
@@ -46,22 +36,14 @@ def render_sidebar() -> Dict:
     with st.sidebar:
         st.markdown("### 📦 系統資訊")
         st.markdown(f"""
-        <div class="sidebar-info-grid">
-            <div class="sidebar-info-item">
-                <span class="sidebar-info-label">系統版本</span>
-                <span class="sidebar-info-value sidebar-info-value--mono">{VERSION}</span>
+        <div class="surface-card" style="margin-top: -8px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                <span style="color:var(--text-muted);font-size:13px;">系統版本</span>
+                <span style="color:var(--accent-cyan);font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;">{VERSION}</span>
             </div>
-            <div class="sidebar-info-item">
-                <span class="sidebar-info-label">開發者</span>
-                <span class="sidebar-info-value">Ricky Yue</span>
-            </div>
-            <div class="sidebar-info-item">
-                <span class="sidebar-info-label">環境</span>
-                <span class="sidebar-info-value">{'Zeabur' if IS_ZEABUR_RUNTIME else 'Local'}</span>
-            </div>
-            <div class="sidebar-info-item">
-                <span class="sidebar-info-label">模式數</span>
-                <span class="sidebar-info-value">28</span>
+            <div style="display:flex;justify-content:space-between;">
+                <span style="color:var(--text-muted);font-size:13px;">開發者</span>
+                <span style="color:var(--text-primary);font-size:13px;font-weight:600;">Ricky Yue</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -111,42 +93,30 @@ def render_sidebar() -> Dict:
 
         with st.expander("🎯 操作指引", expanded=False):
             st.markdown("""
-            <div class="onboarding-step">
-                <div class="onboarding-step__num">1</div>
-                <div class="onboarding-step__content">
-                    <div class="onboarding-step__title">上傳 Excel 文件</div>
-                    <div class="onboarding-step__desc">拖放或點擊瀏覽，確保包含所有必需欄位</div>
-                </div>
-            </div>
-            <div class="onboarding-step">
-                <div class="onboarding-step__num">2</div>
-                <div class="onboarding-step__content">
-                    <div class="onboarding-step__title">選擇轉貨模式</div>
-                    <div class="onboarding-step__desc">28 種模式任選，查看模式說明了解差異</div>
-                </div>
-            </div>
-            <div class="onboarding-step">
-                <div class="onboarding-step__num">3</div>
-                <div class="onboarding-step__content">
-                    <div class="onboarding-step__title">啟動分析</div>
-                    <div class="onboarding-step__desc">點擊「生成調貨建議」，系統自動驗證分析</div>
-                </div>
-            </div>
-            <div class="onboarding-step">
-                <div class="onboarding-step__num">4</div>
-                <div class="onboarding-step__content">
-                    <div class="onboarding-step__title">查看結果</div>
-                    <div class="onboarding-step__desc">KPI、建議清單、統計圖表一目了然</div>
-                </div>
-            </div>
-            <div class="onboarding-step">
-                <div class="onboarding-step__num">5</div>
-                <div class="onboarding-step__content">
-                    <div class="onboarding-step__title">下載報告</div>
-                    <div class="onboarding-step__desc">匯出完整 Excel，含所有建議與統計</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            **完整操作流程:**
+            
+            1. **上傳 Excel 文件**
+               - 點擊瀏覽文件或拖放文件到上傳區域
+               - 確保包含所有必需欄位
+            
+             2. **選擇轉貨模式**
+                   - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C1/C2/D/D2/E1/E1b/E2/F/F2/F3/NST/ND1/ND2/ND3/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001))
+                - 查看模式說明了解各模式特點
+                       - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
+                       - 若選擇 NST，可設定「HD店舖轉出」及「同一SKU轉出店舖數量上限：10間/20間/不限制」
+            
+            3. **啟動分析**
+               - 點擊「生成調貨建議」按鈕開始處理
+               - 系統會自動進行數據驗證和分析
+            
+            4. **查看結果**
+               - 在主頁面查看KPI、調貨建議和統計圖表
+               - 展開詳細統計了解更多信息
+            
+            5. **下載報告**
+               - 點擊下載按鈕獲取 Excel 報告
+               - 報告包含完整的調貨建議和統計信息
+            """)
 
         st.markdown("---")
 
@@ -165,7 +135,6 @@ def render_sidebar() -> Dict:
         b_special_receive_site_limit_option = "最多 2 間"
 
         if mode_code in get_receive_limit_codes():
-            st.markdown('<div class="control-card"><div class="control-card__title">📋 配對限制</div>', unsafe_allow_html=True)
             b_special_receive_site_limit_option = st.radio(
                 "出貨店舖配對接收店數限制",
                 ["優先 1 間", "最多 2 間", "不限制"],
@@ -177,13 +146,11 @@ def render_sidebar() -> Dict:
                 b_special_max_receive_sites_per_source = 1
             elif b_special_receive_site_limit_option == "最多 2 間":
                 b_special_max_receive_sites_per_source = 2
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.session_state.pop('b_special_receive_site_limit_option', None)
 
         f2_allow_hd_transfer = False
         if mode_code in ("F2", "F3", "NST"):
-            st.markdown('<div class="control-card"><div class="control-card__title">🏪 HD 轉出設定</div>', unsafe_allow_html=True)
             f2_hd_option = st.radio(
                 "HD 店舖轉出設定",
                 ["HD 不能轉出（預設）", "HD 可轉出（最後優先）"],
@@ -193,26 +160,22 @@ def render_sidebar() -> Dict:
             )
             if f2_hd_option == "HD 可轉出（最後優先）":
                 f2_allow_hd_transfer = True
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.session_state.pop('f2_hd_transfer_option', None)
 
         f_fulfill_small_first = False
         if mode_code in ("F", "F2", "F3", "NST"):
-            st.markdown('<div class="control-card"><div class="control-card__title">🎯 目標排序</div>', unsafe_allow_html=True)
             f_fulfill_small_first = st.checkbox(
                 "優先滿足小型目標",
                 value=False,
                 key='f_fulfill_small_first',
                 help="勾選後，需Target的店舖按需求量由小到大排序分配，讓更多小型目標能被完全滿足。預設為大目標優先（現有行為）。"
             )
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.session_state.pop('f_fulfill_small_first', None)
 
         nst_max_source_shops = None
         if mode_code == "NST":
-            st.markdown('<div class="control-card"><div class="control-card__title">🔄 SKU 轉出限制</div>', unsafe_allow_html=True)
             nst_shop_limit_option = st.radio(
                 "同一SKU轉出店舖數量上限",
                 ["10 間", "20 間", "不限制"],
@@ -224,7 +187,6 @@ def render_sidebar() -> Dict:
                 nst_max_source_shops = 10
             elif nst_shop_limit_option == "20 間":
                 nst_max_source_shops = 20
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.session_state.pop('nst_shop_limit_option', None)
 
@@ -242,7 +204,6 @@ def render_sidebar() -> Dict:
         #  - 補償接收店數量減少對總調貨量的影響
         d2_site_limit_mode = "unlimited"
         if mode_code == "D2":
-            st.markdown('<div class="control-card"><div class="control-card__title">🏪 接收策略</div>', unsafe_allow_html=True)
             d2_option = st.radio(
                 "接收店舖數量限制",
                 ["不限店舖數量（原有設定）", "限制2間店舖接收（原有設定）", "限制2間店舖接收（優化版）"],
@@ -254,40 +215,32 @@ def render_sidebar() -> Dict:
                 d2_site_limit_mode = "2site_original"
             elif d2_option == "限制2間店舖接收（優化版）":
                 d2_site_limit_mode = "2site_optimized"
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.session_state.pop('d2_site_limit_option', None)
 
         c1_threshold = 1
         c1_ceiling = 3
         if mode_code == "C1":
-            st.markdown('<div class="control-card"><div class="control-card__title">🔢 C1 門檻設定</div>', unsafe_allow_html=True)
             c1_threshold = st.number_input(
                 "C1 補0門檻（補 total_available ≤ N 的店舖）",
                 min_value=0, max_value=100, value=1, step=1,
                 key='c1_threshold',
                 help="設定 C1 模式補0門檻：只補充總庫存（SaSa Net Stock + Pending Received）小於或等於此值的店舖。預設值 1 等同原有行為。"
             )
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.session_state.pop('c1_threshold', None)
         if mode_code in ("C", "C1", "C2"):
-            st.markdown('<div class="control-card"><div class="control-card__title">📦 轉出上限</div>', unsafe_allow_html=True)
             c1_ceiling = st.slider(
                 "每店轉出件數上限",
                 min_value=3, max_value=10, value=3, step=1,
                 key='c1_ceiling',
                 help="限制 C/C1/C2 模式每間源店最多轉出的件數。提高此值可減少調出店舖總數量。預設 3 等同原有行為。"
             )
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.session_state.pop('c1_ceiling', None)
 
-        mode_desc = MODE_DESCRIPTIONS.get(transfer_mode, "")
-        if mode_desc:
-            st.markdown(f'<div class="mode-tooltip">💡 {mode_desc}</div>', unsafe_allow_html=True)
+        st.caption(MODE_DESCRIPTIONS.get(transfer_mode, ""))
 
-        st.markdown('<div class="expander-orange">', unsafe_allow_html=True)
         with st.expander("📋 詳細模式說明", expanded=False):
             st.markdown("""
             ### 轉貨模式詳解
@@ -516,8 +469,6 @@ def render_sidebar() -> Dict:
             - ND3模式：僅零庫存ND店舖可接收，目標=max(Safety×0.5, 3)，轉出店保留3件
             - 接收優先級(B2/B2a/B2L/B2La/B3/B3a/B3L/B3La):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
             """)
-
-        st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("---")
         st.caption(f"更新時間: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
