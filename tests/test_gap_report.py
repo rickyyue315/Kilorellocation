@@ -210,6 +210,28 @@ class TestComputeGapReport:
         assert dest_details[0]['status'] == '不適用(強制調撥)'
         assert dest_details[0]['gap_or_remaining'] == 0
 
+    def test_e_mode_excluded_from_fulfillment_rate(self):
+        """E-mode destinations should not count in fulfillment_rate denominator."""
+        snap_e = capture_pre_match_snapshot(
+            [_make_source('S01', 'OM1', 10)],
+            [_make_dest('S02', 'OM1', 5)],
+            'ART001', '強制轉出',
+        )
+        snap_n = capture_pre_match_snapshot(
+            [_make_source('S03', 'OM1', 10)],
+            [_make_dest('S04', 'OM1', 5)],
+            'ART002', '保守轉貨',
+        )
+        recs = [
+            _make_rec('ART001', 'S01', 'S02', 3),
+            _make_rec('ART002', 'S03', 'S04', 5),
+        ]
+        result = compute_gap_report([snap_e, snap_n], recs)
+        summary = result['summary']
+        # Only 1 non-E destination (S04) which is fulfilled → 100%
+        assert summary['total_dest_count'] == 1
+        assert summary['fulfillment_rate'] == 100.0
+
     def test_d_mode_no_dest_gap(self):
         """D mode has sources but destinations may exist; gap works normally."""
         sources = [_make_source('SITE01', 'OM1', 10, source_type='ND清貨轉出',
@@ -351,3 +373,17 @@ class TestComputeGapReport:
         result = compute_gap_report([snap], recs)
         src_details = [d for d in result['details'] if d['role'] == '來源']
         assert src_details[0]['type_label'] == 'ND清貨轉出'
+
+    def test_source_remaining_pct_field(self):
+        """Source-side entries should use remaining_pct instead of gap_pct."""
+        sources = [_make_source('S01', 'OM1', 10)]
+        dests = [_make_dest('S02', 'OM1', 5)]
+        snap = capture_pre_match_snapshot(sources, dests, 'ART001', '保守轉貨')
+
+        recs = [_make_rec('ART001', 'S01', 'S02', 3)]
+
+        result = compute_gap_report([snap], recs)
+        src_details = [d for d in result['details'] if d['role'] == '來源']
+        assert 'remaining_pct' in src_details[0]
+        assert src_details[0]['remaining_pct'] == 70.0  # 7/10 remaining
+        assert 'gap_pct' not in src_details[0]

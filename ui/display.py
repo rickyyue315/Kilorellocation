@@ -420,6 +420,10 @@ def render_gap_report(gap_report: dict):
         # Build DataFrame for display
         rows = []
         for d in details:
+            if d.get('role') == '來源':
+                pct_val = d.get('remaining_pct', 0)
+            else:
+                pct_val = d.get('gap_pct', 0)
             rows.append({
                 'Article': d.get('article', ''),
                 'Site': d.get('site', ''),
@@ -429,7 +433,7 @@ def render_gap_report(gap_report: dict):
                 '原始需求/可轉量': d.get('original_need_or_surplus', 0),
                 '實際收/轉量': d.get('actual_qty', 0),
                 '缺口/剩餘': d.get('gap_or_remaining', 0),
-                '缺口%': f"{d.get('gap_pct', 0)}%",
+                '缺口%/剩餘%': f"{pct_val}%",
                 '類型': d.get('type_label', ''),
                 '狀態': d.get('status', ''),
             })

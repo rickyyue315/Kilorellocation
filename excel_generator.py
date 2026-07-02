@@ -746,7 +746,7 @@ class ExcelGenerator:
         row = start_row
         headers = ['Article', 'Site', 'OM', '角色', '模式',
                     '原始需求/可轉量', '實際收/轉量', '缺口/剩餘',
-                    '缺口%', '類型', '狀態']
+                    '缺口%/剩餘%', '類型', '狀態']
         for col, h in enumerate(headers):
             worksheet.write(row, col, h, header_fmt)
         row += 1
@@ -775,7 +775,11 @@ class ExcelGenerator:
             worksheet.write(row, 5, entry.get('original_need_or_surplus', 0), data_fmt)
             worksheet.write(row, 6, entry.get('actual_qty', 0), data_fmt)
             worksheet.write(row, 7, gap, row_fmt)
-            worksheet.write(row, 8, entry.get('gap_pct', 0), pct_fmt)
+            if entry.get('role') == '來源':
+                pct_val = entry.get('remaining_pct', 0)
+            else:
+                pct_val = entry.get('gap_pct', 0)
+            worksheet.write(row, 8, pct_val, pct_fmt)
             worksheet.write(row, 9, entry.get('type_label', ''), data_fmt)
             worksheet.write(row, 10, status, status_fmt)
             row += 1

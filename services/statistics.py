@@ -50,6 +50,8 @@ def compute_transfer_statistics(recommendations: List[Dict[str, Any]]) -> Dict[s
         if receive_om not in om_stats:
             om_stats[receive_om] = {'total_qty': 0, 'transfer_qty': 0, 'receive_qty': 0, 'count': 0, 'articles': set()}
         om_stats[receive_om]['receive_qty'] += rec['Transfer Qty']
+        om_stats[receive_om]['count'] += 1
+        om_stats[receive_om]['articles'].add(rec['Article'])
     for om in om_stats:
         om_stats[om]['article_count'] = len(om_stats[om]['articles'])
 
@@ -321,7 +323,7 @@ def capture_pre_match_snapshot(sources: List[Dict], destinations: List[Dict],
     dest_snapshots = []
     for d in destinations:
         dest_snapshots.append({
-            'site': d['site'],
+            'site': str(d['site']).strip().upper(),
             'om': d['om'],
             'article': article,
             'mode': mode,
@@ -336,7 +338,7 @@ def capture_pre_match_snapshot(sources: List[Dict], destinations: List[Dict],
     source_snapshots = []
     for s in sources:
         source_snapshots.append({
-            'site': s['site'],
+            'site': str(s['site']).strip().upper(),
             'om': s['om'],
             'article': article,
             'mode': mode,
@@ -428,12 +430,13 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
             gap = max(d['needed_qty'] - actual, 0)
             gap_pct = round(gap / d['needed_qty'] * 100, 1) if d['needed_qty'] > 0 else 0.0
             status = '已滿足' if gap <= 0 else f'未滿足(缺口{gap}件)'
-        if gap > 0:
-            total_dest_gaps += 1
-            total_gap_qty += gap
-        if gap <= 0:
-            total_fulfilled_dest += 1
-        total_dest_count += 1
+        if not is_e:
+            if gap > 0:
+                total_dest_gaps += 1
+                total_gap_qty += gap
+            if gap <= 0:
+                total_fulfilled_dest += 1
+            total_dest_count += 1
 
         details.append({
             'article': art,
@@ -470,7 +473,7 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
             'original_need_or_surplus': s['transferable_qty'],
             'actual_qty': actual,
             'gap_or_remaining': remaining,
-            'gap_pct': rem_pct,
+            'remaining_pct': rem_pct,
             'type_label': s.get('source_type', ''),
             'status': status,
         })
