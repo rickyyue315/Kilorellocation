@@ -18,7 +18,7 @@ def safe_get_last2m(row) -> int:
 
 def make_source(row, transferable_qty: int, priority: int, source_type: str, **extra) -> Dict:
     source = {
-        'site': row['Site'],
+        'site': str(row['Site']).strip().upper(),
         'om': row['OM'],
         'rp_type': row['RP Type'],
         'transferable_qty': transferable_qty,
@@ -40,7 +40,7 @@ def make_source(row, transferable_qty: int, priority: int, source_type: str, **e
 def make_dest(row, needed_qty: int, priority: int, dest_type: str,
               target_qty: int, max_receive_qty: Optional[int] = None, **extra) -> Dict:
     dest = {
-        'site': row['Site'],
+        'site': str(row['Site']).strip().upper(),
         'om': row['OM'],
         'rp_type': row['RP Type'],
         'needed_qty': needed_qty,

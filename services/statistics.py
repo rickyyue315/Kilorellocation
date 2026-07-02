@@ -220,7 +220,7 @@ def compute_nd_clearance_stats(
         entry['product_desc'] = rec.get('Product Desc', '')
         entry['transfer_om'] = rec.get('Transfer OM', '')
         entry['transfer_site'] = rec.get('Transfer Site', '')
-        entry['original_stock'] = rec.get('Original Stock', 0)
+        entry['original_stock'] = max(entry['original_stock'], int(rec.get('Original Stock', 0)))
         entry['total_transferred'] += rec.get('Transfer Qty', 0)
 
     # ── 若提供 df，補上無 recommendation 的 ND 清貨來源 ──
@@ -379,9 +379,11 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
             'fulfillment_rate': 0.0, 'total_dest_count': 0, 'total_source_count': 0,
         }, 'details': [], 'by_mode': {}}
 
-    # E-mode name prefix check (強制轉出 does not have meaningful destination gaps)
+    # E-mode name check (強制轉出 does not have meaningful destination gaps)
+    _E_MODE_NAMES = frozenset({'強制轉出', '強制轉出(優先類型接收)', '強制轉出(跨OM)'})
+
     def _is_e_mode(mode_name: str) -> bool:
-        return mode_name.startswith('強制轉出')
+        return mode_name in _E_MODE_NAMES
 
     # ── 1. Aggregate pre-match data ──
     dest_pre_match: Dict[Tuple[str, str], Dict] = {}
@@ -500,12 +502,13 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
         by_mode[mode]['details'].append(d)
         sm = by_mode[mode]['summary']
         if d['role'] == '目的地':
-            sm['total_dest_count'] += 1
-            if d['gap_or_remaining'] > 0:
-                sm['total_dest_gaps'] += 1
-                sm['total_gap_qty'] += d['gap_or_remaining']
-            if d['gap_or_remaining'] <= 0:
-                sm['total_fulfilled_dest'] += 1
+            if not _is_e_mode(mode):
+                sm['total_dest_count'] += 1
+                if d['gap_or_remaining'] > 0:
+                    sm['total_dest_gaps'] += 1
+                    sm['total_gap_qty'] += d['gap_or_remaining']
+                if d['gap_or_remaining'] <= 0:
+                    sm['total_fulfilled_dest'] += 1
         else:
             sm['total_source_count'] += 1
             if d['gap_or_remaining'] > 0:

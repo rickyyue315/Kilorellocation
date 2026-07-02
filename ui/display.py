@@ -147,10 +147,12 @@ def _build_stock_lookup(df: pd.DataFrame) -> dict:
     """建立 (Article, Site) → 庫存字典，供顯示層查詢。
 
     抽出為獨立函式以便多個優先級群組共用同一份查詢表，避免重複建構。
+    Site 欄位正規化為大寫以與 recommendation 的 site key 一致。
     """
+    temp = df[['Article', 'Site', 'SaSa Net Stock', 'Safety Stock', 'MOQ']].copy()
+    temp['Site'] = temp['Site'].astype(str).str.strip().str.upper()
     return (
-        df[['Article', 'Site', 'SaSa Net Stock', 'Safety Stock', 'MOQ']]
-        .set_index(['Article', 'Site'])
+        temp.set_index(['Article', 'Site'])
         .rename(columns={'SaSa Net Stock': 'stock', 'Safety Stock': 'safety', 'MOQ': 'moq'})
         .to_dict('index')
     )
