@@ -152,7 +152,7 @@ with tab_system:
                     with st.expander("檢視 ND + Target>0 明細", expanded=False):
                         st.dataframe(
                             f_mode_conflicts[preview_cols].head(50),
-                            width='stretch',
+                            use_container_width=True,
                         )
 
             render_data_preview(df, processing_stats)
@@ -176,7 +176,7 @@ with tab_system:
                     st.session_state.pop(k)
                 st.session_state['_run_key'] = current_run_key
 
-            if st.button("🎯 生成調貨建議", type="primary", width='stretch'):
+            if st.button("🎯 生成調貨建議", type="primary", use_container_width=True):
                 progress_bar.progress(70, text="正在分析數據並生成建議...")
                 with st.spinner("演算法運行中,請稍候..."):
                     mode_name = MODE_NAME_MAP.get(mode_code, "目標優化")

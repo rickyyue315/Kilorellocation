@@ -126,7 +126,7 @@ def render_data_preview(df: pd.DataFrame, processing_stats: dict):
         st.metric("店鋪數", df['Site'].nunique())
 
     st.markdown("**資料樣本（前 10 行)**")
-    st.dataframe(df.head(10), width='stretch')
+    st.dataframe(df.head(10), use_container_width=True)
 
 
 def render_kpi_cards(statistics: dict):
@@ -237,9 +237,9 @@ def render_results_table(recommendations: list, df: pd.DataFrame, current_run_ke
             help="僅在需要時渲染全部結果列，以減少 Zeabur 容器上的前端與傳輸負擔。"
         )
         table_df = rec_df if show_full_result_table else rec_df.head(ZEABUR_RESULT_PREVIEW_LIMIT)
-        st.dataframe(table_df, width='stretch')
+        st.dataframe(table_df, use_container_width=True)
     else:
-        st.dataframe(rec_df, width='stretch')
+        st.dataframe(rec_df, use_container_width=True)
 
 
 def _build_priority_groups(recommendations: list) -> dict:
@@ -283,7 +283,7 @@ def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_
                 st.session_state[cache_key] = pd.DataFrame(
                     _build_display_data(items, df, mode, stock_lookup=stock_lookup)
                 )
-            st.dataframe(st.session_state[cache_key], width='stretch')
+            st.dataframe(st.session_state[cache_key], use_container_width=True)
 
 
 def render_ai_executive_summary_button(recommendations: list, statistics: dict, mode_name: str):
@@ -294,7 +294,7 @@ def render_ai_executive_summary_button(recommendations: list, statistics: dict, 
     if not is_ai_enabled():
         return
 
-    if st.button("🤖 生成執行摘要", width='stretch',
+    if st.button("🤖 生成執行摘要", use_container_width=True,
                  help="AI 分析結果摘要（可選功能，非必要）", type="primary", key="ai_exec_summary"):
         with st.spinner("AI 生成中..."):
             summary_data = {
@@ -351,7 +351,7 @@ def render_statistics(statistics: dict):
                     }
                     for article, stats in article_stats.items()
                 ])
-                st.dataframe(article_df, width='stretch')
+                st.dataframe(article_df, use_container_width=True)
 
             st.markdown("**轉出類型分佈**")
             source_type_stats = statistics.get('source_type_stats', {})
@@ -364,7 +364,7 @@ def render_statistics(statistics: dict):
                     }
                     for source_type, stats in source_type_stats.items()
                 ])
-                st.dataframe(source_df, width='stretch')
+                st.dataframe(source_df, use_container_width=True)
 
         with col2:
             st.markdown("**按 OM 統計**")
@@ -380,7 +380,7 @@ def render_statistics(statistics: dict):
                     }
                     for om, stats in om_stats.items()
                 ])
-                st.dataframe(om_df, width='stretch')
+                st.dataframe(om_df, use_container_width=True)
 
             st.markdown("**接收類型分佈**")
             dest_type_stats = statistics.get('dest_type_stats', {})
@@ -393,7 +393,7 @@ def render_statistics(statistics: dict):
                     }
                     for dest_type, stats in dest_type_stats.items()
                 ])
-                st.dataframe(dest_df, width='stretch')
+                st.dataframe(dest_df, use_container_width=True)
 
 
 def render_gap_report(gap_report: dict):
@@ -476,7 +476,7 @@ def render_gap_report(gap_report: dict):
         if selected_status != '全部':
             filtered_df = filtered_df[filtered_df['狀態'] == selected_status]
 
-        st.dataframe(filtered_df, width='stretch')
+        st.dataframe(filtered_df, use_container_width=True)
 
 
 def render_download_button(excel_data: bytes, excel_filename: str, current_run_key: str):
@@ -487,6 +487,6 @@ def render_download_button(excel_data: bytes, excel_filename: str, current_run_k
         file_name=excel_filename,
         mime=_mime,
         type="primary",
-        width='stretch',
+        use_container_width=True,
         key=f"download_excel_{current_run_key}",
     )
