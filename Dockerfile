@@ -1,6 +1,6 @@
 # KiLo 庫存調貨建議系統 — Zeabur / 通用 Docker 映像
 # 鎖定 Python 版本以確保 Zeabur 部署與本機開發環境一致
-FROM python:3.13-slim
+FROM python:3.11-slim
 
 # 效能與穩定性：停用位元組碼快取（容器內不需要）、管線輸出即時 flush
 ENV PYTHONDONTWRITEBYTECODE=1 \

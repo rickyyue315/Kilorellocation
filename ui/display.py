@@ -126,7 +126,11 @@ def render_data_preview(df: pd.DataFrame, processing_stats: dict):
         st.metric("店鋪數", df['Site'].nunique())
 
     st.markdown("**資料樣本（前 10 行)**")
-    st.dataframe(df.head(10), use_container_width=True)
+    preview = df.head(10).copy()
+    for col in preview.columns:
+        if preview[col].dtype == object:
+            preview[col] = preview[col].astype(str)
+    st.dataframe(preview, use_container_width=True)
 
 
 def render_kpi_cards(statistics: dict):

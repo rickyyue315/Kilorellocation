@@ -458,8 +458,8 @@ class DataProcessor:
         
         # 記錄原始數據統計
         original_stats = {
-            'total_rows': len(df),
-            'columns': list(df.columns)
+            'total_rows': int(len(df)),
+            'columns': [str(c) for c in df.columns],
         }
         
         # 數據類型轉換
@@ -484,16 +484,23 @@ class DataProcessor:
             dup_rows = df.loc[dup_mask, ['Article', 'Site']].head(10).values.tolist()
             raise ValueError(f"數據包含重複的(Article, Site)行，共 {int(dup_mask.sum())} 筆。前10組: {dup_rows}")
         
-        # 記錄處理後統計
+        # 記錄處理後統計（全部為可序列化型別，避免 cache / 跨 runtime 崩潰）
+        fill_stats = {
+            'om_filled': int(self.fill_stats.get('om_filled', 0)),
+            'type_filled': int(self.fill_stats.get('type_filled', 0)),
+            'sites_not_found': sorted(
+                str(s) for s in (self.fill_stats.get('sites_not_found') or set())
+            ),
+        }
         processed_stats = {
-            'total_rows': len(df),
-            'columns': list(df.columns),
-            'data_types': df.dtypes.to_dict(),
-            'fill_stats': self.fill_stats,  # 添加填充統計
+            'total_rows': int(len(df)),
+            'columns': [str(c) for c in df.columns],
+            'data_types': {str(k): str(v) for k, v in df.dtypes.items()},
+            'fill_stats': fill_stats,
             # 無效 RP Type 修正資訊（供界面顯示警告）
-            'invalid_rp_types': getattr(self, '_invalid_rp_type_values', []),
-            'invalid_rp_type_count': getattr(self, '_invalid_rp_type_count', 0),
-            'blank_rp_type_count': getattr(self, '_blank_rp_type_count', 0),
+            'invalid_rp_types': [str(v) for v in getattr(self, '_invalid_rp_type_values', [])],
+            'invalid_rp_type_count': int(getattr(self, '_invalid_rp_type_count', 0)),
+            'blank_rp_type_count': int(getattr(self, '_blank_rp_type_count', 0)),
         }
         
         logger.info("數據預處理完成")
