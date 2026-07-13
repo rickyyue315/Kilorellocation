@@ -1,5 +1,24 @@
 # 版本更新記錄
 
+## v2.28.0 (2026-07-13)
+
+### 同步 stores-template.csv 店舖資料更新（88 → 90 間店舖）
+
+#### 變更說明
+- **HB97（新旺角文華）**：Class 2 由 A2 修正為 A1
+- **HBA7（AIRSIDE）**：新增店舖（HK, C, C2, XS, Hippo, M）
+- **HC71（荃錦中心）**：新增店舖（HK, C, C1, L, Eva, L）
+- **HD20（澳門銀河2）**：Class 1 由 B 修正為 A，Class 2 由 B1 修正為 A3，Size 由 S 修正為 M
+
+#### 修改檔案
+- `stores-template.csv` — 原始資料更新（本次來源）
+- `data/stores.json` — 同步 4 筆變更（HB97 修正、新增 HBA7/HC71、HD20 修正）
+- `config.py` — 版本號 bump 至 v2.28.0
+- `app.py` — docstring 版本更新
+- `VERSION.md` — 本版本記錄
+
+---
+
 ## v2.27.0 (2026-06-16)
 
 ### D/D2 模式 Excel 報表新增「ND清貨完成分析」頁
