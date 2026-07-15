@@ -337,7 +337,12 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Goal: precise zero-stock ND store replenishment with stock preservation
 
 ## Mode ND4: ND Same-OM Zero-Fill with Sales Record Filter (補0及有銷售記錄)
-- Source rules: same as ND3 (retain 3, highest-sales protected, sort by 2-month sales ascending)
+- Source rules:
+  - Two cases based on source store sales history:
+    1. **Zero-sales source** (Last Month + MTD == 0): no retention, transfer all SaSa Net Stock (net_stock > 0 required)
+    2. **With-sales source** (Last Month + MTD > 0): retain 3 pieces, same as ND3 (net_stock > 3, transferable = net_stock - 3)
+  - Highest-sales ND store protected
+  - Sort by 2-month sales ascending (0 sales first)
 - Destination rules:
   - ND stores with SaSa Net Stock == 0
   - ADDITIONAL: Last Month Sold Qty + MTD Sold Qty > 0 (sales record required)
@@ -346,7 +351,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Same OM only (Article + OM grouping)
 - Uses nd_mode strategy (same pairing logic as ND1)
 - Can configure max receive sites per source
-- Goal: precise zero-stock ND store replenishment restricted to stores with sales history
+- Goal: precise zero-stock ND store replenishment restricted to stores with sales history, with optimized zero-sales source transfer
 
 ## Mode 精簡SKU(限同OM): Simplified SKU - Same OM
 - Source rules:

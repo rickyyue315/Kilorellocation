@@ -109,18 +109,27 @@ def identify_sources_nd4_mode(group_df: pd.DataFrame) -> List[Dict]:
 
     for _, row in nd_stores.iterrows():
         net_stock = int(row['SaSa Net Stock'])
-        if net_stock <= ND3_KEEP_STOCK:
-            continue
+        last_month_sold = int(row['Last Month Sold Qty'])
+        mtd_sold = int(row['MTD Sold Qty'])
+        total_sales = last_month_sold + mtd_sold
         effective_sold = int(row['Effective Sold Qty'])
         if effective_sold >= max_nd_sold:
             continue
 
-        transferable_qty = net_stock - ND3_KEEP_STOCK
-        last_month_sold = int(row['Last Month Sold Qty'])
-        mtd_sold = int(row['MTD Sold Qty'])
-        total_sales = last_month_sold + mtd_sold
+        if total_sales == 0:
+            # 無銷量：不保留，全數轉出
+            if net_stock <= 0:
+                continue
+            transferable_qty = net_stock
+            src_type = 'ND4轉出(無銷量全轉)'
+        else:
+            # 有銷量：保留3件
+            if net_stock <= ND3_KEEP_STOCK:
+                continue
+            transferable_qty = net_stock - ND3_KEEP_STOCK
+            src_type = 'ND4轉出(保留3件)'
 
-        sources.append(make_source(row, transferable_qty, 1, 'ND4轉出(保留3件)',
+        sources.append(make_source(row, transferable_qty, 1, src_type,
                                     total_sales_sort=total_sales))
 
     sources.sort(key=lambda x: x.get('total_sales_sort', 0))

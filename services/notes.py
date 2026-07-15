@@ -25,6 +25,8 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
         if total_sales == 0:
             return f"剩{remaining}件(ND4保留3件,0銷優先)"
         return f"剩{remaining}件(ND4保留3件,近2月銷{total_sales})"
+    if src_type == 'ND4轉出(無銷量全轉)':
+        return f"剩{remaining}件(ND4無銷量全轉)"
     if src_type == 'ND轉出' and not mode_info['is_d_family']:
         return f"剩{remaining}件(ND全轉)"
     if src_type == 'F模式ND轉出':

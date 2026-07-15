@@ -425,9 +425,10 @@ def render_sidebar() -> Dict:
             - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
 
             **ND4模式(ND限同OM轉貨-補0及有銷售記錄)**
-            - 繼承ND3全部規則（參考C1、同OM、轉出保留3件、零庫存ND補貨）
-            - 接收端額外限制：僅限擁有銷售記錄的Shop（Last Month Sold Qty + MTD Sold Qty > 0）
+            - 基於ND3架構，接收端僅限有銷售記錄Shop（Last Month Sold Qty + MTD Sold Qty > 0）
             - 無銷售記錄的零庫存ND店不收貨
+            - **轉出端優化**：無銷量來源店不保留3件，全數可轉出；有銷量來源店保留3件（與ND3相同）
+            - 接收目標：max(Safety Stock×0.5, 3)
             - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
 
             **精簡SKU(限同OM)模式**
@@ -473,7 +474,7 @@ def render_sidebar() -> Dict:
             - NST模式：可設定同一SKU轉出店舖數量上限：10間 / 20間 / 不限制
             - ND1/ND2模式：可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
             - ND3模式：僅零庫存ND店舖可接收，目標=max(Safety×0.5, 3)，轉出店保留3件
-            - ND4模式：繼承ND3 + 僅限有銷售記錄Shop接收(Last Month+MTD>0)，無銷量零庫存ND不收
+            - ND4模式：繼承ND3 + 僅限有銷售記錄Shop接收 + 無銷量來源店不保留3件(全數可轉)
             - 接收優先級(B2/B2a/B2L/B2La/B3/B3a/B3L/B3La):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
             """)
 
