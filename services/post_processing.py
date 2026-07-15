@@ -203,3 +203,55 @@ def optimize_single_piece_transfers(recommendations: List[Dict], mode: str, crea
     optimized = [r for r in recommendations if int(r.get('Transfer Qty', 0) or 0) > 0]
     refresh_recommendation_fields(optimized, mode, create_note_fn)
     return optimized
+
+
+def optimize_nd4_avoid_one_remainder(recommendations: List[Dict]) -> bool:
+    """
+    ND4-specific: if a source store ends with exactly 1 remaining after transfer,
+    add 1 extra piece to the highest-sales destination line so source ends with 0.
+    """
+    groups: Dict[Tuple[str, str, str], List[Dict]] = {}
+    for rec in recommendations:
+        key = (
+            str(rec.get('Article', '')),
+            str(rec.get('Transfer Site', '')),
+            str(rec.get('Transfer OM', '')),
+        )
+        groups.setdefault(key, []).append(rec)
+
+    has_change = False
+
+    for group_recs in groups.values():
+        total_transferred = sum(int(r.get('Transfer Qty', 0) or 0) for r in group_recs)
+        original_stock = int(group_recs[0].get('Original Stock', 0) or 0)
+        remaining = original_stock - total_transferred
+        if remaining != 1:
+            continue
+
+        candidates = []
+        for rec in group_recs:
+            qty = int(rec.get('Transfer Qty', 0) or 0)
+            if qty <= 0:
+                continue
+            target_qty = rec.get('Target Qty')
+            if target_qty is not None and int(target_qty) > 0:
+                cumulative = int(rec.get('Cumulative Received Qty', 0) or 0)
+                if cumulative + 1 > int(target_qty):
+                    continue
+            candidates.append(rec)
+
+        if not candidates:
+            candidates = [r for r in group_recs if int(r.get('Transfer Qty', 0) or 0) > 0]
+            if not candidates:
+                continue
+
+        best = max(candidates, key=lambda r: (
+            int(r.get('Receive Site Last Month Sold Qty', 0) or 0)
+            + int(r.get('Receive Site MTD Sold Qty', 0) or 0),
+            int(r.get('Transfer Qty', 0) or 0),
+        ))
+
+        best['Transfer Qty'] = int(best.get('Transfer Qty', 0) or 0) + 1
+        has_change = True
+
+    return has_change

@@ -36,6 +36,7 @@ from services.post_processing import (
     infer_source_rp_type as _infer_source_rp_type_impl,
     refresh_recommendation_fields as _refresh_recommendation_fields_impl,
     optimize_single_piece_transfers as _optimize_single_piece_transfers_impl,
+    optimize_nd4_avoid_one_remainder,
 )
 from services.statistics import capture_pre_match_snapshot
 from strategies.predicates import is_hd_to_hk_restricted
@@ -613,6 +614,10 @@ class TransferLogic:
             all_recommendations.extend(recommendations)
         
         all_recommendations = self._optimize_single_piece_transfers(all_recommendations, mode)
+
+        if mode == self.mode_nd4:
+            if optimize_nd4_avoid_one_remainder(all_recommendations):
+                self._refresh_recommendation_fields(all_recommendations, mode)
 
         for rec in all_recommendations:
             rec['Priority'] = assign_priority(rec)
