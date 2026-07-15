@@ -13,7 +13,7 @@ from services.prioritizer import PRIORITY_ORDER
 
 def _dummy_note_fn(source, dest, current_received_qty, transfer_qty, mode):
     cumulative = current_received_qty + transfer_qty
-    return f"收累{cumulative}"
+    return f"累計{cumulative}件"
 
 
 def _make_rec(article, transfer_site, receive_site, qty, priority_label, **kw):
@@ -100,7 +100,7 @@ class TestNotesCumulativeOrdering:
 
         for i, r in enumerate(recs):
             note = r.get('Notes', '')
-            assert '收累' in note, f"Row {i} Notes missing cumulative: {note}"
+            assert '累計' in note, f"Row {i} Notes missing cumulative: {note}"
 
         prev_cum = 0
         for i, r in enumerate(recs):

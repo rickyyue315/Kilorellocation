@@ -237,7 +237,7 @@ streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.hea
 | F2 | F指定模式 | 僅 `Target` 店舖可接收（ND/RF 均可），Target 直接作為接收量；可設定 HD 轉出選項；Windy 目標店優先從同 OM 無 Target 店提取 |
  | F3 | 目標性補0 | 繼承 F2 + RF轉出保留2件 + RF按最高庫存優先轉出 + RF跨OM不降級。新增「優先滿足小型目標」選項、配對後缺口填補、Target達成分析。 |
 | NST | New Shop Target調貨 | 僅Target店接收，RF轉出保留≥2件 + 75%上限 + 庫存<3不轉出，可設定同一SKU轉出店數上限(10/20/不限)；目標可能未達100% |
-| ND1 | ND 同 OM 轉貨 | ND 店舖可互轉（同 OM），按銷量智能排序，接收上限 2×過去2個月銷量，可限制單一出貨店配對接收店數 |
+| ND1 | ND 同 OM 轉貨 | ND 店舖可互轉（同 OM），按銷量排序，接收上限 2×過去2個月銷量，可限制單一出貨店配對接收店數 |
 | ND2 | ND 混合 OM 轉貨 | ND 店舖可互轉（跨 OM），Windy 只轉 Windy，接收上限 2×過去2個月銷量，可限制單一出貨店配對接收店數 |
 | ND3 | ND 限同OM轉貨(補0) | ND 同 OM 轉貨，轉出保留 3 件，只補零庫存 ND 店（參考C1），按銷量排序，可限制單一出貨店配對接收店數 |
 | 精簡SKU(限同OM) | 精簡SKU 調貨 | RF 超出 Cap（Max(Safety×2, 過去2個月銷量×2)）部分轉出，ND 全轉出，剩餘退回 D001，僅同 OM |

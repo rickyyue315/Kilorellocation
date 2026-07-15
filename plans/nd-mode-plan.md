@@ -17,7 +17,7 @@
 
 ---
 
-## 2. 智能調貨算法設計
+## 2. 調貨算法設計
 
 ### 2.1 兩層優先級系統
 
@@ -125,7 +125,7 @@ flowchart TD
 | 轉出排序 | ND優先級1 + RF優先級2 | 按銷量排序 | 按銷量排序 |
 | 接收排序 | 緊急缺貨 + 潛在缺貨 | RF緊急 → ND按銷量 | RF緊急 → ND按銷量 |
 | 接收上限 | Safety Stock 倍數 | 2倍過去2個月銷量 | 2倍過去2個月銷量 |
-| 轉出類型 | ND轉出 / RF轉出 | ND智能轉出 | ND智能轉出 |
+| 轉出類型 | ND轉出 / RF轉出 | ND轉出(按銷量) | ND轉出(按銷量) |
 | 接收類型 | 緊急/潛在缺貨 | RF緊急缺貨 + ND潛在缺貨接收 | RF緊急缺貨 + ND潛在缺貨接收 |
 
 ---
@@ -150,7 +150,7 @@ def _is_nd_transfer_mode(self, mode: str) -> bool:
 - 新增 ND1/ND2 模式分支
 - ND 店舖按銷量排序：無銷量優先，低銷量次選
 - 保護最高銷量 ND 店舖（與 RF 最高動銷店保護一致）
-- 轉出類型標記：`ND智能轉出`
+- 轉出類型標記：`ND轉出(按銷量)`
 - 轉出數量：全數 SaSa Net Stock
 
 #### 4.1.4 修改 `identify_destinations()` — ND 模式接收邏輯
@@ -256,7 +256,7 @@ if self._is_nd_transfer_mode(mode):
         total_sales = last_month + mtd
         # 排序鍵：total_sales 升序（0銷量最優先轉出）
         sources.append({
-            'source_type': 'ND智能轉出',
+            'source_type': 'ND轉出(按銷量)',
             'priority': 1,
             'sort_key': total_sales,  # 用於排序
             ...
@@ -395,10 +395,10 @@ def perform_quality_checks(self, df: pd.DataFrame, mode: str = None) -> bool:
 ### ND1/ND2 模式的匹配順序
 
 ```
-1. ND智能轉出（0銷量）→ RF緊急缺貨       [最高優先]
-2. ND智能轉出（低銷量）→ RF緊急缺貨
-3. ND智能轉出（0銷量）→ ND潛在缺貨接收   [次要優先]
-4. ND智能轉出（低銷量）→ ND潛在缺貨接收
+1. ND轉出(按銷量)（0銷量）→ RF緊急缺貨       [最高優先]
+2. ND轉出(按銷量)（低銷量）→ RF緊急缺貨
+3. ND轉出(按銷量)（0銷量）→ ND潛在缺貨接收   [次要優先]
+4. ND轉出(按銷量)（低銷量）→ ND潛在缺貨接收
 ```
 
 ---
@@ -406,7 +406,7 @@ def perform_quality_checks(self, df: pd.DataFrame, mode: str = None) -> bool:
 ## 7. 新增轉出/接收類型標記
 
 ### 轉出類型
-- `ND智能轉出`：ND 模式下基於銷量排序的 ND 轉出
+- `ND轉出(按銷量)`：ND 模式下基於銷量排序的 ND 轉出
 
 ### 接收類型
 - `RF緊急缺貨補貨`：沿用現有（零庫存但有銷售記錄的 RF 店舖）

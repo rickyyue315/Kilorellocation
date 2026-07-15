@@ -50,7 +50,7 @@ def render_sidebar() -> Dict:
 
         with st.expander("💡 核心功能", expanded=False):
             st.markdown("""
-            **二十八模式智能調貨系統:**
+            **二十八模式調貨系統:**
             - ✅ A模式(保守轉貨) / B模式(加強轉貨)
             - ✅ B2模式(附加B特別模式) / B2a模式(B2+T遊客鋪不出貨)
             - ✅ B2L模式(附加B2L:Type=L保留2件) / B2La模式(B2L+T遊客鋪不出貨)
@@ -63,7 +63,7 @@ def render_sidebar() -> Dict:
             - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨) / ND3模式(ND限同OM轉貨-補0)
             - ✅ 精簡SKU(限同OM) / 精簡SKU(跨OM) / 精簡SKU(退D001)
             
-            **智能識別與匹配:**
+            **類型識別與匹配:**
             - ✅ ND/RF類型智慧識別
             - ✅ 優先順序調貨匹配
             - ✅ RF轉出限制控制

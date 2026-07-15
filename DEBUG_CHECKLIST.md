@@ -580,7 +580,7 @@ print(f"空值統計:\n{df_check.isnull().sum()}")
 | **E2** | 無 | 跨OM強制轉出 + C模式回退 | 靈活跨OM清倉 |
 | **F** | Target 扣減在途 | Target 直接作為接收量 | 更精確的目標分配 |
 | **F2** | 無 | 僅Target接收 | 集中補貨到指定店 |
-| **ND1** | 無 | ND同OM互轉 | ND店舖間智能調配 |
+| **ND1** | 無 | ND同OM互轉 | ND店舖間調配 |
 | **ND2** | 無 | ND跨OM互轉 | 跨OM ND調配 |
 | **精簡SKU** | 無 | 超Cap轉出+退回D001 | SKU精簡場景專用 |
 

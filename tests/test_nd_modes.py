@@ -319,11 +319,11 @@ class TestND2Mode:
 
 
 # =============================================
-# 智能算法邏輯測試
+# 算法邏輯測試
 # =============================================
 
 class TestNDAlgorithmLogic:
-    """智能調貨算法邏輯測試"""
+    """調貨算法邏輯測試"""
 
     def test_highest_sales_nd_protected_from_transfer(self):
         """最高銷量 ND 店舖不可轉出"""

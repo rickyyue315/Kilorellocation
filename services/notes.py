@@ -10,12 +10,12 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
     remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
     safety = source.get('safety_stock', 0)
 
-    if src_type == 'ND智能轉出':
+    if src_type == 'ND轉出(按銷量)':
         total_sales = source.get('last_month_sold_qty', 0) + source.get('mtd_sold_qty', 0)
         if total_sales == 0:
-            return f"剩{remaining}件(ND智能,0銷優先)"
-        return f"剩{remaining}件(ND智能,近2月銷{total_sales})"
-    if src_type == 'ND3智能轉出(保留3件)':
+            return f"剩{remaining}件(ND按銷量,0銷優先)"
+        return f"剩{remaining}件(ND按銷量,近2月銷{total_sales})"
+    if src_type == 'ND3轉出(保留3件)':
         total_sales = source.get('last_month_sold_qty', 0) + source.get('mtd_sold_qty', 0)
         if total_sales == 0:
             return f"剩{remaining}件(ND3保留3件,0銷優先)"
@@ -146,7 +146,7 @@ def create_recommendation_note(source, dest, current_received_qty, transfer_qty,
         reasons.append("缺口已滿足")
 
     reason_str = f"({','.join(reasons)})" if reasons else ""
-    notes_parts.append(f"轉{transfer_qty}件{reason_str}|出剩{remaining}|收累{cum_received}")
+    notes_parts.append(f"轉{transfer_qty}件{reason_str}|出剩{remaining}件|累計{cum_received}件")
 
     # Section 6: compact markers
     markers = []

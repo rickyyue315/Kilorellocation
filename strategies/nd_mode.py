@@ -36,7 +36,7 @@ def identify_sources_nd_mode(group_df: pd.DataFrame) -> List[Dict]:
         mtd_sold = int(row['MTD Sold Qty'])
         total_sales = last_month_sold + mtd_sold
 
-        sources.append(make_source(row, net_stock, 1, 'ND智能轉出',
+        sources.append(make_source(row, net_stock, 1, 'ND轉出(按銷量)',
                                     total_sales_sort=total_sales))
 
     sources.sort(key=lambda x: x.get('total_sales_sort', 0))
@@ -95,7 +95,7 @@ def identify_sources_nd3_mode(group_df: pd.DataFrame) -> List[Dict]:
         mtd_sold = int(row['MTD Sold Qty'])
         total_sales = last_month_sold + mtd_sold
 
-        sources.append(make_source(row, transferable_qty, 1, 'ND3智能轉出(保留3件)',
+        sources.append(make_source(row, transferable_qty, 1, 'ND3轉出(保留3件)',
                                     total_sales_sort=total_sales))
 
     sources.sort(key=lambda x: x.get('total_sales_sort', 0))

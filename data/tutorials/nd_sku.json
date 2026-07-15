@@ -29,7 +29,7 @@
           },
           {
             "type": "node",
-            "text": "其他 ND 店<br>ND智能轉出",
+            "text": "其他 ND 店<br>ND轉出(按銷量)",
             "color": "green"
           }
         ]
@@ -54,11 +54,11 @@
     ],
     "match_order": [
       [
-        "ND智能轉出",
+        "ND轉出(按銷量)",
         "RF緊急缺貨"
       ],
       [
-        "ND智能轉出",
+        "ND轉出(按銷量)",
         "ND潛在缺貨"
       ]
     ],
@@ -242,7 +242,7 @@
           },
           {
             "type": "node",
-            "text": "Net Stock &gt; 3<br>轉出量 = Net Stock - 3<br>ND3智能轉出(保留3件)",
+            "text": "Net Stock &gt; 3<br>轉出量 = Net Stock - 3<br>ND3轉出(保留3件)",
             "color": "green"
           }
         ]
@@ -262,7 +262,7 @@
     ],
     "match_order": [
       [
-        "ND3智能轉出(保留3件)",
+        "ND3轉出(保留3件)",
         "ND3補0接收"
       ]
     ],

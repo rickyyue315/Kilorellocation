@@ -374,7 +374,7 @@ class ExcelGenerator:
 
     def create_smart_summary_sheet(self, writer, ai_summary: str):
         workbook = writer.book
-        worksheet = workbook.add_worksheet('智能摘要')
+        worksheet = workbook.add_worksheet('摘要')
 
         title_fmt = workbook.add_format({
             'bold': True, 'font_size': 14, 'align': 'left',
@@ -393,7 +393,7 @@ class ExcelGenerator:
         })
 
         row = 0
-        worksheet.write(row, 0, '智能摘要', title_fmt)
+        worksheet.write(row, 0, '摘要', title_fmt)
         row += 2
 
         gen_time = datetime.now(ZoneInfo("Asia/Hong_Kong")).strftime("%Y-%m-%d %H:%M:%S")
@@ -405,7 +405,7 @@ class ExcelGenerator:
         worksheet.write(row, 1, ai_summary, text_fmt)
         row += 2
 
-        worksheet.write(row, 0, '此摘要由 AI 基於聚合統計數據生成，並不包含銷量庫存數據，摘要僅供參考，不能取代系統規則及人手覆核。', footer_fmt)
+        worksheet.write(row, 0, '此摘要基於聚合統計數據生成，並不包含銷量庫存數據，摘要僅供參考，不能取代系統規則及人手覆核。', footer_fmt)
 
         worksheet.set_column('A:A', 14)
         worksheet.set_column('B:B', 80)

@@ -116,7 +116,7 @@ MODE_DEFS: List[ModeDef] = [
             strategy_key='f_mode',
             source_method='_sources_f_mode', dest_method='_dests_f_mode',
             extra_ui_options=frozenset({'f2_hd_transfer', 'f_fulfill_small_first'})),
-    ModeDef("ND1", "ND同OM轉貨", "ND店舖互轉(同OM)，按銷量智能排序",
+    ModeDef("ND1", "ND同OM轉貨", "ND店舖互轉(同OM)，按銷量排序",
             attr_name="mode_nd1",
             families=frozenset({'nd_transfer'}), source_filter=True,
             strategy_key='nd_mode', receive_site_limit=True,

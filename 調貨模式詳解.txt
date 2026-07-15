@@ -865,9 +865,9 @@ statistics = {
 | 20 | F2 | F指定模式 | ✅ | 視Target需求 | 依Target需求 | 依目標 | F模式ND/RF轉出 | 依Target | Target-only+Windy目標優先 | 目標導向集中補貨 | Target-only+跨OM(HD除外) |
 | 21 | F3 | 目標性補0 | ✅ | 視Target需求 | 依Target(RF保留2件) | 依目標(RF保留2件) | F模式ND轉出+F3模式RF轉出(保留2件) | 依Target | RF保留2件+最高庫存優先+跨OM不降級 | 目標導向補貨(RF保留2件) | Target-only+跨OM(RF不降級) |
 | 22 | NST | New Shop Target調貨 | ✅ | 視Target需求 | 依Target(RF保留≥2件，75%上限) | 依目標(RF保留≥2件+75%上限) | NST模式ND轉出+NST模式RF轉出 | 依Target | RF保留≥2件+75%上限+庫存<3不轉出+SKU轉出店數上限 | 目標導向集中補貨(RF嚴格控制) | Target-only+跨OM(HD除外) |
-| 23 | ND1 | ND同OM轉貨 | ❌ | 無限制 | 全部庫存 | 不適用(ND) | ND智能轉出 | 2×銷量 | ND互轉+智能排序 | ND店舖間調貨 | 僅同OM |
-| 24 | ND2 | ND混合OM轉貨 | ✅ | 無限制 | 全部庫存 | 不適用(ND) | ND智能轉出 | 2×銷量 | ND互轉+跨OM+Windy/HD限制 | ND跨OM調貨 | 跨OM(Windy/HD) |
-| 25 | ND3 | ND限同OM轉貨(補0) | ❌ | 無限制 | Net Stock-3(保留3件) | 不適用(ND) | ND3智能轉出(保留3件) | max(Safety×0.5, 3) | ND補0+保留3件 | ND精準補零庫存 | 僅同OM |
+| 23 | ND1 | ND同OM轉貨 | ❌ | 無限制 | 全部庫存 | 不適用(ND) | ND轉出(按銷量) | 2×銷量 | ND互轉+排序 | ND店舖間調貨 | 僅同OM |
+| 24 | ND2 | ND混合OM轉貨 | ✅ | 無限制 | 全部庫存 | 不適用(ND) | ND轉出(按銷量) | 2×銷量 | ND互轉+跨OM+Windy/HD限制 | ND跨OM調貨 | 跨OM(Windy/HD) |
+| 25 | ND3 | ND限同OM轉貨(補0) | ❌ | 無限制 | Net Stock-3(保留3件) | 不適用(ND) | ND3轉出(保留3件) | max(Safety×0.5, 3) | ND補0+保留3件 | ND精準補零庫存 | 僅同OM |
 | 26 | 精簡SKU(限同OM) | 精簡SKU(限同OM) | ❌ | 超出Cap部分 | 依Cap超出量 | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 同左上限 | 超Cap轉出+退回D001 | SKU精簡(同OM) | 僅同OM |
 | 27 | 精簡SKU(跨OM) | 精簡SKU(跨OM) | ✅ | 超出Cap部分 | 依Cap超出量 | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 同左上限 | 超Cap轉出+跨OM+退回D001 | SKU精簡(跨OM) | 跨OM(HD/Windy) |
 | 28 | 精簡SKU(退D001) | 精簡SKU(退D001) | ✅ | 超出Cap部分 | 依Cap超出量(全退D001) | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 不配對(全退D001) | 全數退D001不配對 | SKU精簡(全退D001) | 不配對 |
@@ -923,7 +923,7 @@ statistics = {
 - **模式 F**：適合有明確接收目標量的情況，Target 數量直接作為接收量（不論 ND/RF，不考慮在途），未標Target的RF低庫存店按補0邏輯
 - **模式 F2**：適合需要集中補貨到指定Target店舖（不論 ND/RF），非Target RF店舖完全不接收
 - **模式 F3**：適合需要集中補貨到指定Target店舖，同時確保RF轉出店保留最低庫存（不低於2件），且RF跨OM同OM同等優先
-- **模式 ND1**：適合ND店舖間互相調貨（僅同OM），按銷量智能排序轉出，接收上限2×銷量
+- **模式 ND1**：適合ND店舖間互相調貨（僅同OM），按銷量排序轉出，接收上限2×銷量
 - **模式 ND2**：適合ND店舖間互相調貨（可跨OM），Windy只轉Windy，HD不能轉HA/HB/HC
 - **模式 ND3**：適合僅需精準補充零庫存ND店舖的場景，轉出店保留3件庫存，僅同OM配對
 - **精簡SKU(限同OM)**：適合同OM內SKU精簡場景，RF超出Cap(Max(Safety×2, 過去2個月銷量×2))部分轉出，ND全轉出，剩餘退回D001
@@ -1247,7 +1247,7 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 - 僅 ND 店舖可作為主要轉出來源
 - `SaSa Net Stock > 0` 才可轉出
 - 最高銷量 ND 店舖不轉出
-- 轉出類型：`ND智能轉出`
+- 轉出類型：`ND轉出(按銷量)`
 
 **接收規則：**
 1. RF 緊急缺貨：零庫存且有銷量紀錄，優先接收
@@ -1259,7 +1259,7 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 ## 模式ND2：ND混合OM轉貨 (ND Transfer - Cross OM)
 
 **核心特徵：**
-- 完整沿用 ND1 的智能轉出與接收邏輯
+- 完整沿用 ND1 的轉出與接收邏輯
 - 允許 **跨 OM** 配對
 - `Windy` 來源只能轉到 `Windy` 接收店舖
 - `HD` 開頭店舖不可轉到 `HA/HB/HC` 開頭店舖
@@ -1293,7 +1293,7 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 - 條件3：該 ND 店舖不為最高銷量 ND（保護最高銷量）
 - 可轉數量：SaSa Net Stock - 3（保留 3 件後全數可轉）
 - 按過去2個月銷量由低到高排序（零銷量優先），銷量最低者優先轉出
-- 轉出類型：`ND3智能轉出(保留3件)`
+- 轉出類型：`ND3轉出(保留3件)`
 
 **接收規則：**
 
