@@ -29,7 +29,8 @@
 | 23 | ND1 | ND同OM轉貨 | ND Transfer - Same OM |
 | 24 | ND2 | ND混合OM轉貨 | ND Transfer - Cross OM |
 | 25 | ND3 | ND限同OM轉貨(補0) | ND Same-OM Zero-Fill |
-| 26 | 精簡SKU(限同OM) | 精簡SKU(限同OM) | Simplified SKU - Same OM |
+| 26 | ND4 | ND限同OM轉貨(補0及有銷售記錄) | ND Same-OM Zero-Fill with Sales Filter |
+| 27 | 精簡SKU(限同OM) | 精簡SKU(限同OM) | Simplified SKU - Same OM |
 | 27 | 精簡SKU(跨OM) | 精簡SKU(跨OM) | Simplified SKU - Cross OM |
 | 28 | 精簡SKU(退D001) | 精簡SKU(退D001) | Simplified SKU - Return to D001 |
 
@@ -38,10 +39,10 @@
 ## 通用業務規則 (適用於所有模式)
 
 ### **0. 接收店數限制操作設定（介面）**
-- **規則**：當選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2 時，可在介面設定「出貨店舖接收店數限制」
+- **規則**：當選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3/ND4 時，可在介面設定「出貨店舖接收店數限制」
 - **選項**：`優先 1 間`、`最多 2 間`、`不限制`
 - **作用**：控制同一 SKU 下，單一出貨店舖最多可配對的接收店舖數
-- **適用模式**：B2、B2a、B2L、B2La、B3、B3a、B3L、B3La、E1、E1b、E2、ND1、ND2
+- **適用模式**：B2、B2a、B2L、B2La、B3、B3a、B3L、B3La、E1、E1b、E2、ND1、ND2、ND3、ND4
 - **介面位置**：`app.py` 側邊欄模式選擇區塊
 
 ### **0.1 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La Mix 店舖高銷量保護**
@@ -868,9 +869,10 @@ statistics = {
 | 23 | ND1 | ND同OM轉貨 | ❌ | 無限制 | 全部庫存 | 不適用(ND) | ND轉出(按銷量) | 2×銷量 | ND互轉+排序 | ND店舖間調貨 | 僅同OM |
 | 24 | ND2 | ND混合OM轉貨 | ✅ | 無限制 | 全部庫存 | 不適用(ND) | ND轉出(按銷量) | 2×銷量 | ND互轉+跨OM+Windy/HD限制 | ND跨OM調貨 | 跨OM(Windy/HD) |
 | 25 | ND3 | ND限同OM轉貨(補0) | ❌ | 無限制 | Net Stock-3(保留3件) | 不適用(ND) | ND3轉出(保留3件) | max(Safety×0.5, 3) | ND補0+保留3件 | ND精準補零庫存 | 僅同OM |
-| 26 | 精簡SKU(限同OM) | 精簡SKU(限同OM) | ❌ | 超出Cap部分 | 依Cap超出量 | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 同左上限 | 超Cap轉出+退回D001 | SKU精簡(同OM) | 僅同OM |
-| 27 | 精簡SKU(跨OM) | 精簡SKU(跨OM) | ✅ | 超出Cap部分 | 依Cap超出量 | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 同左上限 | 超Cap轉出+跨OM+退回D001 | SKU精簡(跨OM) | 跨OM(HD/Windy) |
-| 28 | 精簡SKU(退D001) | 精簡SKU(退D001) | ✅ | 超出Cap部分 | 依Cap超出量(全退D001) | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 不配對(全退D001) | 全數退D001不配對 | SKU精簡(全退D001) | 不配對 |
+| 26 | ND4 | ND限同OM轉貨(補0及有銷售記錄) | ❌ | 無限制 | Net Stock-3(保留3件) | 不適用(ND) | ND4轉出(保留3件) | max(Safety×0.5, 3) | ND補0+保留3件+有銷售記錄 | ND精準補零庫存(有銷量) | 僅同OM |
+| 27 | 精簡SKU(限同OM) | 精簡SKU(限同OM) | ❌ | 超出Cap部分 | 依Cap超出量 | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 同左上限 | 超Cap轉出+退回D001 | SKU精簡(同OM) | 僅同OM |
+| 28 | 精簡SKU(跨OM) | 精簡SKU(跨OM) | ✅ | 超出Cap部分 | 依Cap超出量 | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 同左上限 | 超Cap轉出+跨OM+退回D001 | SKU精簡(跨OM) | 跨OM(HD/Windy) |
+| 29 | 精簡SKU(退D001) | 精簡SKU(退D001) | ✅ | 超出Cap部分 | 依Cap超出量(全退D001) | Cap=Max(Safety×2, 2月銷量×2) | 精簡SKU ND/RF轉出 | 不配對(全退D001) | 全數退D001不配對 | SKU精簡(全退D001) | 不配對 |
 
 ### F2 / F3 / NST 對比
 
@@ -926,6 +928,7 @@ statistics = {
 - **模式 ND1**：適合ND店舖間互相調貨（僅同OM），按銷量排序轉出，接收上限2×銷量
 - **模式 ND2**：適合ND店舖間互相調貨（可跨OM），Windy只轉Windy，HD不能轉HA/HB/HC
 - **模式 ND3**：適合僅需精準補充零庫存ND店舖的場景，轉出店保留3件庫存，僅同OM配對
+- **模式 ND4**：適合僅需精準補充零庫存且有銷售記錄ND店舖的場景（無銷售記錄的零庫存店不收貨），轉出店保留3件庫存，僅同OM配對
 - **精簡SKU(限同OM)**：適合同OM內SKU精簡場景，RF超出Cap(Max(Safety×2, 過去2個月銷量×2))部分轉出，ND全轉出，剩餘退回D001
 - **精簡SKU(跨OM)**：適合跨OM SKU精簡場景，規則同精簡SKU(限同OM)但允許跨OM配對（Windy/HD限制適用）
 - **精簡SKU(退D001)**：適合SKU精簡但無需RF店舖接收的場景，所有轉出數量直接退回D001，不進行RF接收配對，無數量限制
@@ -1322,6 +1325,55 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 | 配對範圍 | 僅同 OM | 僅同 OM |
 | 參考模式 | - | C1 |
 | 適用場景 | ND 店舖間互相調貨 | 精準補零庫存 ND 店 |
+
+
+---
+
+## 模式ND4：ND限同OM轉貨(補0及有銷售記錄) (ND Same-OM Zero-Fill with Sales Filter)
+
+**核心特徵：**
+- 繼承 ND3 全部規則（同 OM、轉出保留 3 件、僅 ND 源、保護最高銷量 ND、按銷量排序）
+- 接收端額外限制：僅限 Last Month Sold Qty + MTD Sold Qty > 0（有銷售記錄）的零庫存 ND 店舖才可接收
+- 無銷售記錄的零庫存 ND 店舖不會收到任何貨品
+- 不回落一般缺貨補貨（類似 C1 不包含緊急缺貨、潛在缺貨分支）
+- 可設定同一 SKU 下單一出貨店舖最多配對的接收店數：優先 1 間 / 最多 2 間 / 不限制
+
+**轉出規則：**
+
+#### 僅 ND 類型轉出（同 ND3）
+- 條件1：RP Type 為 "ND"
+- 條件2：SaSa Net Stock > 3（必須保留 3 件）
+- 條件3：該 ND 店舖不為最高銷量 ND（保護最高銷量）
+- 可轉數量：SaSa Net Stock - 3（保留 3 件後全數可轉）
+- 按過去2個月銷量由低到高排序（零銷量優先），銷量最低者優先轉出
+- 轉出類型：`ND4轉出(保留3件)`
+
+**接收規則：**
+
+#### 僅零庫存且有銷售記錄 ND 店舖可接收
+- 條件1：RP Type 為 "ND"
+- 條件2：SaSa Net Stock = 0（零庫存）
+- 條件3：Last Month Sold Qty + MTD Sold Qty > 0（有銷售記錄）← ND4 新限制
+- 目標數量 = max(Safety Stock × 0.5, 3)（參考 C1）
+- 需求數量 = 目標數量 - (Net Stock + Pending Received)
+- 按過去2個月銷量由高到低排序
+- 接收類型：`ND4補0接收(有銷量)`
+
+**配對規則：**
+- 配對策略：使用 nd_mode 策略（同 ND1，dest 優先配對 source）
+- 同 OM 配對（groupby Article + OM）
+- HD 限制不適用（同 OM 內）
+
+**與 ND3 模式的差異對比：**
+
+| 項目 | ND3 模式 | ND4 模式 |
+|------|----------|----------|
+| 轉出規則 | 保留 3 件 | 保留 3 件（同 ND3） |
+| 接收對象 | 僅零庫存 ND（無條件） | 僅零庫存 ND + 有銷售記錄 |
+| 無銷量零庫存店 | 可接收 | 不接收 |
+| 接收目標 | max(Safety×0.5, 3) | max(Safety×0.5, 3) |
+| 配對範圍 | 僅同 OM | 僅同 OM |
+| 適用場景 | 精準補零庫存 ND 店 | 精準補有銷量的零庫存 ND 店 |
 
 
 ---

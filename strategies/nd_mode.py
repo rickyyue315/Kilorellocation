@@ -1,5 +1,5 @@
 """
-ND1/ND2/ND3模式匹配策略 + Source/Dest 識別邏輯
+ND1/ND2/ND3/ND4模式匹配策略 + Source/Dest 識別邏輯
 """
 
 from typing import Any, Dict, List, Optional, Set
@@ -102,6 +102,31 @@ def identify_sources_nd3_mode(group_df: pd.DataFrame) -> List[Dict]:
     return sources
 
 
+def identify_sources_nd4_mode(group_df: pd.DataFrame) -> List[Dict]:
+    sources: List[Dict] = []
+    nd_stores = group_df[group_df['RP Type'] == 'ND']
+    max_nd_sold = compute_max_protected_sold(nd_stores)
+
+    for _, row in nd_stores.iterrows():
+        net_stock = int(row['SaSa Net Stock'])
+        if net_stock <= ND3_KEEP_STOCK:
+            continue
+        effective_sold = int(row['Effective Sold Qty'])
+        if effective_sold >= max_nd_sold:
+            continue
+
+        transferable_qty = net_stock - ND3_KEEP_STOCK
+        last_month_sold = int(row['Last Month Sold Qty'])
+        mtd_sold = int(row['MTD Sold Qty'])
+        total_sales = last_month_sold + mtd_sold
+
+        sources.append(make_source(row, transferable_qty, 1, 'ND4轉出(保留3件)',
+                                    total_sales_sort=total_sales))
+
+    sources.sort(key=lambda x: x.get('total_sales_sort', 0))
+    return sources
+
+
 def identify_destinations_nd3_mode(group_df: pd.DataFrame) -> List[Dict]:
     destinations: List[Dict] = []
     nd_stores = group_df[group_df['RP Type'] == 'ND']
@@ -129,6 +154,35 @@ def identify_destinations_nd3_mode(group_df: pd.DataFrame) -> List[Dict]:
     return destinations
 
 
+def identify_destinations_nd4_mode(group_df: pd.DataFrame) -> List[Dict]:
+    destinations: List[Dict] = []
+    nd_stores = group_df[group_df['RP Type'] == 'ND']
+
+    for _, row in nd_stores.iterrows():
+        net_stock = int(row['SaSa Net Stock'])
+        if net_stock > 0:
+            continue
+        # ND4: only shops with sales records
+        last_month_sold = int(row['Last Month Sold Qty'])
+        mtd_sold = int(row['MTD Sold Qty'])
+        total_sales = last_month_sold + mtd_sold
+        if total_sales <= 0:
+            continue
+        safety_stock = int(row['Safety Stock']) if pd.notna(row.get('Safety Stock', 0)) else 0
+        total_available = net_stock + int(row['Pending Received'])
+        target_qty = max(int(safety_stock * F_TARGET_MULTIPLIER), F_TARGET_FLOOR)
+        needed_qty = target_qty - total_available
+        if needed_qty <= 0:
+            continue
+
+        destinations.append(make_dest(row, needed_qty, 1, 'ND4補0接收(有銷量)', target_qty,
+                                       max_receive_qty=target_qty,
+                                       total_sales=total_sales))
+
+    destinations.sort(key=lambda x: (x['priority'], -x.get('total_sales', 0)))
+    return destinations
+
+
 class NDModeStrategy(BaseMatchStrategy):
     def __init__(self, create_note=None, max_receive_sites_per_source=None):
         super().__init__(create_note)
@@ -142,6 +196,8 @@ class NDModeStrategy(BaseMatchStrategy):
     ) -> List[Dict[str, Any]]:
         if mode == "ND限同OM轉貨(補0)":
             return identify_sources_nd3_mode(group_df)
+        if mode == "ND限同OM轉貨(補0及有銷售記錄)":
+            return identify_sources_nd4_mode(group_df)
         return identify_sources_nd_mode(group_df)
 
     def identify_destinations(
@@ -151,6 +207,8 @@ class NDModeStrategy(BaseMatchStrategy):
     ) -> List[Dict[str, Any]]:
         if mode == "ND限同OM轉貨(補0)":
             return identify_destinations_nd3_mode(group_df)
+        if mode == "ND限同OM轉貨(補0及有銷售記錄)":
+            return identify_destinations_nd4_mode(group_df)
         return identify_destinations_nd_mode(group_df)
 
     def match(
@@ -202,7 +260,7 @@ class NDModeStrategy(BaseMatchStrategy):
                 transfer_qty = min(source['transferable_qty'], dest['needed_qty'], max_receive - current_received)
                 if transfer_qty <= 0:
                     continue
-                if mode == "ND限同OM轉貨(補0)" and transfer_qty == 1:
+                if mode in ("ND限同OM轉貨(補0)", "ND限同OM轉貨(補0及有銷售記錄)") and transfer_qty == 1:
                     continue
 
                 notes = self._create_note(source, dest, current_received, transfer_qty, mode) if self._create_note else ""

@@ -50,7 +50,7 @@ def render_sidebar() -> Dict:
 
         with st.expander("💡 核心功能", expanded=False):
             st.markdown("""
-            **二十八模式調貨系統:**
+            **二十九模式調貨系統:**
             - ✅ A模式(保守轉貨) / B模式(加強轉貨)
             - ✅ B2模式(附加B特別模式) / B2a模式(B2+T遊客鋪不出貨)
             - ✅ B2L模式(附加B2L:Type=L保留2件) / B2La模式(B2L+T遊客鋪不出貨)
@@ -60,7 +60,7 @@ def render_sidebar() -> Dict:
             - ✅ D模式(清貨轉貨) / D2模式(清貨轉貨ND限定)
             - ✅ E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM)
             - ✅ F模式(目標優化) / F2模式(F指定模式) / F3模式(目標性補0) / NST模式(New Shop Target調貨)
-            - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨) / ND3模式(ND限同OM轉貨-補0)
+            - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨) / ND3模式(ND限同OM轉貨-補0) / ND4模式(ND限同OM轉貨-補0及有銷售記錄)
             - ✅ 精簡SKU(限同OM) / 精簡SKU(跨OM) / 精簡SKU(退D001)
             
             **類型識別與匹配:**
@@ -100,9 +100,9 @@ def render_sidebar() -> Dict:
                - 確保包含所有必需欄位
             
              2. **選擇轉貨模式**
-                   - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C1/C2/D/D2/E1/E1b/E2/F/F2/F3/NST/ND1/ND2/ND3/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001))
+                    - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C1/C2/D/D2/E1/E1b/E2/F/F2/F3/NST/ND1/ND2/ND3/ND4/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001))
                 - 查看模式說明了解各模式特點
-                       - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
+                        - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3/ND4，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
                        - 若選擇 NST，可設定「HD店舖轉出」及「同一SKU轉出店舖數量上限：10間/20間/不限制」
             
             3. **啟動分析**
@@ -424,6 +424,12 @@ def render_sidebar() -> Dict:
             - 接收目標：max(Safety Stock×0.5, 3)
             - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
 
+            **ND4模式(ND限同OM轉貨-補0及有銷售記錄)**
+            - 繼承ND3全部規則（參考C1、同OM、轉出保留3件、零庫存ND補貨）
+            - 接收端額外限制：僅限擁有銷售記錄的Shop（Last Month Sold Qty + MTD Sold Qty > 0）
+            - 無銷售記錄的零庫存ND店不收貨
+            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
+
             **精簡SKU(限同OM)模式**
             - RF店舖存貨上限=Max(Safety×2, 過去2個月銷量×2)，超出部分轉出
             - ND店舖全數可轉出
@@ -467,6 +473,7 @@ def render_sidebar() -> Dict:
             - NST模式：可設定同一SKU轉出店舖數量上限：10間 / 20間 / 不限制
             - ND1/ND2模式：可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
             - ND3模式：僅零庫存ND店舖可接收，目標=max(Safety×0.5, 3)，轉出店保留3件
+            - ND4模式：繼承ND3 + 僅限有銷售記錄Shop接收(Last Month+MTD>0)，無銷量零庫存ND不收
             - 接收優先級(B2/B2a/B2L/B2La/B3/B3a/B3L/B3La):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
             """)
 

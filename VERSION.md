@@ -1,5 +1,40 @@
 # 版本更新記錄
 
+## v2.29.0 (2026-07-15)
+
+### 新增 ND4 模式：ND 限同 OM 轉貨（補 0 及有銷售記錄）
+
+#### 模式說明
+- **ND4**：基於 ND3（ND限同OM轉貨補0），但對接收店舖增加銷售記錄限制
+- 轉出規則與 ND3 完全相同（保留 3 件、同 OM、僅 ND 源、保護最高銷量 ND、按銷量升序排序）
+- **接收端差異**：僅 Last Month Sold Qty + MTD Sold Qty > 0（有銷售記錄）的零庫存 ND 店舖才可接收
+- 無銷售記錄的零庫存 ND 店舖不會收到任何貨品
+- 同 OM 配對（不跨 OM）
+- 可設定同一 SKU 下單一出貨店舖配對接收店舖：優先 1 間 / 最多 2 間 / 不限
+
+#### 修改檔案
+- `config.py` — 版本號 bump 至 v2.29.0
+- `models/mode_registry.py` — MODE_DEFS 新增 ND4 ModeDef
+- `strategies/nd_mode.py` — 新增 identify_sources_nd4_mode、identify_destinations_nd4_mode、NDModeStrategy 路由
+- `business_logic.py` — dest_method 路由更新、docstring 版本更新
+- `services/notes.py` — 新增 ND4 轉出/接收分析 note
+- `ui/sidebar.py` — ND4 模式描述、功能清單、操作指引
+- `ui/tutorial.py` — 教學內容更新（決策指南、全局規則、群組標題）
+- `data/tutorials/nd_sku.json` — 新增 ND4 教學 JSON 資料
+- `app.py` — docstring 版本更新（v2.29.0，29 模式）
+
+#### 文件同步
+- `README.md` — 模式列表、模式對照表、功能亮點、介面流程更新
+- `VERSION.md` — 本版本記錄
+- `config.py` — 版本號 bump 至 v2.29.0
+- `app.py` — docstring 版本更新
+- `ui/tutorial.py` — ND4 教學內容
+- `data/tutorials/nd_sku.json` — ND4 教學資料
+- `調貨模式詳解.txt` — 新增 ND4 詳細規則
+- `transfer_logic_ai_brief.md` — 新增 ND4 條目
+
+---
+
 ## v2.28.0 (2026-07-13)
 
 ### 同步 stores-template.csv 店舖資料更新（88 → 90 間店舖）

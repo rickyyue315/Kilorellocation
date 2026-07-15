@@ -16,7 +16,7 @@ _GROUP_DEFS = [
     ("d", "清貨模式（D / D2）", "5"),
     ("e", "強制轉出系列（E1 / E1b / E2）", "6"),
     ("f", "目標優化系列（F / F2 / F3）", "7"),
-    ("nd_sku", "ND/SKU專項（ND1 / ND2 / ND3 / 精簡SKU）", "8"),
+    ("nd_sku", "ND/SKU專項（ND1 / ND2 / ND3 / ND4 / 精簡SKU）", "8"),
 ]
 
 
@@ -200,7 +200,7 @@ def _render_global_rules():
 
     st.markdown("""
 **全局規則說明：**
-1. **ND 店鋪限制**：ND 類型店鋪在所有模式下只能作為轉出方，不能作為接收方（ND1/ND2/ND3 及 F/F2/F3 模式下有 Target 的 ND 店舖除外）
+1. **ND 店鋪限制**：ND 類型店鋪在所有模式下只能作為轉出方，不能作為接收方（ND1/ND2/ND3/ND4 及 F/F2/F3 模式下有 Target 的 ND 店舖除外）
 2. **最高動銷店保護**：RF 類型中有效銷量（Last Month + MTD）最高的店鋪不會被選為轉出方
 3. **避免雙重角色**：同一 SKU 的轉出店鋪絕對不能同時作為接收店鋪
 4. **單件後處理**：所有模式輸出前統一消除 Transfer Qty = 1 的記錄（Rebalance 取 1 件補上 &#10132; Merge 合併至高銷量目標店）
@@ -217,7 +217,7 @@ def _render_decision_guide():
         ("需強制轉出指定商品？", "E1 / E1b / E2", "red"),
         ("重點補零庫存店舖？", "C / C1 / C2", "blue"),
         ("有Type分類需求？", "B2~B3La系列", "green"),
-        ("ND店舖互轉？", "ND1 / ND2 / ND3", "blue"),
+        ("ND店舖互轉？", "ND1 / ND2 / ND3 / ND4", "blue"),
         ("SKU精簡？", "精簡SKU(同OM/跨OM/退D001)", "green"),
         ("基礎調貨", "A(保守) / B(加強)", "gray"),
     ]
@@ -254,6 +254,7 @@ def _render_decision_guide():
 | ND互轉僅同OM | ND1 |
 | ND互轉可跨OM | ND2 |
 | ND店舖補零庫存+保留3件 | ND3 |
+| ND店舖補零庫存+保留3件+僅限有銷售記錄Shop | ND4 |
 | SKU精簡僅同OM | 精簡SKU(限同OM) |
 | SKU精簡可跨OM | 精簡SKU(跨OM) |
 | SKU精簡全退D001不配對 | 精簡SKU(退D001) |

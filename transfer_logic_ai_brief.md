@@ -80,7 +80,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 ---
 
-# Mode Overview (28 Modes: A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, NST, ND1, ND2, ND3, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001))
+# Mode Overview (29 Modes: A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, NST, ND1, ND2, ND3, ND4, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001))
 
 ## Mode A: Conservative
 - Source rules: RF only, Surplus Transfer
@@ -336,6 +336,18 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Can configure max receive sites per source
 - Goal: precise zero-stock ND store replenishment with stock preservation
 
+## Mode ND4: ND Same-OM Zero-Fill with Sales Record Filter (補0及有銷售記錄)
+- Source rules: same as ND3 (retain 3, highest-sales protected, sort by 2-month sales ascending)
+- Destination rules:
+  - ND stores with SaSa Net Stock == 0
+  - ADDITIONAL: Last Month Sold Qty + MTD Sold Qty > 0 (sales record required)
+  - Target Qty = max(Safety Stock * 0.5, 3)
+  - Sort by 2-month sales descending
+- Same OM only (Article + OM grouping)
+- Uses nd_mode strategy (same pairing logic as ND1)
+- Can configure max receive sites per source
+- Goal: precise zero-stock ND store replenishment restricted to stores with sales history
+
 ## Mode 精簡SKU(限同OM): Simplified SKU - Same OM
 - Source rules:
   1. ND: full transfer (all SaSa Net Stock)
@@ -394,7 +406,8 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - F Target priority (ND/RF can receive, Target Qty = needed_qty)
   - F2 Target-only reception (ND/RF can receive, Target Qty = needed_qty)
    - ND1/ND2 ND mutual transfer (breaks ND-no-receive rule)
-   - ND3 ND same-OM zero-fill (retain 3, only 0-stock ND dest, like C1)
+    - ND3 ND same-OM zero-fill (retain 3, only 0-stock ND dest, like C1)
+    - ND4 ND same-OM zero-fill with sales filter (like ND3 but only receive stores with sales history)
    - 精簡SKU(限同OM) surplus beyond Cap + D001 fallback
    - 精簡SKU(跨OM) cross-OM + HD/Windy + D001 fallback
    - 精簡SKU(退D001) all surplus directly returns to D001, no RF receive pairing

@@ -20,6 +20,11 @@ def _note_source_analysis(source, dest, mode, transfer_qty, mode_info):
         if total_sales == 0:
             return f"剩{remaining}件(ND3保留3件,0銷優先)"
         return f"剩{remaining}件(ND3保留3件,近2月銷{total_sales})"
+    if src_type == 'ND4轉出(保留3件)':
+        total_sales = source.get('last_month_sold_qty', 0) + source.get('mtd_sold_qty', 0)
+        if total_sales == 0:
+            return f"剩{remaining}件(ND4保留3件,0銷優先)"
+        return f"剩{remaining}件(ND4保留3件,近2月銷{total_sales})"
     if src_type == 'ND轉出' and not mode_info['is_d_family']:
         return f"剩{remaining}件(ND全轉)"
     if src_type == 'F模式ND轉出':
@@ -89,6 +94,9 @@ def _note_dest_analysis(dest, current_received_qty, transfer_qty):
     if dest_type == 'ND3補0接收':
         target_qty = dest.get('target_qty', 0)
         return f"目標{target_qty}(S×0.5),已收{cumulative}"
+    if dest_type == 'ND4補0接收(有銷量)':
+        target_qty = dest.get('target_qty', 0)
+        return f"目標{target_qty}(S×0.5,有銷量),已收{cumulative}"
     if dest_type == 'RF緊急缺貨補貨':
         return f"RF零庫存有銷量,已收{cumulative}"
     if dest_type == '緊急缺貨補貨':
