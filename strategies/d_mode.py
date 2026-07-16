@@ -1,5 +1,5 @@
-"""
-D/D2模式 (清貨轉貨) 接收端識別邏輯
+﻿"""
+D/D2æ¨¡å¼ (æ¸…è²¨è½‰è²¨) æŽ¥æ”¶ç«¯è­˜åˆ¥é‚è¼¯
 """
 
 from typing import Any, Dict, List, Optional
@@ -25,17 +25,20 @@ def identify_destinations_d_mode(group_df: pd.DataFrame) -> List[Dict]:
             if needed_qty <= 0:
                 continue
             max_receive = max(safety_stock, 2)
-            destinations.append(make_dest(row, needed_qty, 1, '緊急缺貨補貨', max_receive,
+            destinations.append(make_dest(row, needed_qty, 1, 'ç·Šæ€¥ç¼ºè²¨è£œè²¨', max_receive,
                                            max_receive_qty=max_receive))
             continue
 
         is_insufficient_stock = total_available < safety_stock
         if is_insufficient_stock:
             needed_qty = safety_stock - total_available
-            destinations.append(make_dest(row, needed_qty, 2, '潛在缺貨補貨', safety_stock,
+            destinations.append(make_dest(row, needed_qty, 2, 'æ½›åœ¨ç¼ºè²¨è£œè²¨', safety_stock,
                                            max_receive_qty=safety_stock))
 
-    destinations.sort(key=lambda x: x['priority'])
+    destinations.sort(key=lambda x: (
+        x['priority'],
+        -(int(x.get('last_month_sold_qty', 0)) + int(x.get('mtd_sold_qty', 0))),
+    ))
     return destinations
 
 
@@ -54,7 +57,7 @@ def identify_destinations_d2_mode(group_df: pd.DataFrame, enable_2site_limit: bo
             needed_qty = target_qty - total_available
             if needed_qty <= 0:
                 continue
-            destinations.append(make_dest(row, needed_qty, 1, '緊急缺貨補貨', target_qty,
+            destinations.append(make_dest(row, needed_qty, 1, 'ç·Šæ€¥ç¼ºè²¨è£œè²¨', target_qty,
                                            max_receive_qty=target_qty))
             continue
 
@@ -62,8 +65,12 @@ def identify_destinations_d2_mode(group_df: pd.DataFrame, enable_2site_limit: bo
         if is_insufficient_stock:
             target_qty = safety_stock * m
             needed_qty = target_qty - total_available
-            destinations.append(make_dest(row, needed_qty, 2, '潛在缺貨補貨', target_qty,
+            destinations.append(make_dest(row, needed_qty, 2, 'æ½›åœ¨ç¼ºè²¨è£œè²¨', target_qty,
                                            max_receive_qty=target_qty))
 
-    destinations.sort(key=lambda x: x['priority'])
+    destinations.sort(key=lambda x: (
+        x['priority'],
+        -(int(x.get('last_month_sold_qty', 0)) + int(x.get('mtd_sold_qty', 0))),
+    ))
     return destinations
+
