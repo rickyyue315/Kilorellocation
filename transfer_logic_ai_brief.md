@@ -80,7 +80,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 ---
 
-# Mode Overview (29 Modes: A, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, NST, ND1, ND2, ND3, ND4, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001))
+# Mode Overview (30 Modes: A, A1, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, NST, ND1, ND2, ND3, ND4, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001))
 
 ## Mode A: Conservative
 - Source rules: RF only, Surplus Transfer
@@ -91,6 +91,14 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - **Single-piece bump (v2.11.1)**: if Actual=1 and remaining stock after 1-piece transfer >= 3, bump to 2 with safety stock relaxed by -1 (mathematically equivalent to original safety check)
 - Destination rules: Emergency Replenishment, Potential Replenishment
 - Goal: stable operations, strict safety stock protection
+
+## Mode A1: Conservative (No 1 Remainder)
+- Inherits all Mode A rules (RF Surplus Transfer, 20% cap, min 2, safety stock protection)
+- **Additional: Avoid exactly 1 remaining at source store**
+  - During matching (`_adjust_a1_remainder`): if final_remaining == 1, try `transfer_qty + 1` (if source has capacity and dest can accept target_qty+1), else `transfer_qty - 1` if > 1
+  - Post-processing (`optimize_a1_avoid_one_remainder`): after all matching, if any source ends with exactly 1 remaining, add +1 to the best destination line (highest sales, capped at target_qty+1)
+- ND Shop not forced to 0, only eliminates "exactly 1" remainder
+- Goal: conservative transfer while avoiding 1-piece tail at source
 
 ## Mode B: Enhanced
 - Source rules: RF Surplus + RF Enhanced

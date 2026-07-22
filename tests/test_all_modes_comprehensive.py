@@ -189,6 +189,140 @@ class TestModeA:
 
 
 # ===========================================================================
+# 模式 A1：保守轉貨(轉出店舖不餘存貨1件)
+# ===========================================================================
+
+class TestModeA1:
+
+    def test_basic_transfer(self):
+        """A1模式基本流程"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='ND01', **{'RP Type': 'ND', 'SaSa Net Stock': 6,
+                       'Effective Sold Qty': 0, 'Safety Stock': 0,
+                       'Last Month Sold Qty': 0, 'MTD Sold Qty': 0}),
+            _make_row(Site='RF01', **{'SaSa Net Stock': 20, 'Safety Stock': 5,
+                       'Effective Sold Qty': 2}),
+            _make_row(Site='RF02', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 10, 'Last Month Sold Qty': 5, 'MTD Sold Qty': 5}),
+        ])
+        recs = logic.generate_transfer_recommendations(df, logic.mode_a1)
+        assert len(recs) > 0, "A1模式應產生建議"
+        run_common_assertions(recs, df, logic, "A1模式")
+
+    def test_avoids_one_remainder_nd_source(self):
+        """A1模式：ND源店轉出後不應剩1件（多1件給接收或保留2件）"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='HC62', **{'RP Type': 'ND', 'SaSa Net Stock': 7,
+                       'Safety Stock': 2, 'Effective Sold Qty': 0,
+                       'Last Month Sold Qty': 0, 'MTD Sold Qty': 0}),
+            _make_row(Site='HB24', **{'SaSa Net Stock': 0, 'Safety Stock': 6,
+                       'Effective Sold Qty': 5, 'Last Month Sold Qty': 3, 'MTD Sold Qty': 2}),
+        ])
+        recs = logic.generate_transfer_recommendations(df, logic.mode_a1)
+        assert len(recs) > 0, "A1模式應產生建議"
+        run_common_assertions(recs, df, logic, "A1-NDremainder")
+
+        cum: Dict = defaultdict(int)
+        for r in recs:
+            cum[(r['Article'], r['Transfer Site'])] += r['Transfer Qty']
+        for (art, site), total in cum.items():
+            orig = int(recs[0]['Original Stock']) if all(r['Transfer Site'] == site for r in recs if r['Transfer Site'] == site) else 0
+            for r in recs:
+                if r['Transfer Site'] == site:
+                    orig = r['Original Stock']
+                    break
+            remaining = orig - total
+            assert remaining != 1, f"A1模式下 {site} 不應剩1件（剩{remaining}）"
+
+    def test_nd_shop_no_force_zero(self):
+        """A1模式：ND Shop不強制至0（若接收無法+1則保留2件）"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='HC62', **{'RP Type': 'ND', 'SaSa Net Stock': 7,
+                       'Safety Stock': 2, 'Effective Sold Qty': 0,
+                       'Last Month Sold Qty': 0, 'MTD Sold Qty': 0}),
+            _make_row(Site='HB24', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 5, 'Last Month Sold Qty': 3, 'MTD Sold Qty': 2}),
+        ])
+        recs = logic.generate_transfer_recommendations(df, logic.mode_a1)
+        assert len(recs) > 0
+        run_common_assertions(recs, df, logic, "A1-noForceZero")
+        cum: Dict = defaultdict(int)
+        for r in recs:
+            cum[(r['Article'], r['Transfer Site'])] += r['Transfer Qty']
+        for (art, site), total in cum.items():
+            for r in recs:
+                if r['Transfer Site'] == site:
+                    remaining = r['Original Stock'] - total
+                    if remaining == 1:
+                        # If remaining is 1, check if the receiving site has target_qty and couldn't accept +1
+                        for rec in recs:
+                            if rec['Transfer Site'] == site:
+                                target_qty = rec.get('Target Qty', 0)
+                                cumul = total
+                                if target_qty and cumul >= target_qty + 1:
+                                    pytest.fail(f"{site} 剩1件但接收已超target+1")
+                    break
+
+    def test_rf_transfer_no_one_remainder(self):
+        """A1模式：RF源店轉出後不應剩1件"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='RF01', **{'SaSa Net Stock': 12, 'Safety Stock': 3,
+                       'Effective Sold Qty': 2, 'Last Month Sold Qty': 1, 'MTD Sold Qty': 1}),
+            _make_row(Site='RF02', **{'SaSa Net Stock': 0, 'Safety Stock': 8,
+                       'Effective Sold Qty': 10, 'Last Month Sold Qty': 5, 'MTD Sold Qty': 5}),
+        ])
+        recs = logic.generate_transfer_recommendations(df, logic.mode_a1)
+        run_common_assertions(recs, df, logic, "A1-RF")
+        cum: Dict = defaultdict(int)
+        for r in recs:
+            cum[(r['Article'], r['Transfer Site'])] += r['Transfer Qty']
+        for (art, site), total in cum.items():
+            for r in recs:
+                if r['Transfer Site'] == site:
+                    remaining = r['Original Stock'] - total
+                    assert remaining != 1, f"A1模式下RF源店 {site} 不應剩1件（剩{remaining}）"
+                    break
+
+    def test_a1_same_as_a_sources(self):
+        """A1模式使用與A相同的RF源店計算邏輯（20%上限、最低2件）"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='RF_BIG', **{'SaSa Net Stock': 100, 'Safety Stock': 10,
+                       'Effective Sold Qty': 1}),
+            _make_row(Site='RF_NEED', **{'SaSa Net Stock': 0, 'Safety Stock': 50,
+                       'Effective Sold Qty': 20, 'Last Month Sold Qty': 10, 'MTD Sold Qty': 10}),
+        ])
+        recs_a = logic.generate_transfer_recommendations(df, logic.mode_a)
+        recs_a1 = logic.generate_transfer_recommendations(df, logic.mode_a1)
+        assert len(recs_a1) > 0
+        run_common_assertions(recs_a1, df, logic, "A1-20pct")
+        for r in recs_a1:
+            if r['Source Type'] == 'RF過剩轉出':
+                upper = max(int(100 * 0.2), 2)
+                assert r['Transfer Qty'] <= upper, (
+                    f"A1模式 transfer qty {r['Transfer Qty']} > upper {upper}")
+
+    def test_highest_sold_protected(self):
+        """A1模式下最高動銷RF店不應作為轉出"""
+        logic = TransferLogic()
+        df = _df([
+            _make_row(Site='RF_HIGH', **{'SaSa Net Stock': 20, 'Safety Stock': 5,
+                       'Effective Sold Qty': 10}),
+            _make_row(Site='RF_LOW', **{'SaSa Net Stock': 20, 'Safety Stock': 5,
+                       'Effective Sold Qty': 1}),
+            _make_row(Site='RF_NEED', **{'SaSa Net Stock': 0, 'Safety Stock': 5,
+                       'Effective Sold Qty': 8, 'Last Month Sold Qty': 4, 'MTD Sold Qty': 4}),
+        ])
+        recs = logic.generate_transfer_recommendations(df, logic.mode_a1)
+        src_sites = {r['Transfer Site'] for r in recs}
+        assert 'RF_HIGH' not in src_sites, "A1模式最高動銷店不應轉出"
+
+
+# ===========================================================================
 # 模式 B：加強轉貨
 # ===========================================================================
 

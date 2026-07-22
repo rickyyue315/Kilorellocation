@@ -1,5 +1,5 @@
 """
-教學分頁 — 28 種調貨模式圖例教學（數據驅動版本）
+教學分頁 — 30 種調貨模式圖例教學（數據驅動版本）
 """
 
 import json
@@ -9,7 +9,7 @@ import streamlit as st
 _TUTORIALS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "tutorials")
 
 _GROUP_DEFS = [
-    ("basic", "基礎調貨模式（A / B）", "1"),
+    ("basic", "基礎調貨模式（A / A1 / B）", "1"),
     ("b2", "B特別模式（B2 / B2a / B2L / B2La）", "2"),
     ("b3", "B跨OM特別模式（B3 / B3a / B3L / B3La）", "3"),
     ("c", "重點補0系列（C / C1 / C2）", "4"),
@@ -266,7 +266,7 @@ def render_tutorial_page():
     _render_global_rules()
 
     st.markdown("---")
-    st.markdown("### 28 種模式教學")
+    st.markdown("### 30 種模式教學")
     st.markdown("按業務場景分為 8 組，展開查看詳細教學。")
 
     for group_key, group_title, icon in _GROUP_DEFS:

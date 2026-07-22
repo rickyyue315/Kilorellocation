@@ -146,6 +146,163 @@
     }
   },
   {
+    "code": "A1",
+    "name": "保守轉貨(轉出店舖不餘存貨1件)",
+    "risk": "低",
+    "scenario": "需保守轉貨，但轉出後源店剛好剩1件，希望避免此情況（接收方可+1件或源店保留2件）",
+    "source_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "ND 店舖<br>庫存 > 0<br>全數可轉",
+            "color": "purple"
+          },
+          {
+            "type": "node",
+            "text": "RF 店舖<br>庫存 > Safety Stock",
+            "color": "green"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "計算可轉量"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "可轉 = min(<br>庫存-Safety,<br>max(庫存&#215;20%, 2),<br>Net Stock)",
+            "color": "blue"
+          }
+        ]
+      },
+      {
+        "type": "arrow",
+        "label": "配對後避免餘1件"
+      },
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "源店剩1件?<br>接收+1件可解<br>(上限target+1)",
+            "color": "green"
+          },
+          {
+            "type": "node",
+            "text": "否則源店<br>保留2件",
+            "color": "orange"
+          }
+        ]
+      }
+    ],
+    "dest_flow": [
+      {
+        "type": "row",
+        "items": [
+          {
+            "type": "node",
+            "text": "緊急缺貨<br>Net Stock=0<br>有銷量",
+            "color": "red"
+          },
+          {
+            "type": "node",
+            "text": "潛在缺貨<br>庫存 &lt; Safety<br>最高銷量店",
+            "color": "orange"
+          }
+        ]
+      }
+    ],
+    "match_order": [
+      [
+        "ND轉出",
+        "緊急缺貨"
+      ],
+      [
+        "ND轉出",
+        "潛在缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "緊急缺貨"
+      ],
+      [
+        "RF過剩轉出",
+        "潛在缺貨"
+      ]
+    ],
+    "scenario_table": {
+      "headers": [
+        "店舖",
+        "類型",
+        "Net Stock",
+        "Safety",
+        "角色",
+        "調撥量",
+        "調撥後"
+      ],
+      "rows": [
+        [
+          "HC62",
+          "ND",
+          "7",
+          "2",
+          "轉出(ND全轉)",
+          "7",
+          "0"
+        ],
+        [
+          "HB24",
+          "RF",
+          "0",
+          "6",
+          "接收(緊急/上限+1)",
+          "+7",
+          "7"
+        ]
+      ]
+    },
+    "extra_notes": "A1 基於 A 規則，額外處理：若轉出後源店剩1件&#10132;接收方可增1件（&#8804;target+1），否則源店保留2件。ND Shop 不強制至0，僅消除餘1件情況。",
+    "diff_table": {
+      "headers": [
+        "對比項",
+        "A 保守",
+        "A1 保守(不餘1件)"
+      ],
+      "rows": [
+        [
+          "轉出比例上限",
+          "20%",
+          "20%（同A）"
+        ],
+        [
+          "安全庫存保護",
+          "嚴格（不可低於）",
+          "嚴格（不可低於）"
+        ],
+        [
+          "源店餘1件處理",
+          "保留1件",
+          "接收+1或源店保留2件"
+        ],
+        [
+          "接收方可增量",
+          "不可",
+          "+1件（&#8804;target+1）"
+        ],
+        [
+          "ND Shop 處理",
+          "全轉出（可能餘1）",
+          "不餘1件（可保留2）"
+        ]
+      ]
+    }
+  },
+  {
     "code": "B",
     "name": "加強轉貨",
     "risk": "中",

@@ -23,6 +23,8 @@ class ModeDef:
 MODE_DEFS: List[ModeDef] = [
     ModeDef("A", "保守轉貨", "轉出後保留安全庫存，單件自動上調至2件",
             attr_name="mode_a", source_filter=False),
+    ModeDef("A1", "保守轉貨(轉出店舖不餘存貨1件)", "基於保守轉貨規則，避免轉出店剩1件，接收方可+1件",
+            attr_name="mode_a1", source_filter=False),
     ModeDef("B", "加強轉貨", "積極處理滯銷品",
             attr_name="mode_b", source_filter=False),
     ModeDef("B2", "附加B(特別模式)", "B模式 + Type=L全轉出 + Mix高銷量保護",

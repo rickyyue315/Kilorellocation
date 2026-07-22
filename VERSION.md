@@ -1,5 +1,42 @@
 # 版本更新記錄
 
+## v2.30.0 (2026-07-22)
+
+### 新增 A1 模式：保守轉貨(轉出店舖不餘存貨1件)
+
+#### 模式說明
+- **A1**：基於 A（保守轉貨）規則，但**避免轉出店舖剛好剩 1 件存貨**
+- 繼承 A 模式全部規則：RF 過剩轉出（20% 庫存上限、最低 2 件）、安全庫存保護
+- **核心差異**：轉出配對時若源店會剩 1 件，自動執行以下調整：
+  1. **接收方 +1 件**：在接收店 target_qty 上限 +1 的範圍內，增量 1 件以避免餘 1
+  2. **源店保留 2 件**：若 +1 會超出接收上限，則源店保留 2 件（不強制至 0）
+- **ND Shop 不強制出清**：不要求 ND Shop 必須轉至 0 件，僅消除「餘 1 件」情況
+- 適合 ND Shop 轉出且不希望存貨餘 1 件的場景
+
+#### 修改檔案
+- `config.py` — 版本號 bump 至 v2.30.0
+- `models/mode_registry.py` — MODE_DEFS 新增 A1 ModeDef（30 模式）
+- `business_logic.py` — _compute_rf_transferable 加入 mode_a1 路由；generate 加入 A1 後處理
+- `services/matching_engine.py` — 新增 _adjust_a1_remainder()；compute_transfer_qty 雙向調用
+- `services/post_processing.py` — 新增 optimize_a1_avoid_one_remainder()
+- `ui/sidebar.py` — A1 模式描述、功能清單、操作指引
+- `ui/tutorial.py` — 教學內容更新（30 模式、基礎組標題）
+- `data/tutorials/basic.json` — 新增 A1 教學 JSON 資料（含 flow、情境、對比表）
+- `app.py` — docstring 版本更新（v2.30.0，30 模式）
+- `tests/test_mode_registry.py` — 更新模式計數（29→30）
+- `tests/test_all_modes_comprehensive.py` — 新增 TestModeA1（6 個測試案例）
+
+#### 文件同步
+- `README.md` — 模式列表新增 A1、模式對照表、功能亮點、介面流程更新
+- `VERSION.md` — 本版本記錄
+- `config.py` — 版本號 bump 至 v2.30.0
+- `app.py` — docstring 版本更新
+- `ui/tutorial.py` — 教學內容更新
+- `調貨模式詳解.txt` — 新增 A1 模式說明
+- `transfer_logic_ai_brief.md` — 更新模式列表與限制
+
+---
+
 ## v2.29.0 (2026-07-15)
 
 ### 新增 ND4 模式：ND 限同 OM 轉貨（補 0 及有銷售記錄）

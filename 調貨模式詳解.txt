@@ -1,38 +1,39 @@
-## 二十八種調貨模式詳解
+## 三十種調貨模式詳解
 
 ### 全部模式順序列表
 
 | # | 代碼 | 名稱 | 英文名稱 |
 |---|------|------|---------|
 | 1 | A | 保守轉貨 | Conservative Transfer |
-| 2 | B | 加強轉貨 | Enhanced Transfer |
-| 3 | B2 | 附加B(特別模式) | Enhanced Transfer Plus |
-| 4 | B2a | 附加B2a(特別模式-T遊客鋪不出貨) | Enhanced Transfer Plus - Tourist No Source |
-| 5 | B2L | 附加B2L(特別模式-Type=L保留2件) | Enhanced Transfer Plus - Type L Retain 2 |
-| 6 | B2La | 附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨) | Enhanced Transfer Plus - Type L Retain 2 + Tourist No Source |
-| 7 | B3 | 附加B3(跨OM特別模式) | Enhanced Transfer Plus - Cross OM |
-| 8 | B3a | 附加B3a(跨OM特別模式-T遊客鋪不出貨) | Enhanced Transfer Plus Cross OM - Tourist No Source |
-| 9 | B3L | 附加B3L(跨OM特別模式-Type=L保留2件) | Enhanced Transfer Plus Cross OM - Type L Retain 2 |
-| 10 | B3La | 附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨) | Enhanced Transfer Plus Cross OM - Type L Retain 2 + Tourist No Source |
-| 11 | C | 重點補0 | Priority Zero Stock Replenishment |
-| 12 | C1 | 重點補0-只補0/1 | Priority Zero Stock Replenishment - 0/1 Only |
-| 13 | C2 | 附加C2(跨OM重點補0) | Priority Zero Stock Replenishment with Cross-OM |
-| 14 | D | 清貨轉貨 | Clearance Transfer |
-| 15 | D2 | 清貨轉貨(ND限定) | Clearance Transfer - ND Only |
-| 16 | E1 | 強制轉出(同OM) | Forced Transfer - Same OM Only |
-| 17 | E1b | 強制轉出(優先類型接收) | Forced Transfer - Priority Type |
-| 18 | E2 | 強制轉出(跨OM) | Forced Transfer - Cross OM |
-| 19 | F | 目標優化 | Target Optimization |
-| 20 | F2 | F指定模式 | Target-Only Optimization |
-| 21 | F3 | 目標性補0 | Targeted Zero-Fill |
-| 22 | NST | New Shop Target調貨 | New Shop Target Transfer |
-| 23 | ND1 | ND同OM轉貨 | ND Transfer - Same OM |
-| 24 | ND2 | ND混合OM轉貨 | ND Transfer - Cross OM |
-| 25 | ND3 | ND限同OM轉貨(補0) | ND Same-OM Zero-Fill |
-| 26 | ND4 | ND限同OM轉貨(補0及有銷售記錄) | ND Same-OM Zero-Fill with Sales Filter |
-| 27 | 精簡SKU(限同OM) | 精簡SKU(限同OM) | Simplified SKU - Same OM |
-| 27 | 精簡SKU(跨OM) | 精簡SKU(跨OM) | Simplified SKU - Cross OM |
-| 28 | 精簡SKU(退D001) | 精簡SKU(退D001) | Simplified SKU - Return to D001 |
+| 2 | A1 | 保守轉貨(轉出店舖不餘存貨1件) | Conservative Transfer - No 1 Remainder |
+| 3 | B | 加強轉貨 | Enhanced Transfer |
+| 4 | B2 | 附加B(特別模式) | Enhanced Transfer Plus |
+| 5 | B2a | 附加B2a(特別模式-T遊客鋪不出貨) | Enhanced Transfer Plus - Tourist No Source |
+| 6 | B2L | 附加B2L(特別模式-Type=L保留2件) | Enhanced Transfer Plus - Type L Retain 2 |
+| 7 | B2La | 附加B2La(特別模式-Type=L保留2件-T遊客鋪不出貨) | Enhanced Transfer Plus - Type L Retain 2 + Tourist No Source |
+| 8 | B3 | 附加B3(跨OM特別模式) | Enhanced Transfer Plus - Cross OM |
+| 9 | B3a | 附加B3a(跨OM特別模式-T遊客鋪不出貨) | Enhanced Transfer Plus Cross OM - Tourist No Source |
+| 10 | B3L | 附加B3L(跨OM特別模式-Type=L保留2件) | Enhanced Transfer Plus Cross OM - Type L Retain 2 |
+| 11 | B3La | 附加B3La(跨OM特別模式-Type=L保留2件-T遊客鋪不出貨) | Enhanced Transfer Plus Cross OM - Type L Retain 2 + Tourist No Source |
+| 12 | C | 重點補0 | Priority Zero Stock Replenishment |
+| 13 | C1 | 重點補0-只補0/1 | Priority Zero Stock Replenishment - 0/1 Only |
+| 14 | C2 | 附加C2(跨OM重點補0) | Priority Zero Stock Replenishment with Cross-OM |
+| 15 | D | 清貨轉貨 | Clearance Transfer |
+| 16 | D2 | 清貨轉貨(ND限定) | Clearance Transfer - ND Only |
+| 17 | E1 | 強制轉出(同OM) | Forced Transfer - Same OM Only |
+| 18 | E1b | 強制轉出(優先類型接收) | Forced Transfer - Priority Type |
+| 19 | E2 | 強制轉出(跨OM) | Forced Transfer - Cross OM |
+| 20 | F | 目標優化 | Target Optimization |
+| 21 | F2 | F指定模式 | Target-Only Optimization |
+| 22 | F3 | 目標性補0 | Targeted Zero-Fill |
+| 23 | NST | New Shop Target調貨 | New Shop Target Transfer |
+| 24 | ND1 | ND同OM轉貨 | ND Transfer - Same OM |
+| 25 | ND2 | ND混合OM轉貨 | ND Transfer - Cross OM |
+| 26 | ND3 | ND限同OM轉貨(補0) | ND Same-OM Zero-Fill |
+| 27 | ND4 | ND限同OM轉貨(補0及有銷售記錄) | ND Same-OM Zero-Fill with Sales Filter |
+| 28 | 精簡SKU(限同OM) | 精簡SKU(限同OM) | Simplified SKU - Same OM |
+| 29 | 精簡SKU(跨OM) | 精簡SKU(跨OM) | Simplified SKU - Cross OM |
+| 30 | 精簡SKU(退D001) | 精簡SKU(退D001) | Simplified SKU - Return to D001 |
 
 ---
 
@@ -124,6 +125,37 @@ actual_transferable = min(base_transferable, upper_limit, int(row['SaSa Net Stoc
 - 安全線放寬 `Safety Stock - 1` 與原始 `Safety Stock` 數學等價（`SaSa Net Stock - 2 >= safety_stock - 1` ⇔ `SaSa Net Stock - 1 >= safety_stock`）
 
 **轉出類型：** `RF過剩轉出`
+**接收類型：** 緊急缺貨補貨、潛在缺貨補貨
+
+---
+
+## 模式A1：保守轉貨(轉出店舖不餘存貨1件) (Conservative Transfer - No 1 Remainder)
+
+**核心特徵：**
+- 繼承 A 模式全部規則（RF過剩轉出、20% 上限、最低 2 件、安全庫存保護）
+- **額外規則**：避免轉出後源店剛好剩 1 件存貨
+- 接收店舖可多收 1 件（上限為 target_qty + 1）以協助消除餘 1
+- ND Shop 不強制至 0 件，可保留 2 件
+
+**與 A 模式的差異：**
+
+1. **匹配階段調整（`_adjust_a1_remainder`）**：
+   - 在 `compute_transfer_qty` 中計算轉移量時即檢查是否會剩 1 件
+   - 若會剩 1 件 → 嘗試 `transfer_qty + 1`（前提：來源有餘量、接收未達 target_qty+1）
+   - 若不可 +1 且轉移量 > 1 → 減 1 件（讓源店保留 2 件）
+
+2. **後處理階段（`optimize_a1_avoid_one_remainder`）**：
+   - 在 `_optimize_single_piece_transfers` 完成後執行
+   - 掃描所有推薦，若某來源累計轉出後剛好剩 1 件
+   - 選取最佳接收行（銷量最高、件數最多）+1 件
+   - 目標店上限放寬至 `target_qty + 1`
+
+**適用場景：**
+- ND Shop 轉出時不希望存貨餘 1 件
+- 保守轉貨但需消除單件尾數
+- 接收店可彈性 +1 接收
+
+**轉出類型：** `RF過剩轉出`、`ND轉出`
 **接收類型：** 緊急缺貨補貨、潛在缺貨補貨
 
 ---

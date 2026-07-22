@@ -42,6 +42,23 @@ def _adjust_d_family_remainder(is_d_family: bool, source: Dict, transfer_qty: in
     return transfer_qty
 
 
+def _adjust_a1_remainder(logic, mode: str, source: Dict, dest: Dict, transfer_qty: int,
+                         current_received_qty: int = 0) -> int:
+    if mode != logic.mode_a1:
+        return transfer_qty
+    final_remaining = source['original_stock'] - source.get('total_transferred', 0) - transfer_qty
+    if final_remaining != 1:
+        return transfer_qty
+    if source['transferable_qty'] >= transfer_qty + 1:
+        target_qty = dest.get('target_qty')
+        max_receive = (target_qty + 1) if target_qty is not None and target_qty > 0 else (current_received_qty + transfer_qty + 1)
+        if current_received_qty + transfer_qty + 1 <= max_receive:
+            return transfer_qty + 1
+    if transfer_qty > 1:
+        return transfer_qty - 1
+    return transfer_qty
+
+
 def prep_temp_lists(sources: List[Dict], destinations: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
     temp_sources = [{**s, 'total_transferred': 0} for s in sources]
     temp_destinations = [d.copy() for d in destinations]
@@ -56,6 +73,7 @@ def compute_transfer_qty(logic, source: Dict, dest: Dict, mode: str, current_rec
 
     transfer_qty = _clamp_target_qty(is_b_special, is_d_family, dest, transfer_qty, current_received_qty)
     transfer_qty = _adjust_d_family_remainder(is_d_family, source, transfer_qty)
+    transfer_qty = _adjust_a1_remainder(logic, mode, source, dest, transfer_qty, current_received_qty)
 
     if transfer_qty == 1 and source['transferable_qty'] >= 2:
         if source['source_type'] in ('ND轉出', 'ND清貨轉出', 'RF加強轉出', 'RF過剩轉出'):
@@ -65,13 +83,14 @@ def compute_transfer_qty(logic, source: Dict, dest: Dict, mode: str, current_rec
                 if source['transferable_qty'] >= 3:
                     transfer_qty = 3
             else:
-                if dest['needed_qty'] >= 2 or (mode == logic.mode_a and source['source_type'] == 'RF過剩轉出'):
+                if dest['needed_qty'] >= 2 or (mode in (logic.mode_a, logic.mode_a1) and source['source_type'] == 'RF過剩轉出'):
                     transfer_qty = 2
 
     transfer_qty = min(transfer_qty, source['transferable_qty'])
 
     transfer_qty = _clamp_target_qty(is_b_special, is_d_family, dest, transfer_qty, current_received_qty)
     transfer_qty = _adjust_d_family_remainder(is_d_family, source, transfer_qty)
+    transfer_qty = _adjust_a1_remainder(logic, mode, source, dest, transfer_qty, current_received_qty)
 
     if mode == logic.mode_c1 and transfer_qty < 2:
         return 0
