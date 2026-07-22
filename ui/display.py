@@ -416,20 +416,23 @@ def render_gap_report(gap_report: dict):
         k3.metric("剩餘店數", summary.get('total_source_remaining', 0))
         k4.metric("剩餘件數", summary.get('total_remaining_qty', 0))
 
-        k5, k6, k7, _ = st.columns(4)
+        k5, k6, k7, k8 = st.columns(4)
         k5.metric("目的地總數", summary.get('total_dest_count', 0))
-        k6.metric("滿足率", f"{summary.get('fulfillment_rate', 0)}%")
+        k6.metric("目的地滿足率", f"{summary.get('fulfillment_rate', 0)}%")
         k7.metric("來源總數", summary.get('total_source_count', 0))
+        k8.metric("來源轉出率", f"{summary.get('source_transfer_rate', 0)}%")
 
         st.markdown("")
 
         # Build DataFrame for display
         rows = []
         for d in details:
-            if d.get('role') == '來源':
-                rate_val = round(max(100 - d.get('remaining_pct', 0), 0), 1)
-            else:
-                rate_val = round(max(100 - d.get('gap_pct', 0), 0), 1)
+            is_dest = d.get('role') == '目的地'
+            is_source = d.get('role') == '來源'
+            gap_val = d.get('gap_or_remaining', 0) if is_dest else ''
+            rem_val = d.get('gap_or_remaining', 0) if is_source else ''
+            achieve_val = f"{round(max(100 - d.get('gap_pct', 0), 0), 1)}%" if is_dest else ''
+            transfer_val = f"{round(max(100 - d.get('remaining_pct', 0), 0), 1)}%" if is_source else ''
             rows.append({
                 'Article': d.get('article', ''),
                 'Site': d.get('site', ''),
@@ -438,8 +441,10 @@ def render_gap_report(gap_report: dict):
                 '模式': d.get('mode', ''),
                 '原始需求/可轉量': d.get('original_need_or_surplus', 0),
                 '實際收/轉量': d.get('actual_qty', 0),
-                '缺口/剩餘': d.get('gap_or_remaining', 0),
-                '達成率/轉出率': f"{rate_val}%",
+                '缺口': gap_val,
+                '剩餘': rem_val,
+                '達成率': achieve_val,
+                '轉出率': transfer_val,
                 '類型': d.get('type_label', ''),
                 '狀態': d.get('status', ''),
             })

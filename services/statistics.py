@@ -488,6 +488,16 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
         total_fulfilled_dest / total_dest_count * 100, 1
     ) if total_dest_count > 0 else 0.0
 
+    # 來源轉出率：實際轉出 / 可轉出
+    total_transferable = sum(s['transferable_qty'] for s in source_pre_match.values())
+    total_transferred = sum(
+        transferred_total.get((s['article'], s['site']), 0)
+        for s in source_pre_match.values()
+    )
+    source_transfer_rate = round(
+        total_transferred / total_transferable * 100, 1
+    ) if total_transferable > 0 else 0.0
+
     # ── 4. by-mode breakdown ──
     by_mode: Dict[str, Dict] = {}
     for d in details:
@@ -524,6 +534,7 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
             'fulfillment_rate': fulfillment_rate,
             'total_dest_count': total_dest_count,
             'total_source_count': total_source_count,
+            'source_transfer_rate': source_transfer_rate,
         },
         'details': details,
         'by_mode': by_mode,

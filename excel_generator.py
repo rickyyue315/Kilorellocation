@@ -683,7 +683,7 @@ class ExcelGenerator:
         })
 
         row = 0
-        worksheet.merge_range(row, 0, row, 9, '調貨缺口分析', title_fmt)
+        worksheet.merge_range(row, 0, row, 12, '調貨缺口分析', title_fmt)
         row += 2
 
         summary = gap_report.get('summary', {})
@@ -700,8 +700,9 @@ class ExcelGenerator:
 
         row2_kpis = [
             ('目的地總數', summary.get('total_dest_count', 0)),
-            ('滿足率', f"{summary.get('fulfillment_rate', 0)}%"),
+            ('目的地滿足率', f"{summary.get('fulfillment_rate', 0)}%"),
             ('來源總數', summary.get('total_source_count', 0)),
+            ('來源轉出率', f"{summary.get('source_transfer_rate', 0)}%"),
         ]
         for i, (label, value) in enumerate(row2_kpis):
             worksheet.write(row, i * 2, label, kpi_label_fmt)
@@ -734,10 +735,12 @@ class ExcelGenerator:
         worksheet.set_column('E:E', 22)
         worksheet.set_column('F:F', 14)
         worksheet.set_column('G:G', 14)
-        worksheet.set_column('H:H', 22)
-        worksheet.set_column('I:I', 14)
-        worksheet.set_column('J:J', 18)
-        worksheet.set_column('K:K', 22)
+        worksheet.set_column('H:H', 10)
+        worksheet.set_column('I:I', 10)
+        worksheet.set_column('J:J', 12)
+        worksheet.set_column('K:K', 12)
+        worksheet.set_column('L:L', 14)
+        worksheet.set_column('M:M', 22)
         worksheet.set_default_row(18)
 
     def _write_gap_detail_section(self, worksheet, start_row, mode_details,
@@ -745,8 +748,8 @@ class ExcelGenerator:
         """Write the detail table for gap report."""
         row = start_row
         headers = ['Article', 'Site', 'OM', '角色', '模式',
-                    '原始需求/可轉量', '實際收/轉量', '缺口/剩餘',
-                    '達成率/轉出率', '類型', '狀態']
+                    '原始需求/可轉量', '實際收/轉量', '缺口', '剩餘',
+                    '達成率', '轉出率', '類型', '狀態']
         for col, h in enumerate(headers):
             worksheet.write(row, col, h, header_fmt)
         row += 1
@@ -754,7 +757,9 @@ class ExcelGenerator:
         for entry in mode_details:
             gap = entry['gap_or_remaining']
             status = entry['status']
-            is_ok = gap <= 0 and entry['role'] == '目的地'
+            is_dest = entry['role'] == '目的地'
+            is_source = entry['role'] == '來源'
+            is_ok = gap <= 0 and is_dest
             is_na = status.startswith('不適用')
 
             if is_na:
@@ -774,14 +779,20 @@ class ExcelGenerator:
             worksheet.write(row, 4, entry.get('mode', ''), data_fmt)
             worksheet.write(row, 5, entry.get('original_need_or_surplus', 0), data_fmt)
             worksheet.write(row, 6, entry.get('actual_qty', 0), data_fmt)
-            worksheet.write(row, 7, gap, row_fmt)
-            if entry.get('role') == '來源':
-                pct_val = round(max(100 - entry.get('remaining_pct', 0), 0), 1)
+            if is_dest:
+                worksheet.write(row, 7, gap, row_fmt)
+                worksheet.write(row, 8, '', data_fmt)
+                achieve_pct = round(max(100 - entry.get('gap_pct', 0), 0), 1)
+                worksheet.write(row, 9, achieve_pct, pct_fmt)
+                worksheet.write(row, 10, '', data_fmt)
             else:
-                pct_val = round(max(100 - entry.get('gap_pct', 0), 0), 1)
-            worksheet.write(row, 8, pct_val, pct_fmt)
-            worksheet.write(row, 9, entry.get('type_label', ''), data_fmt)
-            worksheet.write(row, 10, status, status_fmt)
+                worksheet.write(row, 7, '', data_fmt)
+                worksheet.write(row, 8, gap, row_fmt)
+                worksheet.write(row, 9, '', data_fmt)
+                transfer_pct = round(max(100 - entry.get('remaining_pct', 0), 0), 1)
+                worksheet.write(row, 10, transfer_pct, pct_fmt)
+            worksheet.write(row, 11, entry.get('type_label', ''), data_fmt)
+            worksheet.write(row, 12, status, status_fmt)
             row += 1
 
         return row
@@ -790,7 +801,7 @@ class ExcelGenerator:
                                  mode_summary, header_fmt, data_fmt, ok_fmt, fail_fmt, na_fmt, pct_fmt):
         """Write a mode-grouped section in the gap report."""
         row = start_row
-        worksheet.merge_range(row, 0, row, 10, f'▸ {mode_name}', header_fmt)
+        worksheet.merge_range(row, 0, row, 12, f'▸ {mode_name}', header_fmt)
         row += 1
 
         mini_kpis = [
