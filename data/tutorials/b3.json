@@ -94,7 +94,7 @@
         ]
       ]
     },
-    "extra_notes": "B3 = B2 邏輯 + 跨 OM + HD/Windy 限制。同樣套用 Mix 保護規則",
+    "extra_notes": "B3 = B2 邏輯 + 跨 OM + HD/Windy 限制。同樣套用 Mix 保護規則。輸出 Excel 含 Transfer/Receive Site Type 欄",
     "diff_table": {
       "headers": [
         "對比項",
@@ -164,7 +164,7 @@
     ],
     "match_order": null,
     "scenario_table": null,
-    "extra_notes": "B3a = B3 + Type=T 不可出貨",
+    "extra_notes": "B3a = B3 + Type=T 不可出貨。輸出 Excel 含 Transfer/Receive Site Type 欄",
     "diff_table": null
   },
   {
@@ -212,7 +212,7 @@
     ],
     "match_order": null,
     "scenario_table": null,
-    "extra_notes": "B3L = B3 跨OM + B2L 的 Type=L 保留 2 件規則",
+    "extra_notes": "B3L = B3 跨OM + B2L 的 Type=L 保留 2 件規則。輸出 Excel 含 Transfer/Receive Site Type 欄",
     "diff_table": null
   },
   {
@@ -265,7 +265,7 @@
     ],
     "match_order": null,
     "scenario_table": null,
-    "extra_notes": "B3La = B3L + Type=T 不可出貨",
+    "extra_notes": "B3La = B3L + Type=T 不可出貨。輸出 Excel 含 Transfer/Receive Site Type 欄",
     "diff_table": null
   }
 ]

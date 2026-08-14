@@ -277,6 +277,8 @@ streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.hea
 
 - 工作表 1：`調貨建議 (Transfer Recommendations)`
 - 調貨明細、來源/接收分類、庫存變化、備註
+- 欄位順序（21 欄，全模式適用）：`Brand;Article;Product Desc;Transfer OM;Transfer Site;Transfer Site Type;Transfer Site Last Month Sold Qty;Transfer Site MTD Sold Qty;Transfer Original Stock;Transfer Safety Stock;Transfer After Transfer Stock;Receive OM;Receive Site;Receive Site Type;Receive Site Last Month Sold Qty;Receive Site MTD Sold Qty;Receive Original Stock;Receive Site Safety Stock;Transfer Qty;Remark;Notes`
+- `Transfer Site Type` / `Receive Site Type` 顯示該店舖於輸入檔 `Type` 欄位的值（T=遊客區/M=混合型/L/R）；非 B 系模式如無 Type 資料則為空白
 - 工作表 2：`統計摘要 (Summary Dashboard)`
 - KPI、按 Article/OM 統計、來源/接收類型分佈
 - 工作表 3（F/F2/F3/NST 模式）：`Target達成分析` — 每組 (Article, Site) 目標量與實際接收量對比、達成狀態、總達成率與總差距

@@ -1,5 +1,30 @@
 # 版本更新記錄
 
+## v2.31.0 (2026-08-14)
+
+### Excel 輸出新欄位順序 + 新增 Type 欄位
+
+#### 變更說明
+- 調貨建議工作表（調貨建議 (Transfer Recommendations)）欄位順序統一調整為 **21 欄**（全模式適用）：
+  `Brand;Article;Product Desc;Transfer OM;Transfer Site;Transfer Site Type;Transfer Site Last Month Sold Qty;Transfer Site MTD Sold Qty;Transfer Original Stock;Transfer Safety Stock;Transfer After Transfer Stock;Receive OM;Receive Site;Receive Site Type;Receive Site Last Month Sold Qty;Receive Site MTD Sold Qty;Receive Original Stock;Receive Site Safety Stock;Transfer Qty;Remark;Notes`
+- **新增 `Transfer Site Type` / `Receive Site Type`**：輸出該店舖於輸入檔 `Type` 欄位的值（T/M/L/R）；非 B 系模式如無 Type 資料則為空白。
+- `精簡SKU(退D001)` 模式維持在最後追加 `D001 Receive Qty` 欄。
+- App 內結果預覽表：B 系模式（B2/B2a/B2L/B2La/B3/B3a/B3L/B3La）改為與新 Excel 欄位一致；其餘模式預覽維持不變。
+
+#### 修改檔案
+- `config.py` — 版本號 bump 至 v2.31.0
+- `services/recommendation_factory.py` — `build_recommendation()` 新增 `Transfer Site Type` / `Receive Site Type`
+- `excel_generator.py` — 新 21 欄順序（EXCEL_COLUMN_ORDER）、索引式列寬/格式套用
+- `ui/display.py` — B 系模式預覽表與新 Excel 欄位一致
+- `tests/test_excel_generator.py` — 新增欄位順序/Type 值/D001 欄測試
+- `tests/test_recommendation_factory.py` — 新增 build_recommendation Type 傳遞測試
+- `app.py` — docstring 版本更新（v2.31.0）
+- `README.md` — Excel 輸出新欄位說明
+- `調貨模式詳解.txt` — Excel輸出資料結構更新
+- `ui/tutorial.py` — B 系模式輸出 Type 欄說明
+
+---
+
 ## v2.30.0 (2026-07-22)
 
 ### 新增 A1 模式：保守轉貨(轉出店舖不餘存貨1件)

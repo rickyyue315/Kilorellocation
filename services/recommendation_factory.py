@@ -53,6 +53,8 @@ def build_recommendation(
         'Receive Original Stock': (
             0 if is_d001_return else dest.get('current_stock', 0)
         ),
+        'Transfer Site Type': source.get('store_type', ''),
+        'Receive Site Type': '' if is_d001_return else dest.get('store_type', ''),
     }
     if not is_d001_return and 'target_qty' in dest:
         rec['Target Qty'] = dest['target_qty']

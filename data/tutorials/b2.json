@@ -136,7 +136,7 @@
         ]
       ]
     },
-    "extra_notes": "Mix 店舖保護：若出貨店 Type=M 且總銷量 &gt; 目標店總銷量，該配對被取消。接收上限 Safety&#215;2",
+    "extra_notes": "Mix 店舖保護：若出貨店 Type=M 且總銷量 &gt; 目標店總銷量，該配對被取消。接收上限 Safety&#215;2。輸出 Excel 含 Transfer/Receive Site Type 欄",
     "diff_table": {
       "headers": [
         "對比項",
@@ -247,7 +247,7 @@
         ]
       ]
     },
-    "extra_notes": "B2a 在 B2 基礎上唯一差異：Type=T 店舖不可作為 source",
+    "extra_notes": "B2a 在 B2 基礎上唯一差異：Type=T 店舖不可作為 source。輸出 Excel 含 Transfer/Receive Site Type 欄",
     "diff_table": null
   },
   {
@@ -318,7 +318,7 @@
         ]
       ]
     },
-    "extra_notes": "B2L 與 B2 差異僅在 Type=L 低銷量規則：B2 全轉出，B2L 保留 2 件後才轉出",
+    "extra_notes": "B2L 與 B2 差異僅在 Type=L 低銷量規則：B2 全轉出，B2L 保留 2 件後才轉出。輸出 Excel 含 Transfer/Receive Site Type 欄",
     "diff_table": null
   },
   {
@@ -367,7 +367,7 @@
     ],
     "match_order": null,
     "scenario_table": null,
-    "extra_notes": "B2La = B2L + B2a 的限制合併：Type=L 保留 2 件 + Type=T 不可出貨",
+    "extra_notes": "B2La = B2L + B2a 的限制合併：Type=L 保留 2 件 + Type=T 不可出貨。輸出 Excel 含 Transfer/Receive Site Type 欄",
     "diff_table": null
   }
 ]

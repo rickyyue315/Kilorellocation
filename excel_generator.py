@@ -18,6 +18,22 @@ from services.statistics import compute_target_fulfillment_stats, compute_nd_cle
 # 設置日誌
 logger = logging.getLogger(__name__)
 
+# 調貨建議工作表統一欄位順序（全模式適用）
+EXCEL_COLUMN_ORDER: List[str] = [
+    'Brand', 'Article', 'Product Desc',
+    'Transfer OM', 'Transfer Site', 'Transfer Site Type',
+    'Transfer Site Last Month Sold Qty', 'Transfer Site MTD Sold Qty',
+    'Transfer Original Stock', 'Transfer Safety Stock', 'Transfer After Transfer Stock',
+    'Receive OM', 'Receive Site', 'Receive Site Type',
+    'Receive Site Last Month Sold Qty', 'Receive Site MTD Sold Qty',
+    'Receive Original Stock', 'Receive Site Safety Stock',
+    'Transfer Qty', 'Remark', 'Notes',
+]
+
+EXCEL_COLUMN_WIDTHS: List[int] = [
+    14, 12, 25, 12, 12, 8, 18, 15, 18, 18, 20, 12, 12, 8, 18, 15, 15, 22, 10, 25, 75,
+]
+
 class ExcelGenerator:
     """Excel輸出類 v2.10.0"""
     
@@ -89,14 +105,20 @@ class ExcelGenerator:
                 'Receive Site Last Month Sold Qty': rec.get('Receive Site Last Month Sold Qty', 0),
                 'Receive Site MTD Sold Qty': rec.get('Receive Site MTD Sold Qty', 0),
                 # 新增Receive Original Stock欄位
-                'Receive Original Stock': rec.get('Receive Original Stock', 0)
+                'Receive Original Stock': rec.get('Receive Original Stock', 0),
+                # 新增 Type 欄位
+                'Transfer Site Type': rec.get('Transfer Site Type', ''),
+                'Receive Site Type': rec.get('Receive Site Type', ''),
             }
             if show_d001_col:
                 row_data['D001 Receive Qty'] = rec['Transfer Qty']
             df_data.append(row_data)
         
-        # 創建DataFrame
-        df = pd.DataFrame(df_data)
+        # 固定欄位順序建構DataFrame
+        cols = list(EXCEL_COLUMN_ORDER)
+        if show_d001_col:
+            cols.append('D001 Receive Qty')
+        df = pd.DataFrame(df_data, columns=cols)
         
         # 寫入Excel
         df.to_excel(writer, sheet_name='調貨建議 (Transfer Recommendations)', index=False)
@@ -104,29 +126,6 @@ class ExcelGenerator:
         # 獲取工作簿和工作表對象
         workbook = writer.book
         worksheet = writer.sheets['調貨建議 (Transfer Recommendations)']
-        
-        # 設置列寬（優化為適中寬度）
-        worksheet.set_column('A:A', 14)  # Brand
-        worksheet.set_column('B:B', 12)  # Article
-        worksheet.set_column('C:C', 25)  # Product Desc
-        worksheet.set_column('D:D', 12)  # Transfer OM
-        worksheet.set_column('E:E', 12)  # Transfer Site
-        worksheet.set_column('F:F', 12)  # Receive OM
-        worksheet.set_column('G:G', 12)  # Receive Site
-        worksheet.set_column('H:H', 10)  # Transfer Qty
-        worksheet.set_column('I:I', 18)  # Transfer Original Stock
-        worksheet.set_column('J:J', 20)  # Transfer After Transfer Stock
-        worksheet.set_column('K:K', 18)  # Transfer Safety Stock
-        worksheet.set_column('L:L', 22)  # Receive Site Safety Stock
-        worksheet.set_column('M:M', 25)  # Remark - 簡潔的轉出→接收映射
-        worksheet.set_column('N:N', 75)  # Notes - 600像素約等於75字符
-        worksheet.set_column('O:O', 18)  # Transfer Site Last Month Sold Qty
-        worksheet.set_column('P:P', 15)  # Transfer Site MTD Sold Qty
-        worksheet.set_column('Q:Q', 18)  # Receive Site Last Month Sold Qty
-        worksheet.set_column('R:R', 15)  # Receive Site MTD Sold Qty
-        worksheet.set_column('S:S', 15)  # Receive Original Stock
-        if show_d001_col:
-            worksheet.set_column('T:T', 18)  # D001 Receive Qty
         
         # 添加標題格式
         header_format = workbook.add_format({
@@ -162,13 +161,11 @@ class ExcelGenerator:
             'align': 'left'
         })
         
-        # 應用數據格式（使用列格式避免逐格寫入，提高效能）
-        worksheet.set_column('A:M', None, data_format)
-        worksheet.set_column('N:N', 75, notes_format)
-        if show_d001_col:
-            worksheet.set_column('O:T', None, data_format)
-        else:
-            worksheet.set_column('O:S', None, data_format)
+        # 按欄位順序套用列寬與格式（避免逐格寫入，提高效能）
+        for idx, col_name in enumerate(cols):
+            fmt = notes_format if col_name == 'Notes' else data_format
+            width = EXCEL_COLUMN_WIDTHS[idx] if col_name != 'D001 Receive Qty' else 18
+            worksheet.set_column(idx, idx, width, fmt)
 
         # 設置標題行高度與預設行高（避免逐行設定）
         worksheet.set_row(0, 40)

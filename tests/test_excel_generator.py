@@ -9,7 +9,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from excel_generator import ExcelGenerator
+from excel_generator import ExcelGenerator, EXCEL_COLUMN_ORDER
 
 
 def _make_recommendation(**overrides):
@@ -33,6 +33,8 @@ def _make_recommendation(**overrides):
         "Receive Site Last Month Sold Qty": 3,
         "Receive Site MTD Sold Qty": 1,
         "Receive Original Stock": 0,
+        "Transfer Site Type": "T",
+        "Receive Site Type": "M",
     }
     defaults.update(overrides)
     return defaults
@@ -139,6 +141,29 @@ class TestGenerateExcelFile:
         recs = [_make_recommendation()]
         result = generator.generate_excel_file(recs, {})
         assert isinstance(result, bytes)
+
+    def test_new_column_order_all_modes(self, generator):
+        for mode in ['加強轉貨', '附加B(特別模式)']:
+            recs = [_make_recommendation()]
+            stats = _make_statistics()
+            result = generator.generate_excel_file(recs, stats, mode=mode)
+            df = pd.read_excel(io.BytesIO(result), sheet_name="調貨建議 (Transfer Recommendations)")
+            assert df.columns.tolist() == EXCEL_COLUMN_ORDER, f"mode={mode} 欄位順序不符"
+
+    def test_type_columns_values(self, generator):
+        recs = [_make_recommendation(**{"Transfer Site Type": "T", "Receive Site Type": "M"})]
+        stats = _make_statistics()
+        result = generator.generate_excel_file(recs, stats, mode='附加B(特別模式)')
+        df = pd.read_excel(io.BytesIO(result), sheet_name="調貨建議 (Transfer Recommendations)")
+        assert df.iloc[0]['Transfer Site Type'] == 'T'
+        assert df.iloc[0]['Receive Site Type'] == 'M'
+
+    def test_d001_mode_keeps_d001_column(self, generator):
+        recs = [_make_recommendation()]
+        stats = _make_statistics()
+        result = generator.generate_excel_file(recs, stats, mode='精簡SKU(退D001)')
+        df = pd.read_excel(io.BytesIO(result), sheet_name="調貨建議 (Transfer Recommendations)")
+        assert df.columns.tolist() == EXCEL_COLUMN_ORDER + ['D001 Receive Qty']
 
 
 class TestSmartSummarySheet:

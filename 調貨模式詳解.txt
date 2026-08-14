@@ -844,27 +844,31 @@ statistics = {
 
 ### **主要工作表：調貨建議**
 
-**欄位順序：**
-1. Article (15列寬)
-2. Product Desc (30列寬) 
-3. Transfer OM (15列寬)
-4. Transfer Site (15列寬)
-5. Receive OM (15列寬)
-6. Receive Site (15列寬)
-7. Transfer Qty (12列寬)
-8. Original Stock (15列寬)
-9. After Transfer Stock (18列寬)
-10. Safety Stock (12列寬)
-11. MOQ (8列寬)
-12. **Remark** (35列寬) - 轉出分類→接收分類映射
-13. Notes (60列寬) - 詳細分類信息
-14. **Transfer Site Last Month Sold Qty** (18列寬) - 轉出店鋪上月銷量
-15. **Transfer Site MTD Sold Qty** (18列寬) - 轉出店鋪本月銷量
-16. **Receive Site Last Month Sold Qty** (18列寬) - 接收店鋪上月銷量
-17. **Receive Site MTD Sold Qty** (18列寬) - 接收店鋪本月銷量
-18. **Receive Original Stock** (18列寬) - 接收店鋪原始庫存
-19. **Target Qty** (12列寬) - 目標數量 (C/B2/E/F模式)
-20. **Cumulative Received Qty** (18列寬) - 累計接收數量 (C/B2/E/F模式)
+**欄位順序（v2.31.0 起，全模式適用）：**
+1. Brand (14列寬) - 品牌
+2. Article (12列寬)
+3. Product Desc (25列寬)
+4. Transfer OM (12列寬)
+5. Transfer Site (12列寬)
+6. **Transfer Site Type** (8列寬) - 轉出店舖 Type（T=遊客區/M=混合型/L/R）
+7. Transfer Site Last Month Sold Qty (18列寬) - 轉出店舖上月銷量
+8. Transfer Site MTD Sold Qty (15列寬) - 轉出店舖本月銷量
+9. Transfer Original Stock (18列寬) - 轉出店舖原始庫存
+10. Transfer Safety Stock (18列寬) - 轉出店舖安全庫存
+11. Transfer After Transfer Stock (20列寬) - 轉出後庫存
+12. Receive OM (12列寬)
+13. Receive Site (12列寬)
+14. **Receive Site Type** (8列寬) - 接收店舖 Type（T=遊客區/M=混合型/L/R）
+15. Receive Site Last Month Sold Qty (18列寬) - 接收店舖上月銷量
+16. Receive Site MTD Sold Qty (15列寬) - 接收店舖本月銷量
+17. Receive Original Stock (15列寬) - 接收店舖原始庫存
+18. Receive Site Safety Stock (22列寬) - 接收店舖安全庫存
+19. Transfer Qty (10列寬) - 調貨件數
+20. **Remark** (25列寬) - 轉出分類→接收分類映射
+21. Notes (75列寬) - 詳細分類信息
+
+> **Type 欄說明**：`Type=T` 為遊客區店舖、`Type=M` 為混合型店舖、`Type=L` 為本地店舖；B2/B2a/B2L/B2La/B3/B3a/B3L/B3La 接收優先級依此排序。非 B 系模式如輸入檔無 Type 資料，此兩欄為空白。
+> `精簡SKU(退D001)` 模式會在最後追加 `D001 Receive Qty` 欄。
 
 ### **次要工作表：統計摘要**
 

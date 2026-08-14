@@ -7,6 +7,14 @@ import pandas as pd
 from typing import Optional
 
 from config import IS_ZEABUR_RUNTIME, ZEABUR_RESULT_PREVIEW_LIMIT
+from models.mode_registry import get_mode_families
+
+
+def _is_b_special_mode(mode: Optional[str]) -> bool:
+    """檢查是否為 B 特別系列模式（B2/B2a/B2L/B2La/B3/B3a/B3L/B3La）"""
+    if not mode:
+        return False
+    return mode in get_mode_families().get('b_special', set())
 
 
 def render_upload_requirements(mode_code: str):
@@ -188,25 +196,50 @@ def _build_display_data(recommendations: list, df: pd.DataFrame, mode: str = Non
         cumulative_transfers[source_key] += rec['Transfer Qty']
         source_after_transfer_stock = source_stock - cumulative_transfers[source_key]
 
-        row_data = {
-            'Article': rec['Article'],
-            'Product Desc': rec['Product Desc'],
-            'Transfer OM': rec['Transfer OM'],
-            'Transfer Site': rec['Transfer Site'],
-            'Transfer Qty': rec['Transfer Qty'],
-            'Source Original Stock': source_stock,
-            'Source After Transfer Stock': source_after_transfer_stock,
-            'Source Safety Stock': source_safety,
-            'Source MOQ': source_moq,
-            'Receive OM': rec['Receive OM'],
-            'Receive Site': rec['Receive Site'],
-            'Receive Original Stock': dest_stock,
-            'Receive Total After': dest_stock + rec['Transfer Qty'],
-            'Receive Safety Stock': dest_safety,
-            'Receive MOQ': dest_moq,
-            'Source Type': rec.get('Source Type', ''),
-            'Destination Type': rec.get('Destination Type', ''),
-        }
+        if _is_b_special_mode(mode):
+            row_data = {
+                'Brand': rec.get('Product Hierarchy') or rec.get('Brand') or '',
+                'Article': rec['Article'],
+                'Product Desc': rec['Product Desc'],
+                'Transfer OM': rec['Transfer OM'],
+                'Transfer Site': rec['Transfer Site'],
+                'Transfer Site Type': rec.get('Transfer Site Type', ''),
+                'Transfer Site Last Month Sold Qty': rec.get('Transfer Site Last Month Sold Qty', 0),
+                'Transfer Site MTD Sold Qty': rec.get('Transfer Site MTD Sold Qty', 0),
+                'Transfer Original Stock': source_stock,
+                'Transfer Safety Stock': source_safety,
+                'Transfer After Transfer Stock': source_after_transfer_stock,
+                'Receive OM': rec['Receive OM'],
+                'Receive Site': rec['Receive Site'],
+                'Receive Site Type': rec.get('Receive Site Type', ''),
+                'Receive Site Last Month Sold Qty': rec.get('Receive Site Last Month Sold Qty', 0),
+                'Receive Site MTD Sold Qty': rec.get('Receive Site MTD Sold Qty', 0),
+                'Receive Original Stock': dest_stock,
+                'Receive Site Safety Stock': dest_safety,
+                'Transfer Qty': rec['Transfer Qty'],
+                'Remark': f"{rec.get('Source Type', '')} → {rec.get('Destination Type', '')}",
+                'Notes': rec.get('Notes', ''),
+            }
+        else:
+            row_data = {
+                'Article': rec['Article'],
+                'Product Desc': rec['Product Desc'],
+                'Transfer OM': rec['Transfer OM'],
+                'Transfer Site': rec['Transfer Site'],
+                'Transfer Qty': rec['Transfer Qty'],
+                'Source Original Stock': source_stock,
+                'Source After Transfer Stock': source_after_transfer_stock,
+                'Source Safety Stock': source_safety,
+                'Source MOQ': source_moq,
+                'Receive OM': rec['Receive OM'],
+                'Receive Site': rec['Receive Site'],
+                'Receive Original Stock': dest_stock,
+                'Receive Total After': dest_stock + rec['Transfer Qty'],
+                'Receive Safety Stock': dest_safety,
+                'Receive MOQ': dest_moq,
+                'Source Type': rec.get('Source Type', ''),
+                'Destination Type': rec.get('Destination Type', ''),
+            }
         if mode == "精簡SKU(退D001)":
             row_data['D001 Receive Qty'] = rec['Transfer Qty']
         display_data.append(row_data)
