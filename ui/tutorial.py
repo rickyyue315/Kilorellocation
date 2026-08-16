@@ -33,7 +33,7 @@ def _flow_node(text, color="blue", width="auto"):
 
 
 def _flow_arrow(label=""):
-    lbl = f'<span style="font-size:11px;color:var(--text-muted);">{label}</span><br>' if label else ""
+    lbl = f'<span class="flow-arrow-label">{label}</span><br>' if label else ""
     return f'<div class="flow-arrow">{lbl}&#8595;</div>'
 
 
@@ -203,7 +203,7 @@ def _render_global_rules():
     st.markdown(f'<div class="flow-container">{flow}</div>', unsafe_allow_html=True)
 
     st.markdown("""
-**全局規則說明：**
+#### 全局規則說明
 1. **ND 店鋪限制**：ND 類型店鋪在所有模式下只能作為轉出方，不能作為接收方（ND1/ND2/ND3/ND4 及 F/F2/F3 模式下有 Target 的 ND 店舖除外）
 2. **最高動銷店保護**：RF 類型中有效銷量（Last Month + MTD）最高的店鋪不會被選為轉出方
 3. **避免雙重角色**：同一 SKU 的轉出店鋪絕對不能同時作為接收店鋪
@@ -308,7 +308,7 @@ def _render_decision_guide():
     branch_nodes = []
     for question, answer, color in branches:
         branch_nodes.append(
-            _flow_node(f'<b>{question}</b><br><span style="font-size:12px;">&#10132; {answer}</span>', color)
+            _flow_node(f'<b>{question}</b><br><span style="font-size:13px;">&#10132; {answer}</span>', color)
         )
 
     flow += _flow_row(branch_nodes, gap="8px")
