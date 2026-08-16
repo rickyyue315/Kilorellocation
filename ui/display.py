@@ -371,17 +371,18 @@ def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_
         ('🟢 低優先', len(groups['🟢低優先']), '#00CC88'),
     ]
     _chips = "".join(
-        f'<div style="flex:1;text-align:center;padding:10px 8px;'
+        f'<div style="flex:1;text-align:center;padding:calc(var(--space-3) + 2px) var(--space-3);'
         f'border:1px solid {color}55;border-left:3px solid {color};'
-        f'border-radius:10px;background:rgba(17,24,39,0.6);">'
-        f'<div style="font-size:13px;color:var(--text-muted);">{label}</div>'
-        f'<div style="font-size:22px;font-weight:700;color:{color};'
+        f'border-radius:var(--radius-md);background:rgba(17,24,39,0.6);">'
+        f'<div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);'
+        f'letter-spacing:0.05em;">{label}</div>'
+        f'<div style="font-size:1.5rem;font-weight:800;color:{color};line-height:1.3;'
         f"font-family:'JetBrains Mono',monospace;\">{count:,}</div>"
         f'</div>'
         for label, count, color in _priority_stats
     )
     st.markdown(
-        f'<div style="display:flex;gap:12px;margin-bottom:8px;">{_chips}</div>',
+        f'<div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-2);">{_chips}</div>',
         unsafe_allow_html=True,
     )
 

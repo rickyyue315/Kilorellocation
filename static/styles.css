@@ -205,8 +205,8 @@ div[data-testid="stMetric"] {
     border: 1px solid var(--border-default);
     border-left: 3px solid var(--brand-orange);
     border-radius: var(--radius-md);
-    padding: var(--space-4) var(--space-5) !important;
-    box-shadow: var(--shadow-md);
+    padding: var(--space-3) var(--space-4) !important;
+    box-shadow: var(--shadow-sm);
     transition: all var(--dur-base) var(--ease-out);
     position: relative;
     overflow: hidden;
@@ -220,21 +220,22 @@ div[data-testid="stMetric"]::before {
 }
 div[data-testid="stMetric"]:hover {
     border-color: var(--border-accent);
-    transform: translateY(-3px);
     box-shadow: var(--shadow-glow);
 }
 div[data-testid="stMetricValue"] {
     color: var(--brand-orange) !important;
     font-weight: 800 !important;
-    font-size: 1.95rem !important;
+    font-size: 1.5rem !important;
     letter-spacing: -0.02em !important;
+    line-height: 1.3 !important;
 }
 div[data-testid="stMetricLabel"] {
     color: var(--text-secondary) !important;
     font-weight: 600 !important;
-    font-size: 0.9rem !important;
+    font-size: 0.85rem !important;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    line-height: 1.3 !important;
 }
 
 /* ── 8. Buttons ── */
@@ -321,12 +322,43 @@ div[data-testid="stRadio"] div[role="radiogroup"] label[data-selected="true"] {
     font-weight: 700 !important;
 }
 
-/* ── 10. File Uploader ── */
+/* ── 10. Selectbox ── */
+div[data-baseweb="select"] > div {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-default) !important;
+    border-radius: var(--radius-md) !important;
+    min-height: 44px;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: border-color var(--dur-fast) var(--ease-out);
+}
+div[data-baseweb="select"] > div:hover {
+    border-color: var(--border-strong) !important;
+}
+div[data-baseweb="select"] > div > div {
+    padding: 8px 12px;
+    line-height: 1.45;
+}
+div[data-baseweb="select"] ul {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-default) !important;
+    border-radius: var(--radius-md) !important;
+}
+div[data-baseweb="select"] li {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+div[data-baseweb="select"] li:hover {
+    background: rgba(245, 158, 11, 0.08) !important;
+    color: var(--brand-orange) !important;
+}
+
+/* ── 11. File Uploader ── */
 section[data-testid="stFileUploadDropzone"] {
     background: var(--bg-surface) !important;
     border: 2px dashed var(--border-accent) !important;
     border-radius: var(--radius-lg) !important;
-    padding: var(--space-6) !important;
+    padding: var(--space-4) var(--space-5) !important;
     transition: all var(--dur-base) var(--ease-out);
 }
 section[data-testid="stFileUploadDropzone"]:hover {
@@ -338,7 +370,11 @@ section[data-testid="stFileUploadDropzone"] button {
     background: var(--bg-elevated) !important;
     color: var(--text-primary) !important;
     border: 1px solid var(--border-default) !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: var(--radius-md) !important;
+    padding: 10px 24px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    transition: all var(--dur-fast) var(--ease-out);
 }
 section[data-testid="stFileUploadDropzone"] button:hover {
     background: var(--brand-orange) !important;
@@ -346,7 +382,7 @@ section[data-testid="stFileUploadDropzone"] button:hover {
     border-color: var(--brand-orange) !important;
 }
 
-/* ── 11. Tabs ── */
+/* ── 12. Tabs ── */
 button[data-baseweb="tab"] {
     font-size: 15px !important;
     font-weight: 600 !important;
@@ -373,7 +409,7 @@ div[data-testid="stTabs"] {
     margin-bottom: var(--space-5);
 }
 
-/* ── 12. Expander ── */
+/* ── 13. Expander ── */
 div[data-testid="stExpander"] {
     background: var(--bg-surface) !important;
     border: 1px solid var(--border-default) !important;
@@ -386,12 +422,14 @@ div[data-testid="stExpander"]:hover { border-color: var(--border-strong) !import
 div[data-testid="stExpander"] summary {
     color: var(--text-primary) !important;
     font-weight: 600 !important;
+    font-size: 15px !important;
     padding: 12px 18px !important;
+    line-height: 1.4 !important;
 }
 div[data-testid="stExpander"] summary:hover { color: var(--brand-orange) !important; }
 div[data-testid="stExpander"] summary svg { color: var(--text-muted); }
 
-/* ── 13. Alert ── */
+/* ── 14. Alert ── */
 .stAlert, .stSuccess, .stInfo, .stWarning, .stError {
     border-radius: var(--radius-md) !important;
     padding: 14px 20px !important;
@@ -409,7 +447,7 @@ div[data-testid="stExpander"] summary svg { color: var(--text-muted); }
 .stWarning svg { color: var(--warning) !important; }
 .stError svg   { color: var(--error) !important; }
 
-/* ── 14. DataFrame ── */
+/* ── 15. DataFrame ── */
 .stDataFrame, [data-testid="stDataFrame"] {
     background: var(--bg-surface) !important;
     border: 1px solid var(--border-default) !important;
@@ -418,7 +456,7 @@ div[data-testid="stExpander"] summary svg { color: var(--text-muted); }
 }
 [data-testid="stDataFrame"] iframe { background: var(--bg-surface) !important; }
 
-/* ── 15. Progress Bar ── */
+/* ── 16. Progress Bar ── */
 .stProgress > div > div > div > div {
     background: linear-gradient(90deg, var(--brand-orange), var(--brand-orange-2)) !important;
     height: 8px !important;
@@ -431,15 +469,17 @@ div[data-testid="stExpander"] summary svg { color: var(--text-muted); }
     100% { background-position: -200% 0; }
 }
 
-/* ── 16. Input / Slider / Checkbox ── */
-.stNumberInput input, .stTextInput input {
+/* ── 17. Input / Slider / Checkbox ── */
+.stNumberInput input, .stTextInput input, .stDateInput input {
     background: var(--bg-elevated) !important;
     border: 1px solid var(--border-default) !important;
     color: var(--text-primary) !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: var(--radius-md) !important;
+    min-height: 44px;
+    font-size: 14px !important;
     transition: border-color var(--dur-fast) var(--ease-out);
 }
-.stNumberInput input:focus, .stTextInput input:focus {
+.stNumberInput input:focus, .stTextInput input:focus, .stDateInput input:focus {
     border-color: var(--brand-orange) !important;
     box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
 }
@@ -452,7 +492,7 @@ div[data-testid="stExpander"] summary svg { color: var(--text-muted); }
     background: linear-gradient(90deg, var(--brand-orange), var(--brand-orange-3)) !important;
 }
 
-/* ── 17. Code / Pre ── */
+/* ── 18. Code / Pre ── */
 code, pre, .stCode {
     font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace !important;
     background: var(--bg-elevated) !important;
@@ -461,7 +501,7 @@ code, pre, .stCode {
     color: var(--accent-cyan) !important;
 }
 
-/* ── 18. Tutorial / Flow Elements ── */
+/* ── 19. Tutorial / Flow Elements ── */
 .flow-container {
     padding: var(--space-5);
     background: var(--bg-surface);
@@ -524,7 +564,7 @@ code, pre, .stCode {
 .risk-badge--medium { background: var(--warning); }
 .risk-badge--high   { background: var(--error); }
 
-/* ── 19. Match Priority ── */
+/* ── 20. Match Priority ── */
 .match-container {
     display: flex; flex-wrap: wrap; gap: var(--space-2);
     padding: var(--space-3);
@@ -552,7 +592,7 @@ code, pre, .stCode {
 .match-dst { color: var(--accent-blue);    font-weight: 600; }
 .match-arrow { color: var(--text-muted);   font-size: 14px; }
 
-/* ── 20. Scenario Table ── */
+/* ── 21. Scenario Table ── */
 .scenario-table {
     width: 100%; border-collapse: separate; border-spacing: 0;
     font-size: 13px; margin: var(--space-2) 0;
@@ -574,7 +614,7 @@ code, pre, .stCode {
 .scenario-table tr:nth-child(even) td { background: var(--bg-canvas); }
 .scenario-table tr:hover td { background: rgba(245, 158, 11, 0.04); }
 
-/* ── 21. Animations ── */
+/* ── 22. Animations ── */
 @keyframes fade-in-up {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -586,14 +626,14 @@ code, pre, .stCode {
 }
 .pulse { animation: pulse-glow 2.4s var(--ease-out) infinite; }
 
-/* ── 22. Focus Visible ── */
+/* ── 23. Focus Visible ── */
 *:focus-visible {
     outline: 2px solid var(--brand-orange) !important;
     outline-offset: 2px;
     border-radius: 4px;
 }
 
-/* ── 23. Responsive (≤ 768px) ── */
+/* ── 24. Responsive (≤ 768px) ── */
 @media (max-width: 768px) {
     .block-container { padding: var(--space-3) !important; max-width: 100% !important; }
     .app-header { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
@@ -608,7 +648,7 @@ code, pre, .stCode {
     button[data-baseweb="tab"] { padding: 10px 14px !important; font-size: 14px !important; }
 }
 
-/* ── 24. prefers-reduced-motion ── */
+/* ── 25. prefers-reduced-motion ── */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
