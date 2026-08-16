@@ -1,5 +1,5 @@
 """
-庫存調貨建議系統 v2.32.0 - Streamlit應用程序
+庫存調貨建議系統 v2.33.0 - Streamlit應用程序
 支持三十模式系統：A(保守轉貨)/A1(保守轉貨-轉出店舖不餘存貨1件)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/NST(New Shop Target調貨)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/ND4(ND限同OM轉貨補0及有銷售記錄)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 含模式教學分頁：30種調貨模式圖例化教學（繁體中文）
 """
@@ -19,6 +19,7 @@ from ui.display import (
     render_upload_requirements,
     render_data_preview,
     render_kpi_cards,
+    render_charts,
     render_results_by_priority,
     render_statistics,
     render_download_button,
@@ -176,6 +177,8 @@ with tab_system:
                         )
 
             render_data_preview(df, processing_stats)
+            # 預處理階段結束，收起進度條（分析階段改用 st.status 呈現）
+            progress_bar.empty()
 
             with st.container():
                 st.markdown("### 🚀 分析與建議")
@@ -201,8 +204,8 @@ with tab_system:
                 st.session_state['_run_key'] = current_run_key
 
             if st.button("🎯 生成調貨建議", type="primary", use_container_width=True):
-                progress_bar.progress(70, text="正在分析數據並生成建議...")
-                with st.spinner("演算法運行中,請稍候..."):
+                with st.status("分析中...", expanded=True) as status:
+                    st.write("演算法運行中，生成調貨建議...")
                     mode_name = MODE_NAME_MAP.get(mode_code, "目標優化")
 
                     transfer_logic = TransferLogic(
@@ -217,8 +220,10 @@ with tab_system:
 
                     recommendations = transfer_logic.generate_transfer_recommendations(df, mode_name)
 
+                    st.write("品質檢查...")
                     quality_passed = transfer_logic.perform_quality_checks(df, mode_name)
 
+                    st.write("統計與缺口分析...")
                     statistics = transfer_logic.get_transfer_statistics()
                     gap_report = transfer_logic.get_gap_report()
 
@@ -229,7 +234,7 @@ with tab_system:
                     st.session_state['quality_errors'] = transfer_logic.quality_errors
                     st.session_state['active_mode_name'] = mode_name
 
-                progress_bar.progress(90, text="分析完成!正在準備結果展示...")
+                    status.update(label="分析完成", state="complete", expanded=False)
 
             recommendations = st.session_state.get('recommendations')
             statistics = st.session_state.get('statistics', {})
@@ -251,11 +256,13 @@ with tab_system:
 
                     render_kpi_cards(statistics)
 
+                    render_charts(statistics)
+
                     render_results_by_priority(recommendations, df, current_run_key, st.session_state.get('active_mode_name', ''))
 
                     render_statistics(statistics)
 
-                    render_gap_report(st.session_state.get('gap_report', {}))
+                    render_gap_report(st.session_state.get('gap_report', {}), current_run_key)
 
                     render_ai_executive_summary_button(recommendations, statistics, st.session_state.get('active_mode_name', ''))
 
@@ -265,37 +272,45 @@ with tab_system:
 
                 _ai_summary = st.session_state.get('ai_executive_summary', '')
                 _excel_cache_key = f"{current_run_key}_{hash(_ai_summary)}" if _ai_summary else current_run_key
-                if st.session_state.get('excel_run_key') != _excel_cache_key or 'excel_data' not in st.session_state:
-                    with st.spinner("生成 Excel 文件..."):
-                        excel_generator = ExcelGenerator()
-                        st.session_state['excel_data'] =                         excel_generator.generate_excel_file(
-                            recommendations,
-                            statistics,
-                            mode=st.session_state.get('active_mode_name', ''),
-                            ai_summary=_ai_summary or None,
-                            df=df,
-                            gap_report=st.session_state.get('gap_report', {}),
-                            floor_body_label=floor_body_label,
-                        )
-                        st.session_state['excel_filename'] = excel_generator.output_filename
-                        st.session_state['excel_run_key'] = _excel_cache_key
+                _excel_ready = (
+                    st.session_state.get('excel_run_key') == _excel_cache_key
+                    and 'excel_data' in st.session_state
+                )
+                if not _excel_ready:
+                    # 惰性生成：按下才產生 Excel，避免大型結果的無謂等待
+                    if st.button(
+                        "📤 準備 Excel 報表",
+                        use_container_width=True,
+                        help="按下後才生成 Excel 文件；生成完成會出現下載按鈕。大型結果可節省等待時間。",
+                    ):
+                        with st.spinner("生成 Excel 文件..."):
+                            excel_generator = ExcelGenerator()
+                            st.session_state['excel_data'] = excel_generator.generate_excel_file(
+                                recommendations,
+                                statistics,
+                                mode=st.session_state.get('active_mode_name', ''),
+                                ai_summary=_ai_summary or None,
+                                df=df,
+                                gap_report=st.session_state.get('gap_report', {}),
+                                floor_body_label=floor_body_label,
+                            )
+                            st.session_state['excel_filename'] = excel_generator.output_filename
+                            st.session_state['excel_run_key'] = _excel_cache_key
+                            _excel_ready = True
 
-                _excel_bytes = st.session_state.get('excel_data', b'')
-                _excel_filename = st.session_state.get('excel_filename', '調貨建議.xlsx')
-
-                render_download_button(_excel_bytes, _excel_filename, current_run_key)
-
-                progress_bar.progress(100, text="處理完畢!")
+                if _excel_ready:
+                    _excel_bytes = st.session_state.get('excel_data', b'')
+                    _excel_filename = st.session_state.get('excel_filename', '調貨建議.xlsx')
+                    render_download_button(_excel_bytes, _excel_filename, current_run_key)
             else:
                 st.info("根據當前規則，沒有生成任何調貨建議。")
-                progress_bar.progress(100, text="處理完畢!")
 
         except Exception as e:
             st.error(f"處理文件時發生錯誤: {e}")
-            if st.checkbox("顯示詳細錯誤追蹤"):
+            with st.expander("顯示詳細錯誤追蹤"):
                 st.exception(e)
             if 'progress_bar' in locals():
-                progress_bar.progress(100, text="處理失敗!")
+                progress_bar.empty()
 
     st.markdown(f"""
     <div class="app-footer">

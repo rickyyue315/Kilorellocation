@@ -15,12 +15,14 @@ from config import (
     TURNDAY_MAX_DAYS,
 )
 from models.mode import MODE_DESCRIPTIONS
-from models.mode_registry import get_ui_options, get_receive_limit_codes
+from models.mode_registry import (
+    get_receive_limit_codes,
+    get_display_groups,
+    get_ui_options_for_codes,
+)
 from services.perf_timer import ENABLE_PERF, get_perf_records, clear_perf_records
+from ui.mode_docs import MODE_DOCS, GENERAL_DOCS
 from ui.mojibake import fix_mojibake_text
-
-
-_MODE_OPTIONS = get_ui_options()
 
 
 def _render_perf_panel():
@@ -100,29 +102,29 @@ def render_sidebar() -> Dict:
 
         with st.expander("🎯 操作指引", expanded=False):
             st.markdown("""
-            **完整操作流程:**
-            
-            1. **上傳 Excel 文件**
-               - 點擊瀏覽文件或拖放文件到上傳區域
-               - 確保包含所有必需欄位
-            
-             2. **選擇轉貨模式**
-                    - 在側邊欄選擇適合的轉貨模式（A/B/B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/C/C1/C2/D/D2/E1/E1b/E2/F/F2/F3/NST/ND1/ND2/ND3/ND4/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001))
-                - 查看模式說明了解各模式特點
-                        - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3/ND4，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
-                       - 若選擇 NST，可設定「HD店舖轉出」及「同一SKU轉出店舖數量上限：10間/20間/不限制」
-            
-            3. **啟動分析**
-               - 點擊「生成調貨建議」按鈕開始處理
-               - 系統會自動進行數據驗證和分析
-            
-            4. **查看結果**
-               - 在主頁面查看KPI、調貨建議和統計圖表
-               - 展開詳細統計了解更多信息
-            
-            5. **下載報告**
-               - 點擊下載按鈕獲取 Excel 報告
-               - 報告包含完整的調貨建議和統計信息
+**完整操作流程:**
+
+1. **上傳 Excel 文件**
+   - 點擊瀏覽文件或拖放文件到上傳區域
+   - 確保包含所有必需欄位
+
+2. **選擇轉貨模式**
+   - 先選「模式分類」，再於組內選擇適合的轉貨模式
+   - 查看模式說明了解各模式特點
+   - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3/ND4，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
+   - 若選擇 NST，可設定「HD店舖轉出」及「同一SKU轉出店舖數量上限：10間/20間/不限制」
+
+3. **啟動分析**
+   - 點擊「生成調貨建議」按鈕開始處理
+   - 系統會自動進行數據驗證和分析
+
+4. **查看結果**
+   - 在主頁面查看KPI、圖表概覽、調貨建議和統計
+   - 展開詳細統計了解更多信息
+
+5. **下載報告**
+   - 點擊「準備 Excel 報表」生成文件後，再點擊下載按鈕獲取報告
+   - 報告包含完整的調貨建議和統計信息
             """)
 
         st.markdown("---")
@@ -152,12 +154,32 @@ def render_sidebar() -> Dict:
         st.markdown("---")
 
         st.markdown("### ⚙️ 選擇轉貨模式")
+        display_groups = get_display_groups()
+        group_labels = [label for label, _codes in display_groups]
+        # 依目前選中的模式還原分類（rerun 後仍停留在所屬組）
+        _selected_option = st.session_state.get('transfer_mode', '')
+        _selected_code = (
+            _selected_option.split(":", 1)[0].strip()
+            if ":" in _selected_option else _selected_option.strip()
+        )
+        group_index = next(
+            (i for i, (_label, codes) in enumerate(display_groups) if _selected_code in codes),
+            0,
+        )
+        mode_group = st.selectbox(
+            "模式分類",
+            group_labels,
+            index=group_index,
+            key='mode_group',
+            help="先選模式分類，再於下方選擇組內模式（分組與「📖 模式教學」分頁一致）",
+        )
+        group_codes = next(codes for label, codes in display_groups if label == mode_group)
         transfer_mode = st.radio(
             "選擇轉貨模式",
-            _MODE_OPTIONS,
+            get_ui_options_for_codes(group_codes),
             key='transfer_mode',
             help="選擇適合的調貨模式",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
         )
         transfer_mode = fix_mojibake_text(transfer_mode)
         mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
@@ -272,249 +294,12 @@ def render_sidebar() -> Dict:
 
         st.caption(MODE_DESCRIPTIONS.get(transfer_mode, ""))
 
-        with st.expander("📋 詳細模式說明", expanded=False):
-            st.markdown("""
-            ### 轉貨模式詳解
-            
-            **A模式(保守轉貨)**
-            - 轉出後剩餘庫存不低於安全庫存
-            - 轉出類型為RF過剩轉出
-            - 適合保守型調貨策略
-            - 單件自動上調：若可轉量=1且轉出後仍餘≥3件，上調至2件（放寬Safety Stock -1）
+        with st.expander(f"📋 目前模式詳解：{mode_code}", expanded=False):
+            st.markdown(MODE_DOCS.get(mode_code, "（此模式暫無詳細說明，請參考「📖 模式教學」分頁。）"))
+            st.caption("💡 完整 30 個模式的圖例教學，請切換上方「📖 模式教學」分頁。")
 
-            **A1模式(保守轉貨-轉出店舖不餘存貨1件)**
-            - 繼承A模式全部規則（RF過剩轉出、百分比上限、最低轉出2件）
-            - **避免源店剩1件**：轉出後若源店剛好剩1件，自動調整
-            - **接收方可+1件**：為消除1件餘數，接收店可增1件（上限為target_qty+1）
-            - **ND Shop不強制至0**：若加1件超額則保留2件於源店而非強制出清
-            - 適合ND Shop轉出且不希望存貨餘1件的場景
-            
-            **B模式(加強轉貨)**
-            - 轉出後剩餘庫存可能低於安全庫存
-            - 轉出類型為RF加強轉出
-            - 更積極地處理滯銷品
-            
-            **B2模式(附加B特別模式)**
-            - ND店舖全轉出
-            - Type=L在銷量≤2時全轉出(含RF),若銷量>2則回到B模式
-            - 其餘RF依B模式規則
-            - Mix店舖若總銷量高於目標店則不可出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
-            - 接收端依遊客區/混合型店舖優先級排序
-            - 接收上限為Safety Stock的2倍
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-
-            **B2L模式(附加B2L特別模式)**
-            - 參照B2模式,差異僅在 Type=L 特例
-            - Type=L在銷量≤2時不再全轉出,改為保留2件（可轉出=max(淨庫存-2,0)）
-            - 若 Type=L 淨庫存≤2，則不轉出
-            - Mix店舖若總銷量高於目標店則不可出貨（總銷量=Last Month Sold Qty+MTD Sold Qty）
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-            
-            **B3模式(附加B跨OM特別模式)**
-            - 參照B2,但允許跨OM配對
-            - 同樣套用Mix店舖總銷量保護規則（總銷量=Last Month Sold Qty+MTD Sold Qty）
-            - HD不能轉到HA/HB/HC
-            - Windy轉出只能到Windy,Windy可接收其他OM
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-
-            **B2a模式(附加B2a特別模式)**
-            - 參照B2模式
-            - 新增限制：Type=T(遊客鋪)不可出貨
-            - 同樣套用Mix店舖總銷量保護規則（總銷量=Last Month Sold Qty+MTD Sold Qty）
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-
-            **B3a模式(附加B3a跨OM特別模式)**
-            - 參照B3模式
-            - 新增限制：Type=T(遊客鋪)不可出貨
-            - 同樣套用Mix店舖總銷量保護規則（總銷量=Last Month Sold Qty+MTD Sold Qty）
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-
-            **B2La模式(附加B2La特別模式)**
-            - 參照B2L模式
-            - 新增限制：Type=T(遊客鋪)不可出貨
-            - Type=L低銷量維持保留2件規則
-
-            **B3L模式(附加B3L跨OM特別模式)**
-            - 參照B3模式,差異僅在 Type=L 特例
-            - Type=L在銷量≤2時保留2件（可轉出=max(淨庫存-2,0)）
-            - 保留B3跨OM規則（HD限制、Windy限制）
-
-            **B3La模式(附加B3La跨OM特別模式)**
-            - 參照B3L模式
-            - 新增限制：Type=T(遊客鋪)不可出貨
-            
-            **C模式(重點補0)**
-            - 主要針對接收店舖
-            - 當(SaSa Net Stock+Pending Received)≤1時
-            - 補充至該店舖的Safety或MOQ+1的數量(取最低值)
-            
-            **C1模式(重點補0-只補0/1(或自選數量))**
-            - 參照C模式，但**僅處理total_available≤N的店舖**（N可於側邊欄設定）
-            - 不回落到一般缺貨補貨（緊急缺貨、潛在缺貨）
-            - 轉出門檻：淨庫存必須>2才可轉出
-            - 轉出量下限：至少2件才參與配對
-            - 每店轉出上限可調（3~10件，預設3），提高上限可減少調出店舖總數
-            - 優先使用可轉量較大的來源（減少拆單）
-            
-            **C2模式(附加C跨OM重點補0)**
-            - 參照C模式的轉出/接收邏輯
-            - 允許跨OM配對
-            - HD不能轉到HA/HB/HC
-            - Windy轉出只能到Windy,Windy可接收其他OM
-            
-            **D模式(清貨轉貨)**
-            - 針對ND類型且無銷售記錄的店舖進行清貨
-            - 避免1件餘貨,確保轉出後剩餘庫存為0件或≥2件
-            - 轉出類型為ND清貨轉出
-            - RF店舖亦可作為過剩轉出源(沿用A模式規則)
-            
-            **D2模式(清貨轉貨ND限定)**
-            - 按照D模式邏輯,但**僅ND Shop轉出，RF Shop只做接收不做轉出**
-            - 僅針對無銷售記錄(Last Month=0且MTD=0)的ND店舖清貨轉出
-            - 有銷售記錄的ND店舖不做轉出
-            - RF店舖只作為接收方(緊急缺貨/潛在缺貨)
-            - 仍限制同一組OM內配對
-            - 避免1件餘貨邏輯同D模式
-            - 可切換接收策略（三選一）：
-              - 「不限店舖數量（原有設定）」：每間ND源可配對任意RF接收店，target_qty正常值
-              - 「限制2間店舖接收（原有設定）」：每間ND源最多配對2間RF接收店，target_qty正常值
-              - 「限制2間店舖接收（優化版）」：每間ND源最多配對2間RF接收店，target_qty放大至200%
-            
-            **E1模式(強制轉出)**
-            - 針對標記為*ALL*的商品行,全數強制轉出
-            - 接收店舖為RF,上限為Safety Stock的2倍
-            - **僅同OM配對**,HD不能轉到HA/HB/HC
-            - 轉出類型為E模式強制轉出
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-
-            **E1b模式(強制轉出優先類型接收)**
-            - 使用E1模式轉出邏輯:標記為*ALL*的商品行全數強制轉出
-            - **僅同OM配對**,HD不能轉到HA/HB/HC
-            - 接收店舖為RF,上限為Safety Stock的2倍
-            - 接收優先級參照B2:Type=T(遊客區)優先,其次Type=M(混合型)
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-            
-            **E2模式(強制轉出跨OM)**
-            - 針對標記為*ALL*的商品行,全數強制轉出
-            - 接收店舖為RF,上限為Safety Stock的2倍
-            - 優先同OM配對,**可跨OM**,HD不能轉到HA/HB/HC
-            - 轉出類型為E模式強制轉出
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-            
-            **F模式(目標優化)**
-            - Target欄位填數字作為優先接收目標
-            - 其他店舖按C模式補0需求計算
-            - 允許跨OM配對,HD不能轉到HA/HB/HC
-
-            **F2模式(F指定模式)**
-            - Target欄位填數字作為唯一接收目標
-            - 僅Target店舖可接收，非Target RF店舖不參與接收
-            - 允許跨OM配對
-            - HD轉出選項：預設HD不能轉到HA/HB/HC；可切換為「HD可轉出（最後優先）」，此時HD來源排在最低優先級，僅在其他來源不足時才使用
-            - **Windy目標店優先**：若目標店為Windy（有Target），優先從其他無Target的Windy店舖提取；僅在Windy來源不足時才使用非Windy來源
-
-            **F3模式(目標性補0)**
-            - 繼承F2全部規則（僅Target接收、HD轉出選項、Windy目標優先）
-            - **RF轉出保留2件**：RF店舖轉出後淨庫存不低於2件（net_stock > 2 才可轉出，轉出量=net_stock-2）
-            - **RF最高庫存優先**：轉出時最高庫存店舖優先轉出（同優先級內銷量低優先）
-            - **RF跨OM不降級**：RF跨OM配對與同OM配對同等優先（無tier懲罰）
-
-            **NST模式(New Shop Target調貨)**
-            - 繼承F2全部規則（僅Target接收、HD轉出選項、Windy目標優先）
-            - **RF轉出保留≥2件**：RF店舖轉出後淨庫存不低於2件
-            - **RF轉出上限75%**：RF店舖轉出量不超過淨庫存的75%（net_stock × 0.75）
-            - **庫存<3不轉出**：RF店舖淨庫存少於3件時不參與轉出
-            - **同一SKU轉出店數上限**：可設定10間/20間/不限制，控制每SKU最多多少間店舖可同時轉出
-            - **目標可能未達100%**：因RF轉出限制，Target目標可能未能完全滿足，此為預期行為
-            - 允許跨OM配對，HD轉出選項同F2
-            - 配對後剩餘來源會自動填補尚未滿足的目標
-
-            **ND1模式(ND同OM轉貨)**
-            - 打破「ND不可接收」全局限制，ND店舖可互相調貨
-            - **限制同OM**：轉出與接收店舖須屬同一OM組別
-            - 轉出排序：過去2個月銷量=0(Last Month + MTD)優先轉出 → 銷量最低次選 → 最高銷量保護不轉
-            - 接收優先級1：RF緊急缺貨(零庫存但有銷售記錄)
-            - 接收優先級2：ND潛在缺貨(按過去2個月銷量降序，高銷量優先接收)
-            - 接收上限：2×(Last Month Sold Qty + MTD Sold Qty)
-            - 過去2個月銷量=0的ND店舖不可接收
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-
-            **NST模式(New Shop Target調貨)**
-            - 繼承F2全部規則（僅Target接收、HD轉出選項、Windy目標優先）
-            - **RF轉出保留≥2件**：RF店舖轉出後淨庫存不低於2件
-            - **RF轉出上限75%**：RF店舖轉出量不超過淨庫存的75%（net_stock × 0.75）
-            - **庫存<3不轉出**：RF店舖淨庫存少於3件時不參與轉出
-            - **同一SKU轉出店數上限**：可設定10間/20間/不限制，控制每SKU最多多少間店舖可同時轉出
-            - **目標可能未達100%**：因RF轉出限制，Target目標可能未能完全滿足，此為預期行為
-            - 允許跨OM配對，HD轉出選項同F2
-
-            **ND2模式(ND混合OM轉貨)**
-            - 同ND1模式規則，但允許**跨OM**配對
-            - Windy(澳門)轉出只能到Windy店舖
-            - HD不能轉到HA/HB/HC
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-
-            **ND3模式(ND限同OM轉貨-補0)**
-            - ND同OM轉貨，參考C1模式，僅針對零庫存ND店舖補貨
-            - 轉出保留3件庫存（Net Stock>3才可轉出，轉出量=Net Stock-3）
-            - 僅同OM配對，不跨OM
-            - 不回落一般缺貨補貨（僅補零庫存ND店）
-            - 接收目標：max(Safety Stock×0.5, 3)
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-
-            **ND4模式(ND限同OM轉貨-補0及有銷售記錄)**
-            - 基於ND3架構，接收端僅限有銷售記錄Shop（Last Month Sold Qty + MTD Sold Qty > 0）
-            - 無銷售記錄的零庫存ND店不收貨
-            - **轉出端優化**：無銷量來源店不保留3件，全數可轉出；有銷量來源店保留3件（與ND3相同）
-            - 接收目標：max(Safety Stock×0.5, 3)
-            - 可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-
-            **精簡SKU(限同OM)模式**
-            - RF店舖存貨上限=Max(Safety×2, 過去2個月銷量×2)，超出部分轉出
-            - ND店舖全數可轉出
-            - 轉給RF店舖最少2件起（參考C1模式）
-            - 剩餘無法配對的數量一律退回D001（無數量限制）
-            - 僅同OM配對
-
-            **精簡SKU(跨OM)模式**
-            - 同精簡SKU(限同OM)規則，但允許跨OM配對
-            - Windy轉出只能到Windy店舖
-            - HD不能轉到HA/HB/HC
-            - 剩餘無法配對的數量一律退回D001
-            
-            **精簡SKU(退D001)模式**
-            - RF店舖存貨上限=Max(Safety×2, 過去2個月銷量×2)，超出部分可轉出
-            - ND店舖全數可轉出
-            - 所有轉出數量一律退回D001，不進行RF接收配對
-            - RF僅1件不回退D001（避免浪費人力），ND不受此限
-            - 允許跨OM配對（Windy/HD限制適用）
-            
-            ### 轉出類型判斷
-            
-            - **RF過剩轉出**:轉出後剩餘庫存不會低於Safety Stock
-            - **RF加強轉出**:轉出後剩餘庫存會低於Safety Stock
-            - **ND清貨轉出**:D/D2模式特殊，ND店舖無銷售記錄時
-            - **E模式強制轉出**:E1/E1b/E2模式特殊，標記商品強制轉出
-            
-            ### 接收條件說明
-            
-            **一般條件:**
-            - SaSa Net Stock + Pending Received < Safety Stock 時需要調撥接收
-            
-            **特殊條件:**
-            - C/C2模式：當(SaSa Net Stock+Pending Received)≤1時,補充至Safety或MOQ+1(取最低值)
-            - C1模式：僅處理total_available≤N的店舖（N可於側邊欄設定），每店轉出上限可調3~10件，不回落一般缺貨補貨
-            - D/D2模式：避免1件餘貨規則(D2僅ND清貨轉出，RF不轉出)
-            - E1模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM)
-            - E1b模式：所有RF店舖可接收,上限為Safety Stock的2倍(僅同OM，優先Type=T/M)
-            - E2模式：所有RF店舖可接收,上限為Safety Stock的2倍(可跨OM)
-            - B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式：接收上限為Safety Stock的2倍,並累計追蹤接收量
-            - NST模式：可設定同一SKU轉出店舖數量上限：10間 / 20間 / 不限制
-            - ND1/ND2模式：可設定同一SKU下單一出貨店舖配對接收店舖：優先1間 / 最多2間 / 不限
-            - ND3模式：僅零庫存ND店舖可接收，目標=max(Safety×0.5, 3)，轉出店保留3件
-            - ND4模式：繼承ND3 + 僅限有銷售記錄Shop接收 + 無銷量來源店不保留3件(全數可轉)
-            - 接收優先級(B2/B2a/B2L/B2La/B3/B3a/B3L/B3La):遊客區店舖高銷量 → 混合型店舖高銷量 → 遊客區店舖高Safety → 混合型店舖高Safety
-            """)
+        with st.expander("📋 通用規則（轉出類型／接收條件）", expanded=False):
+            st.markdown(GENERAL_DOCS)
 
         st.markdown("---")
         st.caption(f"更新時間: {datetime.now().strftime('%Y-%m-%d %H:%M')}")

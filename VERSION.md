@@ -1,5 +1,43 @@
 # 版本更新記錄
 
+## v2.33.0 (2026-08-16)
+
+### UI/UX 改進（無模式邏輯變更）
+
+#### 變更說明
+- **Bug 修復**：
+  - 優先級統計列改為彩色色塊統計條（🔴🟡🟢 顏色原本已定義但從未套用）
+  - 側邊欄操作指引 markdown 縮排修正（次層列表不再破版）
+  - 調貨缺口分析欄位改為數值型（缺口／剩餘可排序），達成率／轉出率以 ProgressColumn 進度條呈現（0–100%）
+  - 缺口分析篩選狀態按 run 隔離，切換設定後自動重置（與結果表快取行為一致）
+  - 教學 SVG 圖（Turnday 公式／對比圖）配色由舊青色主題改為現行橙色深色主題
+  - 移除 `config.py` 未使用的 THEME 死代碼
+- **圖表概覽**：結果區新增「📈 圖表概覽」— 轉出／接收類型分佈、按 OM 轉出 vs 接收量、Top 10 商品轉出量長條圖（Streamlit 內建圖表，零新依賴）
+- **表格強化**：結果表與統計表整數欄位套用 column_config 數字格式（千分位）
+- **模式選擇 UX**：30 個選項平面 radio 改為「模式分類（8 組，與教學分頁一致）→ 組內模式」兩級選擇；側邊欄「詳細模式說明」240 行全量文檔改為只顯示目前模式詳解（重構為 MODE_DOCS 字典，重複的 NST 段落自動消除）＋獨立「通用規則」區塊
+- **流程優化**：
+  - Excel 改為按下「📤 準備 Excel 報表」才生成（原本結果一出來即自動生成）
+  - 上傳進度條於預處理完成後收起；分析階段改用 st.status 狀態面板逐步顯示（演算法 → 品質檢查 → 統計與缺口分析）
+  - 錯誤追蹤改為常駐 expander（原本藏在 checkbox 後面）
+  - 教學 JSON 加入 @st.cache_data，rerun 不再重讀 8 個 JSON 檔
+
+#### 修改檔案
+- `ui/display.py` — 優先級彩色統計條、render_charts 圖表概覽、column_config、缺口分析數值化＋run 隔離
+- `ui/sidebar.py` — 兩級模式選擇器、MODE_DOCS 重構、操作指引縮排修復（538 → 323 行）
+- `ui/mode_docs.py` — 新增（30 模式詳解字典＋通用規則）
+- `ui/tutorial.py` — _load_group 加 @st.cache_data
+- `app.py` — render_charts 接線、惰性 Excel、st.status、進度條收起、錯誤 expander、docstring 版本
+- `models/mode_registry.py` — 新增 get_display_groups() / get_ui_options_for_codes()（get_ui_options 原樣保留）
+- `config.py` — VERSION bump 至 v2.33.0、移除 THEME
+- `static/tutorials/turnday_formula.svg` / `turnday_compare.svg` — 配色更新為現行主題
+- `tests/test_ui_helpers.py` — 新增（顯示分組覆蓋全部 30 模式、MODE_DOCS 完整性）
+- `README.md` — 標題版本對齊、介面操作流程更新
+
+#### 文件同步
+- `README.md` / `VERSION.md` / `config.py` / `app.py` 已同步；`調貨模式詳解.txt` 與 `transfer_logic_ai_brief.md` 無需變更（無模式新增／移除／邏輯修改，僅 UI 層重組）
+
+---
+
 ## v2.32.0 (2026-08-16)
 
 ### 新增保底主體（Safety / Turnday）× 模式矩陣

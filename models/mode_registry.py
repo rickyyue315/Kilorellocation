@@ -205,6 +205,30 @@ def get_ui_options() -> List[str]:
     return [f"{d.code}: {d.name}" for d in MODE_DEFS]
 
 
+# 側邊欄兩級選擇器的顯示分組（分組與「📖 模式教學」分頁一致）
+_DISPLAY_GROUPS: List[tuple] = [
+    ("基礎調貨模式（A / A1 / B）", ["A", "A1", "B"]),
+    ("B特別模式（B2 / B2a / B2L / B2La）", ["B2", "B2a", "B2L", "B2La"]),
+    ("B跨OM特別模式（B3 / B3a / B3L / B3La）", ["B3", "B3a", "B3L", "B3La"]),
+    ("重點補0系列（C / C1 / C2）", ["C", "C1", "C2"]),
+    ("清貨模式（D / D2）", ["D", "D2"]),
+    ("強制轉出系列（E1 / E1b / E2）", ["E1", "E1b", "E2"]),
+    ("目標優化系列（F / F2 / F3 / NST）", ["F", "F2", "F3", "NST"]),
+    ("ND/SKU專項（ND1~ND4 / 精簡SKU）", ["ND1", "ND2", "ND3", "ND4",
+                                            "精簡SKU(限同OM)", "精簡SKU(跨OM)", "精簡SKU(退D001)"]),
+]
+
+
+def get_display_groups() -> List[tuple]:
+    """回傳 (組名, [模式code]) 有序清單，8 組恰好覆蓋全部 30 個模式。"""
+    return list(_DISPLAY_GROUPS)
+
+
+def get_ui_options_for_codes(codes) -> List[str]:
+    """依 code 清單產生 "CODE: name" 選項字串（與 get_ui_options 同格式）。"""
+    return [f"{_BY_CODE[c].code}: {_BY_CODE[c].name}" for c in codes if c in _BY_CODE]
+
+
 def get_receive_limit_codes() -> List[str]:
     return [d.code for d in MODE_DEFS if d.receive_site_limit]
 
