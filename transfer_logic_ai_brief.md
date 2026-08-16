@@ -12,6 +12,10 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Last Month Sold Qty, MTD Sold Qty, Last 2 Month Sold Qty
 - Effective Sold Qty = Last Month Sold Qty + MTD Sold Qty
 - Total Available = SaSa Net Stock + Pending Received
+- Floor body (v2.32.0, dual): Safety Stock (default, from upload file) OR Turnday floor
+  - Turnday floor = ceil(Daily Sold Rate x N days), N user-selectable 3-60 (default 14)
+  - Daily Sold Rate = Effective Sold Qty / coverage days; coverage days = last-month calendar days + MTD as-of date day-of-month (user inputs the MTD data date, usually T-1; e.g. Aug 15 -> July 31 + 15 = 46 days)
+  - When Turnday is selected, the Safety Stock column value is REPLACED by the Turnday floor before logic runs (original preserved in Original Safety Stock); zero-sales SKUs get floor = 0
 - Target (optional, for F/F2 modes)
 - ALL (optional, for E1/E1b/E2 modes)
 - Type (optional, for B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1b modes)
@@ -47,6 +51,10 @@ Draw one logic image that lets users compare all current transfer modes and unde
    - Strategy A (Rebalance): take 1 piece from another destination with qty ≥3 in same source group, making the 1-piece line become 2.
    - Strategy B (Merge): if no donor ≥3, merge the 1-piece into the highest-sales destination in the group (measured by Last Month Sold Qty + MTD Sold Qty), then remove the 1-piece record.
    - Exception: if the source store has only 1 transferable piece for that SKU in total, the single-piece line is preserved.
+8. **Floor body (v2.32.0, applies to ALL 30 modes)**: the system has two interchangeable floor bodies, orthogonal to mode selection (2 bodies x 30 modes):
+   - Safety body (default): floor = uploaded Safety Stock. Behavior identical to v2.31.
+   - Turnday body: floor = ceil(Daily Sold Rate x N days). Every Safety Stock touchpoint switches basis automatically: source floor (Total Available - S -> Total Available - T), source eligibility (Total Available > S -> > T), Emergency/Potential target (S -> T), Priority Zero target (max(S*0.5, 3) -> max(T*0.5, 3)), receive caps (max(S*2, 3) -> max(T*2, 3)), simplified-SKU cap (max(S*2, last-2-month sales*2) -> max(T*2, ...)).
+   - Fixed keep-stock floors NOT affected by body: C1 (net stock > 2), F3 (keep 2), NST (keep >= 2 + 75% cap), ND3/ND4 (keep 3).
 
 ## Destination types (labels used in output)
 - Emergency Replenishment: SaSa Net Stock = 0 and Effective Sold Qty > 0

@@ -4,7 +4,7 @@
 
 import os
 
-VERSION = "v2.31.0"
+VERSION = "v2.32.0"
 
 ZEABUR_ENV_KEYS = [
     'ZEABUR',
@@ -77,6 +77,15 @@ D2_NEEDED_QTY_MULTIPLIER = 2
 NST_RF_RETAIN_STOCK = 2
 NST_RF_TRANSFER_CAP = 0.75
 NST_RF_MIN_STOCK_TO_SOURCE = 3
+
+# ── 保底主體 (Safety / Turnday) ─────────────────────────────────────
+
+FLOOR_BODY_SAFETY = "safety"
+FLOOR_BODY_TURNDAY = "turnday"
+
+TURNDAY_DEFAULT_DAYS = 14
+TURNDAY_MIN_DAYS = 3
+TURNDAY_MAX_DAYS = 60
 
 # ── Magic Numbers (data_processor.py) ──────────────────────────────
 

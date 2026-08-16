@@ -6,7 +6,14 @@ import streamlit as st
 from datetime import datetime
 from typing import Dict, Optional
 
-from config import VERSION
+from config import (
+    VERSION,
+    FLOOR_BODY_SAFETY,
+    FLOOR_BODY_TURNDAY,
+    TURNDAY_DEFAULT_DAYS,
+    TURNDAY_MIN_DAYS,
+    TURNDAY_MAX_DAYS,
+)
 from models.mode import MODE_DESCRIPTIONS
 from models.mode_registry import get_ui_options, get_receive_limit_codes
 from services.perf_timer import ENABLE_PERF, get_perf_records, clear_perf_records
@@ -117,6 +124,30 @@ def render_sidebar() -> Dict:
                - 點擊下載按鈕獲取 Excel 報告
                - 報告包含完整的調貨建議和統計信息
             """)
+
+        st.markdown("---")
+
+        st.markdown("### 🛡️ 保底主體")
+        floor_body_option = st.radio(
+            "保底主體（與下方調貨模式可任意組合）",
+            ["Safety Stock（現行版本）", "Turnday（日銷速×日數）"],
+            index=0,
+            key='floor_body_option',
+            help="Safety Stock：沿用上載檔案的 Safety Stock 做保底（現行版本，行為不變）。Turnday：以日銷速×自選日數計算保底值取代 Safety Stock，全部模式的 Safety 觸點（轉出保底、缺貨目標、接收上限等）自動切換至 Turnday 基準。"
+        )
+        if floor_body_option == "Turnday（日銷速×日數）":
+            floor_body = FLOOR_BODY_TURNDAY
+            turnday_days = st.number_input(
+                "Turnday 日數（保底 = 日銷速 × N日）",
+                min_value=TURNDAY_MIN_DAYS, max_value=TURNDAY_MAX_DAYS,
+                value=TURNDAY_DEFAULT_DAYS, step=1,
+                key='turnday_days',
+                help="保底庫存 = ceil(日銷速 × 此日數)。日銷速 = (Last Month Sold + MTD Sold) ÷ 覆蓋日數，覆蓋日數由主頁面的「MTD數據日期」計算。零銷量 SKU 保底為 0（可全數轉出）。"
+            )
+        else:
+            floor_body = FLOOR_BODY_SAFETY
+            turnday_days = None
+            st.session_state.pop('turnday_days', None)
 
         st.markdown("---")
 
@@ -493,6 +524,9 @@ def render_sidebar() -> Dict:
     return {
         'mode_code': mode_code,
         'transfer_mode': transfer_mode,
+        'floor_body': floor_body,
+        'floor_body_option': floor_body_option,
+        'turnday_days': turnday_days,
         'b_special_max_receive_sites_per_source': b_special_max_receive_sites_per_source,
         'b_special_receive_site_limit_option': b_special_receive_site_limit_option,
         'f2_allow_hd_transfer': f2_allow_hd_transfer,

@@ -1,5 +1,37 @@
 # 版本更新記錄
 
+## v2.32.0 (2026-08-16)
+
+### 新增保底主體（Safety / Turnday）× 模式矩陣
+
+#### 變更說明
+- **保底主體二選一**（側邊欄），與全部 30 個調貨模式任意組合（2 主體 × 30 模式 = 60 種組合，零代碼分叉）：
+  - `Safety Stock（現行版本）`（預設）：沿用上載檔 Safety Stock，行為與 v2.31 完全一致（現有 392 個測試全數不改一行通過）。
+  - `Turnday（日銷速×日數）`：以 Turnday 保底值取代 Safety Stock 欄位值，全部 Safety 觸點自動切換（轉出保底、緊急/潛在缺貨目標、補0目標 S×0.5→T×0.5、接收上限 S×2→T×2、精簡SKU Cap Max(S×2,銷×2)→Max(T×2,銷×2)）。
+- **Turnday 公式**：`保底 = ceil(日銷速 × 自選日數 N)`（3–60 日，預設 14）；`日銷速 = Effective Sold Qty ÷ 覆蓋日數`；`覆蓋日數 = 上月日數 + MTD數據日期日號`（例：8/15 = 7月31日 + 15日 = 46日）。零銷量 SKU 保底 = 0（可全數轉出）。
+- **上載區新增 MTD 數據日期輸入**（`st.date_input`，預設昨日 T-1），Turnday 主體顯示覆蓋日數核對 caption。
+- **透明度**：Turnday 套用後原值備份至 `Original Safety Stock`、新增 `Daily Sold Rate` 欄；結果標題標明「當前模式 | 保底主體」；Excel 統計摘要新增「保底主體」列（主體、日數、數據日期）供輸出追溯。
+- **不受影響**：C1（淨存>2）、F3/NST（保留2件/75%）、ND3/ND4（保留3件）等非 Safety 固定保底維持原狀；Safety 主體路徑零改動（`business_logic.py` / `strategies/` 不變）。
+
+#### 修改檔案
+- `config.py` — 版本號 bump 至 v2.32.0；新增 FLOOR_BODY_SAFETY / FLOOR_BODY_TURNDAY / TURNDAY_DEFAULT_DAYS / TURNDAY_MIN_DAYS / TURNDAY_MAX_DAYS
+- `services/turnday.py` — 新增（compute_coverage_days / describe_coverage / apply_turnday_floor）
+- `ui/sidebar.py` — 新增保底主體 radio + Turnday 日數輸入，回傳 dict 增 floor_body / floor_body_option / turnday_days
+- `app.py` — 上載區 MTD 數據日期輸入 + 覆蓋日數核對；Turnday 套用（df.copy 後欄位取代）；current_run_key 加入主體設定；結果卡片標明主體；Excel 傳遞 floor_body_label；docstring 版本更新
+- `excel_generator.py` — generate_excel_file / create_summary_dashboard_sheet 新增 floor_body_label 參數，統計摘要寫入「保底主體」列
+- `tests/test_turnday.py` — 新增 20 個測試（覆蓋日數月邊界/ceil/零銷量/欄位取代/原 df 不變動/Safety×Turnday×A模式整合/印章流轉）
+- `README.md` — 核心規則、功能重點、系統衍生欄位、介面操作流程更新
+- `調貨模式詳解.txt` — 新增「保底主體（Safety / Turnday）」章節
+- `ui/tutorial.py` — 新增 `_render_floor_body_guide()` 保底主體教學段（概念流程圖 + SVG 圖解 + 公式 + 模式受影響對照 + 風險提示），模式教學區頂部加入 Safety→Turnday 替換說明
+- `static/tutorials/turnday_formula.svg` — 新增 Turnday 三步計算流程圖解（覆蓋日數 → 日銷速 → 保底，深色主題）
+- `static/tutorials/turnday_compare.svg` — 新增 Safety vs Turnday 保底對比圖（快銷/慢銷/零銷量店舖情境條形圖，深色主題）
+- `transfer_logic_ai_brief.md` — Safety Stock 語義更新（dual floor body）
+
+#### 文件同步
+- `README.md` / `VERSION.md` / `config.py` / `app.py` / `ui/tutorial.py` / `調貨模式詳解.txt` / `transfer_logic_ai_brief.md` 已全部同步
+
+---
+
 ## v2.31.0 (2026-08-14)
 
 ### Excel 輸出新欄位順序 + 新增 Type 欄位

@@ -171,13 +171,15 @@ class ExcelGenerator:
         worksheet.set_row(0, 40)
         worksheet.set_default_row(22)
     
-    def create_summary_dashboard_sheet(self, writer, statistics: Dict):
+    def create_summary_dashboard_sheet(self, writer, statistics: Dict,
+                                       floor_body_label: Optional[str] = None):
         """
         創建統計摘要工作表
-        
+
         Args:
             writer: ExcelWriter對象
             statistics: 統計信息字典
+            floor_body_label: optional 保底主體標示（Safety Stock / Turnday 設定）
         """
         logger.info("創建統計摘要工作表")
         
@@ -243,6 +245,11 @@ class ExcelGenerator:
         
         worksheet.write('A6', '涉及OM數量', kpi_format)
         worksheet.write('B6', statistics.get('unique_oms', 0), kpi_value_format)
+
+        # 保底主體標示（Safety Stock / Turnday），供輸出檔案追溯計算基準
+        if floor_body_label:
+            worksheet.write('A7', '保底主體', header_format)
+            worksheet.merge_range('B7:E7', floor_body_label, data_format)
         
         # 按Article統計
         row = 8
@@ -332,10 +339,11 @@ class ExcelGenerator:
                            mode: str = None,
                            ai_summary: Optional[str] = None,
                            df: Optional[pd.DataFrame] = None,
-                           gap_report: Optional[Dict] = None) -> bytes:
+                           gap_report: Optional[Dict] = None,
+                           floor_body_label: Optional[str] = None) -> bytes:
         """
         生成完整的Excel文件，返回 bytes（記憶體操作，無磁碟 I/O）
-        
+
         Args:
             recommendations: 調貨建議列表
             statistics: 統計信息字典
@@ -344,19 +352,20 @@ class ExcelGenerator:
             ai_summary: optional AI executive summary text
             df: optional raw DataFrame for computing full target fulfillment stats
             gap_report: optional post-transfer gap report
-        
+            floor_body_label: optional 保底主體標示（Safety Stock / Turnday 設定），寫入統計摘要
+
         Returns:
             Excel 文件的 bytes 內容
         """
         logger.info("開始生成Excel文件（BytesIO模式）")
-        
+
         self.generate_filename()
 
-        
+
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
             self.create_transfer_recommendations_sheet(writer, recommendations, mode)
-            self.create_summary_dashboard_sheet(writer, statistics)
+            self.create_summary_dashboard_sheet(writer, statistics, floor_body_label)
             if mode in ("目標優化", "F指定模式", "目標性補0", "New Shop Target調貨"):
                 self.create_target_fulfillment_sheet(writer, recommendations, df)
             if mode in ("清貨轉貨", "清貨轉貨(ND限定)"):

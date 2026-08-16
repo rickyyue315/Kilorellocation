@@ -52,6 +52,30 @@
 - **目的**：避免出現高銷售 Mix 店舖被轉去低銷售店舖
 - **適用模式**：B2、B2a、B2L、B2La、B3、B3a、B3L、B3La
 
+### **0.2 保底主體（Safety / Turnday，v2.32.0 新增）**
+- **概念**：保底主體與 30 個調貨模式**正交組合**（2 主體 × 30 模式 = 60 種組合），側邊欄先選保底主體、再選調貨模式
+- **主體一：Safety Stock（現行版本，預設）**
+  - 沿用上載檔 `Safety Stock` 欄位做保底，行為與 v2.31 完全一致
+- **主體二：Turnday（日銷速×日數）**
+  - **公式**：
+    - 覆蓋日數 = 上月日數 + MTD數據日期日號（數據日期於上載區輸入，通常 T-1；例：8月15日 = 7月31日 + 15日 = 46日）
+    - 日銷速 = Effective Sold Qty ÷ 覆蓋日數（Effective Sold Qty = Last Month Sold Qty + MTD Sold Qty）
+    - Turnday 保底 = ceil(日銷速 × 自選日數 N)（N 可選 3–60 日，預設 14；零銷量 → 保底 0）
+  - **套用方式**：preprocess 後把 `Safety Stock` 欄位值換成 Turnday 保底（原值備份至 `Original Safety Stock`，並新增 `Daily Sold Rate` 欄），全部模式邏輯不變、自動運行於新基準
+  - **切換的 Safety 觸點**：
+    - 轉出保底：transferable = total_available − S → total_available − T
+    - 轉出資格：total_available > S → total_available > T
+    - 緊急/潛在缺貨目標：S → T
+    - 補0目標：max(S×0.5, 3) → max(T×0.5, 3)（即 N/2 日用量，最少 3）
+    - 接收上限：max(S×2, 3) → max(T×2, 3)（即 2N 日用量，最少 3）
+    - 精簡SKU Cap：Max(S×2, 過去2個月銷量×2) → Max(T×2, 過去2個月銷量×2)
+  - **不受主體影響的固定保底**：C1（淨存>2 才轉出）、F3（保留2件）、NST（保留≥2件 + 75%上限）、ND3/ND4（保留3件）維持原狀
+  - **各模式受影響程度**：
+    - 全面受影響（轉出+接收都吃 Safety）：A/A1/B/C/C2/B2系列/E1/E1b/E2/D/D2/ND1/ND2/精簡SKU×2
+    - 部分受影響（僅接收端 Safety 觸點切換）：C1、F/F2/F3、NST、ND3/ND4
+  - **輸出標示**：結果標題顯示「當前模式 | 保底主體」；Excel 統計摘要含「保底主體」列（主體、日數、數據日期、覆蓋日數）；建議上的 Safety 印章欄（Transfer Safety Stock / Receive Site Safety Stock）帶出當前主體保底值
+- **代碼位置**：`services/turnday.py`（compute_coverage_days / apply_turnday_floor）、`app.py`（日期輸入與套用）、`ui/sidebar.py`（主體選擇）
+
 ### **1. ND店鋪限制**
 - **規則**：ND類型店鋪在所有模式下只能作為轉出方，不能作為接收方
 - **原因**：ND店鋪為特殊類型，不適合接收調貨

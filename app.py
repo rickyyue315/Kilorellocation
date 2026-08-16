@@ -1,5 +1,5 @@
 """
-庫存調貨建議系統 v2.31.0 - Streamlit應用程序
+庫存調貨建議系統 v2.32.0 - Streamlit應用程序
 支持三十模式系統：A(保守轉貨)/A1(保守轉貨-轉出店舖不餘存貨1件)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/NST(New Shop Target調貨)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/ND4(ND限同OM轉貨補0及有銷售記錄)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 含模式教學分頁：30種調貨模式圖例化教學（繁體中文）
 """
@@ -7,10 +7,10 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
-from config import VERSION, IS_ZEABUR_RUNTIME
+from config import VERSION, IS_ZEABUR_RUNTIME, FLOOR_BODY_SAFETY, FLOOR_BODY_TURNDAY
 from models.mode import MODE_NAME_MAP
 from ui.mojibake import fix_mojibake_text, patch_streamlit_text_rendering
 from ui.styles import load_css
@@ -30,6 +30,7 @@ from data_processor import DataProcessor
 from business_logic import TransferLogic
 from excel_generator import ExcelGenerator
 from services.target_utils import find_f_mode_nd_target_conflicts
+from services.turnday import apply_turnday_floor, compute_coverage_days, describe_coverage
 
 
 @st.cache_data(show_spinner=False)
@@ -60,6 +61,8 @@ sidebar_result = render_sidebar()
 
 mode_code = sidebar_result['mode_code']
 transfer_mode = sidebar_result['transfer_mode']
+floor_body = sidebar_result['floor_body']
+turnday_days = sidebar_result['turnday_days']
 b_special_max_receive_sites_per_source = sidebar_result['b_special_max_receive_sites_per_source']
 b_special_receive_site_limit_option = sidebar_result['b_special_receive_site_limit_option']
 f2_allow_hd_transfer = sidebar_result['f2_allow_hd_transfer']
@@ -95,6 +98,15 @@ with tab_system:
             help="支援 .xlsx 和 .xls 格式",
         )
 
+        mtd_as_of_date = st.date_input(
+            "MTD數據日期（數據覆蓋至該日，通常T-1）",
+            value=(datetime.now() - timedelta(days=1)).date(),
+            key='mtd_as_of_date',
+            help="Turnday 保底主體用以計算日銷速的數據截止日期：覆蓋日數 = 上月日數 + 該日日號（例：8月15日 = 7月31日 + 15日 = 46日）。Safety 主體不使用此日期。"
+        )
+        if floor_body == FLOOR_BODY_TURNDAY:
+            st.caption(describe_coverage(mtd_as_of_date))
+
     if uploaded_file is not None:
         progress_bar = st.progress(0, text="準備開始處理文件...")
         try:
@@ -121,6 +133,14 @@ with tab_system:
                 if not has_type_column:
                     st.error("❌ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
                     st.stop()
+
+            if floor_body == FLOOR_BODY_TURNDAY:
+                df = apply_turnday_floor(df, mtd_as_of_date, int(turnday_days))
+                st.info(
+                    f"🛡️ Turnday 保底主體已套用：保底 = 日銷速 × {int(turnday_days)}日"
+                    f"（數據日期 {mtd_as_of_date.isoformat()}，覆蓋日數 {compute_coverage_days(mtd_as_of_date)}日）。"
+                    f"Safety Stock 欄已換成 Turnday 保底值，原值保留於 Original Safety Stock。"
+                )
 
             st.success("檔案上傳與數據預處理成功!")
 
@@ -160,14 +180,18 @@ with tab_system:
             with st.container():
                 st.markdown("### 🚀 分析與建議")
 
+                floor_body_label = (
+                    "Safety Stock（現行版本）" if floor_body == FLOOR_BODY_SAFETY
+                    else f"Turnday（日銷速×{int(turnday_days)}日，數據日期 {mtd_as_of_date.isoformat()}）"
+                )
                 st.markdown(f"""
                 <div class="surface-card">
-                    <strong>當前模式</strong> · {transfer_mode}
+                    <strong>當前模式</strong> · {transfer_mode} &nbsp;|&nbsp; <strong>保底主體</strong> · {floor_body_label}
                 </div>
                 """, unsafe_allow_html=True)
 
             nst_max_source_shops = sidebar_result.get('nst_max_source_shops')
-            current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{d2_site_limit_mode}_{c1_threshold}_{c1_ceiling}_{f_fulfill_small_first}_{nst_max_source_shops}_{uploaded_file.name}_{uploaded_file.size}"
+            current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{d2_site_limit_mode}_{c1_threshold}_{c1_ceiling}_{f_fulfill_small_first}_{nst_max_source_shops}_{floor_body}_{turnday_days}_{mtd_as_of_date.isoformat()}_{uploaded_file.name}_{uploaded_file.size}"
             if st.session_state.get('_run_key') != current_run_key:
                 for k in ['recommendations', 'statistics', 'gap_report', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name',
                           'ai_executive_summary']:
@@ -251,6 +275,7 @@ with tab_system:
                             ai_summary=_ai_summary or None,
                             df=df,
                             gap_report=st.session_state.get('gap_report', {}),
+                            floor_body_label=floor_body_label,
                         )
                         st.session_state['excel_filename'] = excel_generator.output_filename
                         st.session_state['excel_run_key'] = _excel_cache_key

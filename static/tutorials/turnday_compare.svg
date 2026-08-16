@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" font-family="Arial, 'Microsoft JhengHei', 'PingFang TC', sans-serif">
+  <!-- Safety vs Turnday 保底對比圖（v2.32.0 教學用，深色主題） -->
+  <rect x="0" y="0" width="1200" height="500" rx="16" fill="#12121a" stroke="#1e1e2e" stroke-width="1.5"/>
+
+  <text x="40" y="46" font-size="21" font-weight="bold" fill="#00d4ff">保底主體對比：Safety Stock（固定值） vs Turnday（隨銷速調節）</text>
+  <text x="40" y="72" font-size="13" fill="#888899">示例設定：上載檔 Safety Stock = 5 ／ Turnday N = 14 日 ／ 覆蓋 46 日（條形長度按件數等比例繪製）</text>
+
+  <!-- 圖例 -->
+  <rect x="800" y="38" width="14" height="14" rx="3" fill="rgba(136,136,153,0.35)" stroke="#888899" stroke-width="1.5"/>
+  <text x="820" y="50" font-size="12" fill="#c9c9d4">Safety 保底（固定）</text>
+  <rect x="972" y="38" width="14" height="14" rx="3" fill="rgba(0,212,255,0.3)" stroke="#00d4ff" stroke-width="1.5"/>
+  <text x="992" y="50" font-size="12" fill="#c9c9d4">Turnday 保底（動態）</text>
+
+  <!-- 表頭 -->
+  <text x="40" y="108" font-size="12" font-weight="bold" fill="#888899">店舖情況</text>
+  <text x="250" y="108" font-size="12" font-weight="bold" fill="#888899">近46日銷量 · 日銷速</text>
+
+  <!-- 刻度網格（0/7/14/21/28 件，25px = 1 件，x=470 起） -->
+  <line x1="470" y1="95" x2="470" y2="445" stroke="#1e1e2e" stroke-width="1"/>
+  <line x1="645" y1="95" x2="645" y2="445" stroke="#1e1e2e" stroke-width="1"/>
+  <line x1="820" y1="95" x2="820" y2="445" stroke="#1e1e2e" stroke-width="1"/>
+  <line x1="995" y1="95" x2="995" y2="445" stroke="#1e1e2e" stroke-width="1"/>
+  <line x1="1170" y1="95" x2="1170" y2="445" stroke="#1e1e2e" stroke-width="1"/>
+  <text x="470" y="462" font-size="11" fill="#888899" text-anchor="middle">0</text>
+  <text x="645" y="462" font-size="11" fill="#888899" text-anchor="middle">7</text>
+  <text x="820" y="462" font-size="11" fill="#888899" text-anchor="middle">14</text>
+  <text x="995" y="462" font-size="11" fill="#888899" text-anchor="middle">21</text>
+  <text x="1170" y="462" font-size="11" fill="#888899" text-anchor="middle">28 件</text>
+
+  <!-- ── 快銷店 ────────────────────────────── -->
+  <text x="40" y="152" font-size="15" font-weight="bold" fill="#ffffff">快銷店</text>
+  <text x="40" y="171" font-size="11" fill="#888899">RF · 高動銷</text>
+  <text x="250" y="152" font-size="13" fill="#9BE8FF">92 件 · 2.0 件/日</text>
+  <rect x="470" y="138" width="125" height="18" rx="4" fill="rgba(136,136,153,0.3)" stroke="#888899" stroke-width="1.5"/>
+  <text x="603" y="152" font-size="12" fill="#c9c9d4">Safety 5</text>
+  <rect x="470" y="162" width="700" height="18" rx="4" fill="rgba(0,212,255,0.25)" stroke="#00d4ff" stroke-width="1.5"/>
+  <text x="1158" y="176" font-size="12" font-weight="bold" fill="#9BE8FF" text-anchor="end">Turnday 28 ＝ 2 週用量 → 更保守 · 防斷貨</text>
+
+  <line x1="40" y1="205" x2="1160" y2="205" stroke="#1e1e2e" stroke-width="1"/>
+
+  <!-- ── 慢銷店 ────────────────────────────── -->
+  <text x="40" y="262" font-size="15" font-weight="bold" fill="#ffffff">慢銷店</text>
+  <text x="40" y="281" font-size="11" fill="#888899">RF · 低動銷</text>
+  <text x="250" y="262" font-size="13" fill="#9BE8FF">23 件 · 0.5 件/日</text>
+  <rect x="470" y="248" width="125" height="18" rx="4" fill="rgba(136,136,153,0.3)" stroke="#888899" stroke-width="1.5"/>
+  <text x="603" y="262" font-size="12" fill="#c9c9d4">Safety 5</text>
+  <rect x="470" y="272" width="175" height="18" rx="4" fill="rgba(245,158,11,0.25)" stroke="#F59E0B" stroke-width="1.5"/>
+  <text x="655" y="286" font-size="12" font-weight="bold" fill="#FCD34D">Turnday 7 → 保底下降 · 釋放庫存</text>
+
+  <line x1="40" y1="315" x2="1160" y2="315" stroke="#1e1e2e" stroke-width="1"/>
+
+  <!-- ── 零銷量店 ────────────────────────────── -->
+  <text x="40" y="372" font-size="15" font-weight="bold" fill="#ffffff">零銷量店</text>
+  <text x="40" y="391" font-size="11" fill="#888899">RF · 近期無售出</text>
+  <text x="250" y="372" font-size="13" fill="#9BE8FF">0 件 · 0 件/日</text>
+  <rect x="470" y="358" width="125" height="18" rx="4" fill="rgba(136,136,153,0.3)" stroke="#888899" stroke-width="1.5"/>
+  <text x="603" y="372" font-size="12" fill="#c9c9d4">Safety 5</text>
+  <rect x="470" y="382" width="125" height="18" rx="4" fill="none" stroke="#F87171" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text x="610" y="396" font-size="12" font-weight="bold" fill="#F87171">Turnday 0 → 存貨可全數轉出（徹底清走死貨）</text>
+
+  <!-- ── Footer ────────────────────────────── -->
+  <line x1="40" y1="440" x2="1160" y2="440" stroke="#1e1e2e" stroke-width="1.5"/>
+  <text x="40" y="478" font-size="12" fill="#888899">Turnday 讓保底隨實際銷速自動調節：快銷店更高（防斷貨）· 慢銷店更低（釋放庫存）· 零銷量歸零（清走死貨）；Safety 主體則一律沿用上載檔固定值</text>
+</svg>

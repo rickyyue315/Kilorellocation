@@ -39,6 +39,10 @@ KiLo 是基於 Streamlit 的庫存調貨建議系統，依據庫存、銷量、�
 
 ## 核心規則
 
+- **保底主體（Safety / Turnday，v2.32.0 新增）**：側邊欄二選一，與全部 30 個模式任意組合（2 主體 × 30 模式）。
+  - `Safety Stock（現行版本）`：沿用上載檔案的 Safety Stock 做保底（預設，行為與以往完全一致）。
+  - `Turnday（日銷速×日數）`：保底 = ceil(日銷速 × 自選日數 N，3–60 日，預設 14）；日銷速 = Effective Sold Qty ÷ 覆蓋日數；覆蓋日數 = 上月日數 + MTD 數據日期日號（數據日期於上載區輸入，通常 T-1，例：8月15日 = 7月31日 + 15日 = 46日）。所有 Safety 觸點（轉出保底、緊急/潛在缺貨目標、補0目標 Safety×0.5、接收上限 Safety×2、精簡SKU Cap）自動切換至 Turnday 基準；零銷量 SKU 保底為 0（可全數轉出）；原 Safety 值備份於 `Original Safety Stock`。
+  - 不受主體影響的固定保底：C1（淨存>2）、F3/NST（保留2件、75%上限）、ND3/ND4（保留3件）維持原狀；Turnday 只改變各模式中讀取 Safety Stock 的公式。
 - ND 店舖在所有模式下僅可轉出，不可接收（**ND1/ND2 模式例外**，允許 ND 互轉；**F/F2/F3 模式例外**，Target ND 店舖可接收）。
 - RF 最高有效銷量店舖受保護，不會被選為轉出方。
 - 同一 SKU 下，轉出店舖不可同時為接收店舖。
@@ -72,6 +76,7 @@ KiLo 是基於 Streamlit 的庫存調貨建議系統，依據庫存、銷量、�
 ## 功能重點
 
 - 三十模式調貨策略。
+- **保底主體 × 模式矩陣（v2.32.0）**：Safety Stock（現行版本）或 Turnday（日銷速×自選日數）兩種保底主體，可與全部 30 個調貨模式任意組合；Turnday 主體下上載區需輸入 MTD 數據日期（通常 T-1）以計算日銷速，並顯示覆蓋日數核對。
 - **模式教學分頁**：內建繁體中文圖例教學，涵蓋全部 30 種模式的適用場景、HTML/CSS 流程圖、配對優先級、數字情境範例與模式對比，附模式選擇決策指南。
 - **C/C1/C2 模式新增 UI 選擇鍵**：可在側邊欄設定每店轉出件數上限（3~10件，預設 3），調整 C/C1/C2 模式的源店分散程度。提高每店轉出上限可減少調出店舖總數量。
 - **D2 模式新增 UI 選擇鍵（3 選 1）**：可在側邊欄切換「不限店舖數量（原有設定）」、「限制2間店舖接收（原有設定）」或「限制2間店舖接收（優化版）」。其中限制版限制同一 SKU 各 ND 轉出源最多配對 2 間 RF 接收店；優化版另將接收量放大至 200%，原有設定版維持正常接收量。
@@ -212,6 +217,7 @@ streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.hea
 
 - `Effective Sold Qty = Last Month Sold Qty + MTD Sold Qty`
 - `Total Available = SaSa Net Stock + Pending Received`
+- Turnday 主體額外衍生：`Original Safety Stock`（上載檔案原值備份）、`Daily Sold Rate`（日銷速，Effective Sold Qty ÷ 覆蓋日數）；`Safety Stock` 欄位值此時為 Turnday 保底 ceil(日銷速 × N)
 
 ## 模式對照
 
@@ -249,11 +255,11 @@ streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.hea
 
 ## 介面操作流程
 
-1. 上傳 Excel。
-2. 選擇模式。
+1. 上傳 Excel（上載區可一併設定 MTD 數據日期，通常 T-1；僅 Turnday 主體用於計算日銷速）。
+2. 選擇保底主體（Safety Stock / Turnday＋日數），再選擇調貨模式。
 3. 若為 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3/ND4，可設定接收店數限制。若為 NST，可設定 HD 轉出選項及同一 SKU 轉出店數上限。
 4. 點擊「生成調貨建議」。
-5. 檢視表格與統計。
+5. 檢視表格與統計（結果標題會標明當前保底主體，Excel 統計摘要亦註明主體設定）。
 6. 下載 Excel 報表。
 
 ### 模式教學分頁
@@ -261,6 +267,7 @@ streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.hea
 系統頂部提供「模式教學」分頁，包含：
 
 - **全局規則流程圖**：ND 限制、最高動銷店保護、避免雙重角色、單件後處理
+- **保底主體教學（v2.32.0，含圖解）**：Safety / Turnday 兩主體概念與矩陣組合流程圖、Turnday 三步計算圖解（覆蓋日數 → 日銷速 → 保底）、Safety vs Turnday 保底對比圖（快銷/慢銷/零銷量三種店舖情境）、模式受影響程度對照表、風險提示與日數選擇建議
 - **8 組模式教學**（按業務場景分組）：
   1. 基礎調貨（A / B）
   2. B 特別模式（B2 / B2a / B2L / B2La）

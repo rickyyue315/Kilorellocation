@@ -4,9 +4,12 @@
 
 import json
 import os
+from pathlib import Path
+
 import streamlit as st
 
 _TUTORIALS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "tutorials")
+_ASSETS_DIR = Path(__file__).resolve().parent.parent / 'static' / 'tutorials'
 
 _GROUP_DEFS = [
     ("basic", "基礎調貨模式（A / A1 / B）", "1"),
@@ -207,6 +210,82 @@ def _render_global_rules():
 """)
 
 
+def _render_floor_body_guide():
+    st.markdown("### 保底主體（Safety / Turnday）— 適用於所有模式")
+
+    st.markdown("""
+v2.32.0 起，側邊欄提供兩種**保底主體**，可與全部 30 個調貨模式任意組合（2 主體 × 30 模式）：
+- **Safety Stock（現行版本）**：沿用上載檔的 Safety Stock 做保底（預設，行為與以往完全一致）。
+- **Turnday（日銷速×日數）**：保底 = ceil(日銷速 × 自選日數 N)，讓保底隨實際銷速自動調節 —— 快銷店保底更高、滯銷店更低。
+""")
+
+    flow = _flow_row([_flow_node("上載 Excel<br>＋ MTD數據日期（通常T-1）", "blue")])
+    flow += _flow_arrow()
+    flow += _flow_row([
+        _flow_node("Safety 主體<br>保底 = 上載檔 Safety Stock", "green"),
+        _flow_node("Turnday 主體<br>保底 = ceil(日銷速 × N日)", "purple"),
+    ])
+    flow += _flow_arrow()
+    flow += _flow_row([
+        _flow_node("所有 Safety 觸點統一切換<br>轉出保底 / 缺貨目標 / 接收上限(S×2) / 補0目標(S×0.5)", "orange"),
+    ])
+    flow += _flow_arrow("正交組合")
+    flow += _flow_row([
+        _flow_node("30 個調貨模式<br>同一套邏輯運行", "blue"),
+    ])
+
+    st.markdown(f'<div class="flow-container">{flow}</div>', unsafe_allow_html=True)
+
+    _formula_svg = _ASSETS_DIR / 'turnday_formula.svg'
+    if _formula_svg.exists():
+        st.image(str(_formula_svg), use_container_width=True)
+
+    st.markdown("""
+**計算公式（通式）：**
+
+```
+覆蓋日數 = 上月日數 + MTD數據日期日號      例：8月15日 = 7月31日 + 15日 = 46日
+日銷速   = Effective Sold Qty ÷ 覆蓋日數    例：92 ÷ 46 = 2.0 件/日
+保底     = ceil(日銷速 × 自選日數 N)        例：ceil(2.0 × 14) = 28 件
+```
+""")
+
+    _compare_svg = _ASSETS_DIR / 'turnday_compare.svg'
+    if _compare_svg.exists():
+        st.markdown("#### 保底效果對比（N=14日示例）")
+        st.image(str(_compare_svg), use_container_width=True)
+
+    st.markdown("""
+**模式受影響程度：**
+
+| 類別 | 模式 | Turnday 主體下的變化 |
+|------|------|------|
+| 全面受影響 | A/A1/B/C/C2/B2系列/E1/E1b/E2/D/D2/ND1/ND2/精簡SKU×2 | 轉出保底＋接收目標全部改用 Turnday 基準（S→T） |
+| 部分受影響 | C1、F/F2/F3、NST、ND3/ND4 | 僅接收端 Safety 觸點切換（如補0目標 max(S×0.5,3) → max(T×0.5,3)）；固定保底（淨存>2、保留2件、75%上限、保留3件）不變 |
+| 接收上限語義 | B2系列/E1/精簡SKU | S×2 → T×2 = 2N 日用量上限；補0目標 S×0.5 → N/2 日用量 |
+
+""")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("#### Safety 主體")
+        st.markdown(_risk_badge("低"), unsafe_allow_html=True)
+        st.markdown("""
+- 保底為固定值，不隨銷速變化
+- 適合 Safety 值已反映實際業務經驗的品類
+- 行為與 v2.31 完全一致
+""")
+    with col2:
+        st.markdown("#### Turnday 主體")
+        st.markdown(_risk_badge("中"), unsafe_allow_html=True)
+        st.markdown("""
+- ⚠️ 零銷量 SKU 保底 = 0，該店存貨可被全數轉出（清死貨利好，惟需接受陳列歸零）
+- ⚠️ 快銷店保底可能遠高於原 Safety，轉出量減少屬預期
+- ⚠️ 日銷速依賴 MTD 數據日期正確性，請核對上載區顯示的覆蓋日數
+- 日數建議：日常補貨 7–14 日；季節品/前置期長 21–30 日
+""")
+
+
 def _render_decision_guide():
     st.markdown("### 模式選擇決策指南")
     st.markdown("根據以下問題，快速找到適合你的調貨模式：")
@@ -266,8 +345,16 @@ def render_tutorial_page():
     _render_global_rules()
 
     st.markdown("---")
+    _render_floor_body_guide()
+
+    st.markdown("---")
     st.markdown("### 30 種模式教學")
     st.markdown("按業務場景分為 8 組，展開查看詳細教學。")
+    st.info(
+        "💡 **保底主體提示**：以下各模式公式中的「Safety / Safety Stock」字樣，在 Turnday 主體下會自動替換為 "
+        "Turnday 保底（ceil(日銷速 × N日)，計算方法見上方教學）；各模式的固定保底"
+        "（C1 淨存>2、F3/NST 保留2件、ND3/ND4 保留3件、NST 75%上限）不受主體影響。"
+    )
 
     for group_key, group_title, icon in _GROUP_DEFS:
         modes_data = _load_group(group_key)
