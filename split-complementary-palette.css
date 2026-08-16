@@ -1,0 +1,23 @@
+/* Split-complementary Palette */
+:root {
+  --primary-0: #022331;
+  --primary-100: #03384f;
+  --primary-200: #067eb1;
+  --primary-300: #26b9f7;
+  --primary-400: #89d9fb;
+  --secondary-0: #31020b;
+  --secondary-100: #4f0312;
+  --secondary-200: #b10629;
+  --secondary-300: #f72650;
+  --secondary-400: #fb89a0;
+  --accent-0: #312802;
+  --accent-100: #4f4003;
+  --accent-200: #b18f06;
+  --accent-300: #f7cd26;
+  --accent-400: #fbe489;
+  --neutral-0: #17191c;
+  --neutral-100: #3c4048;
+  --neutral-200: #6b7280;
+  --neutral-300: #a0a6b0;
+  --neutral-400: #d8dadf;
+}
