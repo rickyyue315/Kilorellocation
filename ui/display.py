@@ -616,8 +616,8 @@ def render_gap_report(gap_report: dict, current_run_key: str = ""):
                 '實際收/轉量': st.column_config.NumberColumn(format="%d"),
                 '缺口': st.column_config.NumberColumn(format="%d"),
                 '剩餘': st.column_config.NumberColumn(format="%d"),
-                '達成率': st.column_config.ProgressColumn(value_min=0, value_max=100, format="%.1f%%"),
-                '轉出率': st.column_config.ProgressColumn(value_min=0, value_max=100, format="%.1f%%"),
+                '達成率': st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.1f%%"),
+                '轉出率': st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.1f%%"),
             },
         )
 
