@@ -650,57 +650,7 @@ code, pre, .stCode {
     button[data-baseweb="tab"] { padding: 10px 14px !important; font-size: 14px !important; }
 }
 
-/* ── 25. Mode Picker Card ── */
-.mode-pick-card {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-default);
-    border-left: 3px solid var(--brand-orange);
-    border-radius: var(--radius-md);
-    padding: var(--space-3) var(--space-4);
-    margin: var(--space-2) 0 var(--space-3) 0;
-    box-shadow: var(--shadow-sm);
-}
-.mode-pick-card__head {
-    display: flex; align-items: center; gap: var(--space-2);
-    flex-wrap: wrap;
-    margin-bottom: 2px;
-}
-.mode-pick-card__code {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 800; font-size: 1.05rem;
-    color: var(--brand-orange-2);
-}
-.mode-pick-card__name {
-    font-weight: 700; font-size: 0.95rem;
-    color: var(--text-primary);
-    flex: 1 1 auto;
-}
-.mode-pick-card__tag {
-    font-size: 0.82rem; font-weight: 600;
-    color: var(--accent-cyan);
-    margin: 2px 0;
-}
-.mode-pick-card__desc {
-    font-size: 0.82rem; line-height: 1.55;
-    color: var(--text-secondary);
-    margin: 2px 0;
-}
-.mode-pick-card__needs {
-    font-size: 0.82rem; font-weight: 600;
-    color: var(--text-secondary);
-    margin-top: 4px;
-}
-.mode-pick-reason {
-    font-size: 0.82rem; line-height: 1.55;
-    color: #FDE68A;
-    background: var(--warning-bg);
-    border: 1px solid rgba(245, 158, 11, 0.2);
-    border-radius: var(--radius-sm);
-    padding: var(--space-2) var(--space-3);
-    margin-top: 6px;
-}
-
-/* ── 26. prefers-reduced-motion ── */
+/* ── 25. prefers-reduced-motion ── */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
