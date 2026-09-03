@@ -1,5 +1,37 @@
 # 版本更新記錄
 
+## v2.34.0 (2026-09-03)
+
+### 模式選擇器改版：意圖嚮導＋搜尋＋資訊卡（無模式邏輯變更）
+
+#### 變更說明
+- **痛點**：舊版「模式分類（8 組）→ 組內模式 radio」兩級選單要求用戶先理解 B2/B2a/B2L/B3La 等技術代碼差異才能找到正確分組；切換分組會重置選擇；組內 radio 標籤冗長難比較。
+- **新版選擇器（`ui/mode_picker.py`，三入口並存）**：
+  1. **🔍 搜尋直達**：頂部關鍵字搜尋，按代碼／名稱／短標籤／描述／關鍵字篩選全部 30 個模式（例：Target、清貨、ND、跨OM、sku）；清空自動回到嚮導。
+  2. **① 調貨需求嚮導**：6 種業務意圖（📦 日常補貨缺貨互調 / 🏷️ Type分類調撥 / 🧹 ND清貨 / 📌 強制轉出 / 🎯 Target指定分配 / 🔄 ND互轉・SKU精簡）＋「📚 全部模式（8 分組，沿用舊瀏覽）」；選意圖後答 1–2 條跟進問題（如「Type=L 全清還是留2件」「RF 轉出限制」），即得排序候選清單，首位標 **⭐首選**，並顯示推薦理由。
+  3. **② 資訊卡**：選中模式即時顯示短標籤、風險等級（低/中/高）、一句話描述、特殊欄位需求提示（需 Type／ALL／Target）與推薦理由；候選 radio 標籤格式統一為「代碼: 名稱 — 短標籤〔需特殊欄位〕」。
+- **記憶選擇**：候選 radio 按範圍使用獨立 session key（`mode_pick__*`），切換意圖／分組後各範圍的上次選擇會被記住（舊版切組會重置為組內第一個）；首次進入沿用跨範圍舊選擇。
+- **舊用戶無痛遷移**：意圖預設落在目前選中模式所屬意圖；session_state['transfer_mode'] 仍鏡像 canonical "CODE: name" 字串，下游（run_key、模式詳解、教學分組、Excel）零改動。
+- **資料驅動元數據（`models/mode_registry.py`）**：新增 `MODE_TAGLINES`（30 短標籤）、`MODE_KEYWORDS`（搜尋關鍵字）、`MODE_RISKS`（風險等級，與教學 JSON 一致）、`get_intent_groups()`（6 意圖恰好覆蓋 30 模式無重複）、`get_mode_needs()`（特殊欄位提示）、`search_modes()`（子字串搜尋）、`rank_candidates()`（意圖×答案→推薦排序，純函式可單元測試）。
+- **樣式**：`static/styles.css` 新增 `.mode-pick-card` 資訊卡（深色主題、橙色強調、沿用風險徽章）。
+- **側邊欄**：操作指引同步更新；移除與資訊卡重複的模式描述 caption（`ui/sidebar.py` 293 → 291 行）。
+
+#### 修改檔案
+- `ui/mode_picker.py` — 新增（意圖嚮導＋搜尋＋資訊卡＋範圍記憶選擇器）
+- `models/mode_registry.py` — 新增 MODE_TAGLINES / MODE_KEYWORDS / MODE_RISKS / get_intent_groups / get_intent_codes / get_mode_tagline / get_mode_risk / get_mode_needs / search_modes / rank_candidates
+- `ui/sidebar.py` — 接入 render_mode_picker（取代兩級選單）、操作指引更新、移除重複 caption
+- `static/styles.css` — 新增 mode-pick-card 資訊卡樣式
+- `tests/test_mode_picker.py` — 新增（元數據完整性 30 模式覆蓋、搜尋、9 種意圖推薦路徑、helper 解析共 21 項測試）
+- `config.py` — VERSION bump 至 v2.34.0
+- `app.py` — docstring 版本更新
+- `README.md` — 介面操作流程更新
+
+#### 文件同步
+- `README.md` / `VERSION.md` / `config.py` / `app.py` 已同步；模式邏輯零變更，`調貨模式詳解.txt`、`transfer_logic_ai_brief.md`、`ui/tutorial.py` 無需修改
+- 測試：420 → 441 項全數通過
+
+---
+
 ## v2.33.0 (2026-08-16)
 
 ### UI/UX 改進（無模式邏輯變更）

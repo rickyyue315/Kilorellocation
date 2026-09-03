@@ -14,15 +14,10 @@ from config import (
     TURNDAY_MIN_DAYS,
     TURNDAY_MAX_DAYS,
 )
-from models.mode import MODE_DESCRIPTIONS
-from models.mode_registry import (
-    get_receive_limit_codes,
-    get_display_groups,
-    get_ui_options_for_codes,
-)
+from models.mode_registry import get_receive_limit_codes
 from services.perf_timer import ENABLE_PERF, get_perf_records, clear_perf_records
 from ui.mode_docs import MODE_DOCS, GENERAL_DOCS
-from ui.mojibake import fix_mojibake_text
+from ui.mode_picker import render_mode_picker
 
 
 def _render_perf_panel():
@@ -109,8 +104,8 @@ def render_sidebar() -> Dict:
    - 確保包含所有必需欄位
 
 2. **選擇轉貨模式**
-   - 先選「模式分類」，再於組內選擇適合的轉貨模式
-   - 查看模式說明了解各模式特點
+   - 可搜尋關鍵字（如 Target、清貨、跨OM）直達，或選「調貨需求」按嚮導推薦（含⭐首選）
+   - 選中後看資訊卡（短標籤／風險／所需欄位）確認特點
    - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3/ND4，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
    - 若選擇 NST，可設定「HD店舖轉出」及「同一SKU轉出店舖數量上限：10間/20間/不限制」
 
@@ -154,35 +149,9 @@ def render_sidebar() -> Dict:
         st.markdown("---")
 
         st.markdown("### ⚙️ 選擇轉貨模式")
-        display_groups = get_display_groups()
-        group_labels = [label for label, _codes in display_groups]
-        # 依目前選中的模式還原分類（rerun 後仍停留在所屬組）
-        _selected_option = st.session_state.get('transfer_mode', '')
-        _selected_code = (
-            _selected_option.split(":", 1)[0].strip()
-            if ":" in _selected_option else _selected_option.strip()
-        )
-        group_index = next(
-            (i for i, (_label, codes) in enumerate(display_groups) if _selected_code in codes),
-            0,
-        )
-        mode_group = st.selectbox(
-            "模式分類",
-            group_labels,
-            index=group_index,
-            key='mode_group',
-            help="先選模式分類，再於下方選擇組內模式（分組與「📖 模式教學」分頁一致）",
-        )
-        group_codes = next(codes for label, codes in display_groups if label == mode_group)
-        transfer_mode = st.radio(
-            "選擇轉貨模式",
-            get_ui_options_for_codes(group_codes),
-            key='transfer_mode',
-            help="選擇適合的調貨模式",
-            label_visibility="collapsed",
-        )
-        transfer_mode = fix_mojibake_text(transfer_mode)
-        mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
+        # 新版選擇器：🔍搜尋 → ①調貨需求＋②候選（含⭐首選）→ 📚全部模式（8分組）
+        # 回傳 canonical "CODE: name"，下游（run_key／詳解／教学分組）無需改動
+        mode_code, transfer_mode = render_mode_picker()
 
         b_special_max_receive_sites_per_source: Optional[int] = None
         b_special_receive_site_limit_option = "最多 2 間"
@@ -291,8 +260,6 @@ def render_sidebar() -> Dict:
             )
         else:
             st.session_state.pop('c1_ceiling', None)
-
-        st.caption(MODE_DESCRIPTIONS.get(transfer_mode, ""))
 
         with st.expander(f"📋 目前模式詳解：{mode_code}", expanded=False):
             st.markdown(MODE_DOCS.get(mode_code, "（此模式暫無詳細說明，請參考「📖 模式教學」分頁。）"))
