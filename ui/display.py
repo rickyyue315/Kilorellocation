@@ -366,14 +366,14 @@ def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_
     total_qty = sum(r['Transfer Qty'] for r in recommendations)
 
     _priority_stats = [
-        ('🔴 高優先', len(groups['🔴高優先']), '#FF4444'),
-        ('🟡 中優先', len(groups['🟡中優先']), '#FFAA00'),
-        ('🟢 低優先', len(groups['🟢低優先']), '#00CC88'),
+        ('🔴 高優先', len(groups['🔴高優先']), '#DC2626'),
+        ('🟡 中優先', len(groups['🟡中優先']), '#D97706'),
+        ('🟢 低優先', len(groups['🟢低優先']), '#059669'),
     ]
     _chips = "".join(
         f'<div style="flex:1;text-align:center;padding:calc(var(--space-3) + 2px) var(--space-3);'
         f'border:1px solid {color}55;border-left:3px solid {color};'
-        f'border-radius:var(--radius-md);background:rgba(17,24,39,0.6);">'
+        f'border-radius:var(--radius-md);background:rgba(255,255,255,0.6);">'
         f'<div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);'
         f'letter-spacing:0.05em;">{label}</div>'
         f'<div style="font-size:1.5rem;font-weight:800;color:{color};line-height:1.3;'

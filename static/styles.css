@@ -1,6 +1,6 @@
 <style>
 /* ═══════════════════════════════════════════════════════
-   KiLo Reallocation — Modern Minimal Dark UI
+   KiLo Reallocation — Modern Minimal Light UI (Day Mode)
    Version: 2026.06
    ═══════════════════════════════════════════════════════ */
 
@@ -8,38 +8,38 @@
 
 /* ── 1. Design Tokens ── */
 :root {
-    --bg-canvas:        #0B0F19;
-    --bg-surface:       #111827;
-    --bg-elevated:      #1A2332;
-    --bg-overlay:       rgba(17, 24, 39, 0.72);
+    --bg-canvas:        #F8FAFC;
+    --bg-surface:       #FFFFFF;
+    --bg-elevated:      #F1F5F9;
+    --bg-overlay:       rgba(255, 255, 255, 0.80);
 
-    --border-subtle:    rgba(255, 255, 255, 0.06);
-    --border-default:   #1E293B;
-    --border-strong:    #334155;
-    --border-accent:    rgba(245, 158, 11, 0.35);
+    --border-subtle:    rgba(15, 23, 42, 0.06);
+    --border-default:   #E2E8F0;
+    --border-strong:    #CBD5E1;
+    --border-accent:    rgba(217, 119, 6, 0.40);
 
-    --text-primary:     #F8FAFC;
-    --text-secondary:   #CBD5E1;
-    --text-muted:       #94A3B8;
-    --text-disabled:    #64748B;
+    --text-primary:     #0F172A;
+    --text-secondary:   #334155;
+    --text-muted:       #64748B;
+    --text-disabled:    #94A3B8;
 
-    --brand-orange:     #F59E0B;
-    --brand-orange-2:   #FBBF24;
-    --brand-orange-3:   #D97706;
-    --accent-cyan:      #22D3EE;
-    --accent-blue:      #60A5FA;
-    --accent-violet:    #A78BFA;
-    --accent-emerald:   #34D399;
-    --accent-rose:      #FB7185;
+    --brand-orange:     #D97706;
+    --brand-orange-2:   #F59E0B;
+    --brand-orange-3:   #B45309;
+    --accent-cyan:      #0891B2;
+    --accent-blue:      #2563EB;
+    --accent-violet:    #7C3AED;
+    --accent-emerald:   #059669;
+    --accent-rose:      #E11D48;
 
-    --success:          #10B981;
-    --success-bg:       rgba(16, 185, 129, 0.10);
-    --warning:          #F59E0B;
-    --warning-bg:       rgba(245, 158, 11, 0.10);
-    --error:            #EF4444;
-    --error-bg:         rgba(239, 68, 68, 0.10);
-    --info:             #3B82F6;
-    --info-bg:          rgba(59, 130, 246, 0.10);
+    --success:          #059669;
+    --success-bg:       rgba(5, 150, 105, 0.10);
+    --warning:          #D97706;
+    --warning-bg:       rgba(217, 119, 6, 0.10);
+    --error:            #DC2626;
+    --error-bg:         rgba(220, 38, 38, 0.08);
+    --info:             #2563EB;
+    --info-bg:          rgba(37, 99, 235, 0.08);
 
     --space-1: 4px;  --space-2: 8px;   --space-3: 12px;
     --space-4: 16px; --space-5: 24px;  --space-6: 32px;
@@ -48,10 +48,10 @@
     --radius-sm: 6px;  --radius-md: 10px;
     --radius-lg: 14px; --radius-xl: 20px;
 
-    --shadow-sm:  0 1px 2px rgba(0,0,0,0.20);
-    --shadow-md:  0 4px 16px rgba(0,0,0,0.30);
-    --shadow-lg:  0 12px 40px rgba(0,0,0,0.45);
-    --shadow-glow: 0 0 0 1px var(--border-accent), 0 8px 28px rgba(245,158,11,0.18);
+    --shadow-sm:  0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-md:  0 4px 16px rgba(15, 23, 42, 0.10);
+    --shadow-lg:  0 12px 40px rgba(15, 23, 42, 0.14);
+    --shadow-glow: 0 0 0 1px var(--border-accent), 0 8px 28px rgba(245, 158, 11, 0.16);
 
     --ease-out:  cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in:   cubic-bezier(0.4, 0, 1, 1);
@@ -92,7 +92,7 @@ html, body, .stApp {
 section[data-testid="stSidebar"] {
     background-color: var(--bg-surface) !important;
     border-right: 1px solid var(--border-default) !important;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.08);
 }
 section[data-testid="stSidebar"] .block-container {
     padding: var(--space-5) !important;
@@ -263,7 +263,7 @@ div[data-testid="stMetricLabel"] {
 
 .stButton > button[kind="primary"],
 .stDownloadButton > button[kind="primary"] {
-    background: linear-gradient(135deg, var(--brand-orange) 0%, var(--brand-orange-3) 100%) !important;
+    background: linear-gradient(135deg, var(--brand-orange) 0%, var(--brand-orange-2) 100%) !important;
     color: #0B0F19 !important;
     border: none !important;
     box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25);
@@ -271,7 +271,7 @@ div[data-testid="stMetricLabel"] {
 }
 .stButton > button[kind="primary"]:hover,
 .stDownloadButton > button[kind="primary"]:hover {
-    background: linear-gradient(135deg, var(--brand-orange-2) 0%, var(--brand-orange) 100%) !important;
+    background: linear-gradient(135deg, var(--brand-orange-3) 0%, var(--brand-orange) 100%) !important;
     transform: translateY(-2px);
     box-shadow: 0 8px 28px rgba(245, 158, 11, 0.40);
 }
@@ -438,10 +438,10 @@ div[data-testid="stExpander"] summary svg { color: var(--text-muted); }
     border-left-width: 4px !important;
     backdrop-filter: blur(6px);
 }
-.stSuccess { background: var(--success-bg) !important; color: #6EE7B7 !important; border-left-color: var(--success) !important; }
-.stInfo    { background: var(--info-bg) !important;    color: #93C5FD !important; border-left-color: var(--info) !important; }
-.stWarning { background: var(--warning-bg) !important; color: #FDE68A !important; border-left-color: var(--warning) !important; }
-.stError   { background: var(--error-bg) !important;   color: #FCA5A5 !important; border-left-color: var(--error) !important; }
+.stSuccess { background: var(--success-bg) !important; color: #047857 !important; border-left-color: var(--success) !important; }
+.stInfo    { background: var(--info-bg) !important;    color: #1D4ED8 !important; border-left-color: var(--info) !important; }
+.stWarning { background: var(--warning-bg) !important; color: #B45309 !important; border-left-color: var(--warning) !important; }
+.stError   { background: var(--error-bg) !important;   color: #B91C1C !important; border-left-color: var(--error) !important; }
 .stSuccess svg { color: var(--success) !important; }
 .stInfo svg    { color: var(--info) !important; }
 .stWarning svg { color: var(--warning) !important; }
@@ -508,11 +508,11 @@ code, pre, .stCode {
     border: 1px solid var(--border-default);
     border-radius: var(--radius-lg);
     margin: var(--space-3) 0;
-    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: inset 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 .flow-node {
     padding: 8px 12px;
-    background: rgba(15, 30, 61, 0.6);
+    background: rgba(37, 99, 235, 0.08);
     border: 2px solid var(--accent-blue);
     border-radius: var(--radius-sm);
     text-align: center;
@@ -522,12 +522,12 @@ code, pre, .stCode {
     transition: transform var(--dur-fast) var(--ease-out);
 }
 .flow-node:hover { transform: scale(1.04); }
-.flow-node--green  { background: rgba(5, 46, 22, 0.6);  border-color: var(--accent-emerald); }
-.flow-node--red    { background: rgba(69, 10, 10, 0.6);  border-color: var(--error); }
-.flow-node--yellow { background: rgba(61, 29, 6, 0.6);   border-color: var(--brand-orange-2); }
-.flow-node--purple { background: rgba(37, 14, 74, 0.6);  border-color: var(--accent-violet); }
-.flow-node--gray   { background: rgba(30, 30, 46, 0.6);  border-color: var(--text-muted); }
-.flow-node--orange { background: rgba(67, 20, 7, 0.6);   border-color: var(--brand-orange); }
+.flow-node--green  { background: rgba(5, 150, 105, 0.10);  border-color: var(--accent-emerald); }
+.flow-node--red    { background: rgba(220, 38, 38, 0.08);  border-color: var(--error); }
+.flow-node--yellow { background: rgba(217, 119, 6, 0.12);  border-color: var(--brand-orange-2); }
+.flow-node--purple { background: rgba(124, 58, 237, 0.10); border-color: var(--accent-violet); }
+.flow-node--gray   { background: rgba(100, 116, 139, 0.10); border-color: var(--text-muted); }
+.flow-node--orange { background: rgba(249, 115, 22, 0.10); border-color: var(--brand-orange); }
 .flow-label {
     font-weight: 600; font-size: 14px;
     color: var(--text-primary);
@@ -549,9 +549,9 @@ code, pre, .stCode {
 .mode-scenario { font-size: 14px; line-height: 1.6; color: var(--text-secondary); margin: var(--space-2) 0 var(--space-4) 0; }
 .mode-notes {
     font-size: 13.5px; line-height: 1.6;
-    color: #FDE68A;
+    color: #92400E;
     background: var(--warning-bg);
-    border: 1px solid rgba(245, 158, 11, 0.2);
+    border: 1px solid rgba(217, 119, 6, 0.25);
     border-radius: var(--radius-sm);
     padding: var(--space-3) var(--space-4);
     margin: var(--space-3) 0;
@@ -603,7 +603,7 @@ code, pre, .stCode {
     overflow: hidden;
 }
 .scenario-table th {
-    background: var(--brand-orange); color: var(--bg-canvas);
+    background: var(--brand-orange-3); color: #FFFFFF;
     padding: 8px 12px; text-align: center; font-weight: 700; font-size: 12.5px;
     border-bottom: 1px solid rgba(0,0,0,0.1);
 }

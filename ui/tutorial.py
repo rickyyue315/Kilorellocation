@@ -239,7 +239,7 @@ v2.32.0 起，側邊欄提供兩種**保底主體**，可與全部 30 個調貨�
 
     _formula_svg = _ASSETS_DIR / 'turnday_formula.svg'
     if _formula_svg.exists():
-        st.image(str(_formula_svg), use_container_width=True)
+        st.image(_formula_svg.read_text(encoding="utf-8"), use_container_width=True)
 
     st.markdown("""
 **計算公式（通式）：**
@@ -254,7 +254,7 @@ v2.32.0 起，側邊欄提供兩種**保底主體**，可與全部 30 個調貨�
     _compare_svg = _ASSETS_DIR / 'turnday_compare.svg'
     if _compare_svg.exists():
         st.markdown("#### 保底效果對比（N=14日示例）")
-        st.image(str(_compare_svg), use_container_width=True)
+        st.image(_compare_svg.read_text(encoding="utf-8"), use_container_width=True)
 
     st.markdown("""
 **模式受影響程度：**
