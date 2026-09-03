@@ -1,36 +1,34 @@
 """
-UI 輔助結構測試 — 顯示分組與模式文檔的完整性（防止新增模式時漏配）
+UI 輔助結構測試 — 模式選項與文檔的完整性（防止新增模式時漏配）
 """
 
 import unittest
 
 from models.mode_registry import (
     MODE_DEFS,
-    get_display_groups,
-    get_ui_options_for_codes,
+    get_ui_options,
 )
 from ui.mode_docs import MODE_DOCS, GENERAL_DOCS
 
 
-class TestDisplayGroups(unittest.TestCase):
-    def test_display_groups_cover_all_modes_exactly_once(self):
-        """8 個顯示分組應恰好覆蓋全部 30 個模式，且無重複。"""
+class TestUiOptions(unittest.TestCase):
+    def test_ui_options_cover_all_modes_exactly_once(self):
+        """get_ui_options() 應恰好覆蓋全部 30 個模式，且無重複。"""
         all_codes = [d.code for d in MODE_DEFS]
-        grouped_codes = [code for _label, codes in get_display_groups() for code in codes]
+        option_codes = [o.split(":", 1)[0].strip() for o in get_ui_options()]
 
         self.assertEqual(len(all_codes), 30)
-        self.assertEqual(sorted(grouped_codes), sorted(all_codes))
-        self.assertEqual(len(grouped_codes), len(set(grouped_codes)), "分組內模式不可重複")
+        self.assertEqual(sorted(option_codes), sorted(all_codes))
+        self.assertEqual(len(option_codes), len(set(option_codes)), "選項不可重複")
 
-    def test_ui_options_for_codes_format(self):
+    def test_ui_options_format(self):
         """選項字串須維持 "CODE: name" 格式（app.py 以 split(":", 1) 解析）。"""
-        for label, codes in get_display_groups():
-            options = get_ui_options_for_codes(codes)
-            self.assertEqual(len(options), len(codes), f"群組「{label}」選項數量不符")
-            for option in options:
-                self.assertIn(":", option)
-                code, _name = option.split(":", 1)
-                self.assertIn(code.strip(), codes)
+        options = get_ui_options()
+        self.assertEqual(len(options), len(MODE_DEFS), "選項數量不符")
+        for option in options:
+            self.assertIn(":", option)
+            code, _name = option.split(":", 1)
+            self.assertIn(code.strip(), [d.code for d in MODE_DEFS])
 
 
 class TestModeDocs(unittest.TestCase):

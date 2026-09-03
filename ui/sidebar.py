@@ -17,8 +17,7 @@ from config import (
 from models.mode import MODE_DESCRIPTIONS
 from models.mode_registry import (
     get_receive_limit_codes,
-    get_display_groups,
-    get_ui_options_for_codes,
+    get_ui_options,
 )
 from services.perf_timer import ENABLE_PERF, get_perf_records, clear_perf_records
 from ui.mode_docs import MODE_DOCS, GENERAL_DOCS
@@ -109,8 +108,7 @@ def render_sidebar() -> Dict:
    - 確保包含所有必需欄位
 
 2. **選擇轉貨模式**
-   - 先選「模式分類」，再於組內選擇適合的轉貨模式
-   - 查看模式說明了解各模式特點
+   - 在側邊欄「選擇轉貨模式」中選擇適合的轉貨模式（全部 30 個模式一次列出，不分類）
    - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3/ND4，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
    - 若選擇 NST，可設定「HD店舖轉出」及「同一SKU轉出店舖數量上限：10間/20間/不限制」
 
@@ -154,31 +152,11 @@ def render_sidebar() -> Dict:
         st.markdown("---")
 
         st.markdown("### ⚙️ 選擇轉貨模式")
-        display_groups = get_display_groups()
-        group_labels = [label for label, _codes in display_groups]
-        # 依目前選中的模式還原分類（rerun 後仍停留在所屬組）
-        _selected_option = st.session_state.get('transfer_mode', '')
-        _selected_code = (
-            _selected_option.split(":", 1)[0].strip()
-            if ":" in _selected_option else _selected_option.strip()
-        )
-        group_index = next(
-            (i for i, (_label, codes) in enumerate(display_groups) if _selected_code in codes),
-            0,
-        )
-        mode_group = st.selectbox(
-            "模式分類",
-            group_labels,
-            index=group_index,
-            key='mode_group',
-            help="先選模式分類，再於下方選擇組內模式（分組與「📖 模式教學」分頁一致）",
-        )
-        group_codes = next(codes for label, codes in display_groups if label == mode_group)
         transfer_mode = st.radio(
             "選擇轉貨模式",
-            get_ui_options_for_codes(group_codes),
+            get_ui_options(),
             key='transfer_mode',
-            help="選擇適合的調貨模式",
+            help="選擇適合的調貨模式（全部 30 個模式，不分組）",
             label_visibility="collapsed",
         )
         transfer_mode = fix_mojibake_text(transfer_mode)

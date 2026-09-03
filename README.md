@@ -1,4 +1,4 @@
-# KiLo 庫存調貨建議系統 v2.33.0
+# KiLo 庫存調貨建議系統 v2.34.0
 
 ## 系統概述
 
@@ -256,7 +256,7 @@ streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.hea
 ## 介面操作流程
 
 1. 上傳 Excel（上載區可一併設定 MTD 數據日期，通常 T-1；僅 Turnday 主體用於計算日銷速）。
-2. 選擇保底主體（Safety Stock / Turnday＋日數），再於「模式分類 → 選擇轉貨模式」兩級選單選擇模式（8 組分類與「模式教學」分頁一致；側邊欄只顯示目前模式的詳解）。
+2. 選擇保底主體（Safety Stock / Turnday＋日數），再於「選擇轉貨模式」一次選取全部 30 個調貨模式（不分類；側邊欄只顯示目前模式的詳解）。
 3. 若為 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3/ND4，可設定接收店數限制。若為 NST，可設定 HD 轉出選項及同一 SKU 轉出店數上限。
 4. 點擊「生成調貨建議」（分析進度以狀態面板逐步顯示：演算法 → 品質檢查 → 統計與缺口分析）。
 5. 檢視 KPI、「📈 圖表概覽」（類型分佈／OM 對比／Top 10 商品）、調貨建議與統計（缺口分析的達成率／轉出率以進度條呈現，可排序）。
@@ -333,5 +333,5 @@ python -m pytest tests/test_b2_b3_source_receive_site_limit.py tests/test_b2_pri
 
 ## 版本
 
-- 目前版本：`v2.26.0`
+- 目前版本：`v2.34.0`
 - 詳細異動請見 `VERSION.md`

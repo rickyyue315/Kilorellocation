@@ -1,5 +1,28 @@
 # 版本更新記錄
 
+## v2.34.0 (2026-09-03)
+
+### 模式選擇器簡化（無模式邏輯變更）
+
+#### 變更說明
+- **模式選擇 UX**：「模式分類（8 組）→ 組內模式」兩級選擇改回 30 個選項平面 radio，全部模式一次列出、不分類（依照使用者反饋）。
+- 側邊欄「選擇轉貨模式」改為 `get_ui_options()` 直接顯示全部 30 個模式，操作指引同步更新。
+- 移除 `models/mode_registry.py` 的 `_DISPLAY_GROUPS` / `get_display_groups()` / `get_ui_options_for_codes()`（不再使用）；`get_ui_options()` 原樣保留。
+- `tests/test_ui_helpers.py` 更新：顯示分組測試改為 `get_ui_options()` 覆蓋全部 30 模式且不重複、格式維持 `"CODE: name"`。
+
+#### 修改檔案
+- `ui/sidebar.py` — 兩級選擇器改回平面 radio、操作指引更新
+- `models/mode_registry.py` — 移除分組輔助函式（get_ui_options 保留）
+- `tests/test_ui_helpers.py` — 測試改為選項完整性與格式
+- `config.py` — VERSION bump 至 v2.34.0
+- `app.py` — docstring 版本更新
+- `README.md` — 介面操作流程版本對齊
+
+#### 文件同步
+- `README.md` / `VERSION.md` / `config.py` / `app.py` 已同步；`ui/tutorial.py`（教學分頁分組屬教學展示，維持不變）、`調貨模式詳解.txt` 與 `transfer_logic_ai_brief.md` 無需變更（無模式新增／移除／邏輯修改，僅 UI 層重組）。
+
+---
+
 ## v2.33.0 (2026-08-16)
 
 ### UI/UX 改進（無模式邏輯變更）
