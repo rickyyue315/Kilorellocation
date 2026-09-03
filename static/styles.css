@@ -116,6 +116,58 @@ section[data-testid="stSidebar"] .stCaption span {
     overflow-wrap: break-word !important;
 }
 
+/* ── 3b. Sidebar 字體縮放（白天模式優化：整體縮小） ── */
+section[data-testid="stSidebar"] {
+    font-size: 0.82rem !important;
+}
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] h4 {
+    font-size: 1.05rem !important;
+    margin: var(--space-2) 0 !important;
+}
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] li {
+    font-size: 0.82rem !important;
+    line-height: 1.55 !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stWidgetLabel"] {
+    font-size: 12.5px !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] > label {
+    font-size: 0.85rem !important;
+    margin-bottom: var(--space-1) !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label {
+    font-size: 0.78rem !important;
+    padding: 5px 10px !important;
+    line-height: 1.4 !important;
+}
+section[data-testid="stSidebar"] .stButton > button,
+section[data-testid="stSidebar"] .stDownloadButton > button {
+    font-size: 13px !important;
+    padding: 9px 20px !important;
+}
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div,
+section[data-testid="stSidebar"] .stNumberInput input,
+section[data-testid="stSidebar"] .stTextInput input,
+section[data-testid="stSidebar"] .stDateInput input {
+    font-size: 13px !important;
+    min-height: 38px !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stExpander"] summary {
+    font-size: 13px !important;
+    padding: 10px 14px !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stCheckbox"] {
+    font-size: 13px !important;
+}
+section[data-testid="stSidebar"] .stCaption,
+section[data-testid="stSidebar"] [data-testid="stCaption"] {
+    font-size: 0.75rem !important;
+}
+
 /* ── 4. Typography Hierarchy ── */
 h1, h2, h3, h4, h5, h6 {
     color: var(--text-primary) !important;
