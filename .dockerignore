@@ -28,6 +28,7 @@ Old App chi text.txt
 
 # 測試與輸出
 tests
+requirements-dev.txt
 stderr*.txt
 test_output.txt
 test_result.txt
