@@ -177,15 +177,11 @@ streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.hea
 
 ### 部署設定建議
 
-1. **偵測方式**：Zeabur 會優先使用 `Dockerfile`（鎖定 Python 3.11）。
+1. **偵測方式**：Zeabur 會優先使用 `Dockerfile`（鎖定 Python 3.13、layer cache 加速重建）。
 2. **Port**：啟動命令已讀取 Zeabur 注入的 `PORT` 環境變數，無需手動設定。
 3. **Health Check**：在 Zeabur Service 的 Networking/Health Check 設定路徑為 `/_stcore/health`（Streamlit 內建健康端點，回傳 `ok`），避免部署後被誤判為 unhealthy 而重啟循環。
 4. **上傳大小**：`maxUploadSize` 已對齊應用層 50MB 上限（`.streamlit/config.toml`），防止小容器因大型暫存而 OOM。
-5. **加速重新部署**：依賴已預先安裝在基底映像 `rickyyue315/kilo-reallocation-base`（Docker Hub，由 GitHub Actions 在 `requirements.txt` 變更時自動重建），`Dockerfile` 直接 `FROM` 該映像，部署時不再逐次 `pip install`，重新部署時間由約 5 分鐘降至約 1~2 分鐘。
-   - **適用 private repo**：基底映像只包含公開的 open-source 套件（Python 3.11-slim + PyPI 依賴），不含任何專案程式碼，因此 GitHub repo 維持 private 亦無洩漏風險。
-   - **一次性設定**：到 GitHub repo → Settings → Secrets and variables → Actions 新增 `DOCKERHUB_USERNAME` 與 `DOCKERHUB_TOKEN`（Docker Hub Access Token，於 https://hub.docker.com/settings/security 產生）；首次可到 Actions 頁面手動觸發 "Build Base Image" workflow 預建基底映像。
-   - 若公司已有 Azure 訂閱，也可改用 ACR（Azure Container Registry）per-repo 啟用 Anonymous Pull 來取代 Docker Hub，做法相同。
-6. **環境變數**：
+5. **環境變數**：
 
    | 變數 | 預設 | 說明 |
    | --- | --- | --- |

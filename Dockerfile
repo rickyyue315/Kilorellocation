@@ -1,13 +1,22 @@
 # KiLo 庫存調貨建議系統 — Zeabur / 通用 Docker 映像
-# 依賴已預先安裝於 Docker Hub 上的基底映像（見 docker/Dockerfile.base 與 .github/workflows/build-base-image.yml），
-# Zeabur 每次部署只須拉取基底映像 + 複製程式碼，不必逐次 pip install（省約 3~5 分鐘）。
-# 基底映像只含公開 open-source 依賴（不含本專案程式碼），repo 保持 private 亦無洩漏風險。
-ARG BASE_IMAGE=rickyyue315/kilo-reallocation-base:latest
-FROM ${BASE_IMAGE}
+# 鎖定 Python 版本以確保 Zeabur 部署與本機開發環境一致
+FROM python:3.11-slim
+
+# 效能與穩定性：停用位元組碼快取（容器內不需要）、管線輸出即時 flush
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
-# 複製應用程式碼（變動頻率較高）
+# 先僅複製依賴檔，利用 Docker layer cache 加速重建
+COPY requirements.txt runtime.txt ./
+
+# 安裝依賴
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 再複製應用程式碼（變動頻率較高）
 COPY . .
 
 # Streamlit 預設埠；Zeabur 會注入 PORT 環境變數

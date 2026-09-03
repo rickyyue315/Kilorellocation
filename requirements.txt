@@ -1,5 +1,4 @@
 # ── 執行期依賴（鎖定為已通過 354 項測試的版本，確保 Zeabur 部署與本機一致）──
-# 測試依賴（pytest）已移至 requirements-dev.txt，不進入部署映像
 pandas==2.3.3
 numpy==2.4.2
 openpyxl==3.1.5
@@ -8,3 +7,6 @@ xlsxwriter==3.2.9
 streamlit==1.51.0
 ftfy==6.3.1
 httpx==0.28.1
+
+# ── 開發/測試 ──
+pytest==9.0.2
