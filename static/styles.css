@@ -796,10 +796,12 @@ code, pre, .stCode {
     font-size: 0.78rem; line-height: 1.6; color: var(--text-secondary);
 }
 .side-summary strong { color: var(--text-primary); }
-/* 僅長選單（≥10 個選項）啟用內部捲動，短選單不受影響 */
-section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"]:has(> label:nth-child(10)) {
-    max-height: 340px;
+/* 側邊欄選單：垂直上下捲動（短選單不足高度時此規則無作用，長選單自動出現直向捲軸） */
+section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] {
+    max-height: 360px;
     overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
     scroll-behavior: smooth;
 }
 
