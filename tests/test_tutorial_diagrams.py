@@ -95,6 +95,21 @@ class TestCompactLayout(unittest.TestCase):
         groups = [("組", [(m["code"], m.get("risk", "中")) for m in _load_all_modes()[:4]], "用途", "僅同OM")]
         self.assertLessEqual(_svg_height(td.build_overview_map_svg(groups * 4)), 560)
 
+    def test_global_and_floor_svg(self):
+        import xml.etree.ElementTree as ET
+        g = td.build_global_rules_svg()
+        self.assertTrue(g.startswith("<svg"))
+        ET.fromstring(g)
+        self.assertLessEqual(_svg_height(g), 480)
+        for keyword in ("ND", "雙重角色", "單件"):
+            self.assertIn(keyword, g)
+        f = td.build_floor_body_svg()
+        self.assertTrue(f.startswith("<svg"))
+        ET.fromstring(f)
+        self.assertLessEqual(_svg_height(f), 520)
+        for keyword in ("Safety", "Turnday", "30"):
+            self.assertIn(keyword, f)
+
 
 if __name__ == "__main__":
     unittest.main()

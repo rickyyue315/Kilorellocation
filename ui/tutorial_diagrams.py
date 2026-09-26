@@ -339,6 +339,117 @@ def build_overview_map_svg(groups: list) -> str:
     return "".join(p)
 
 
+_GLOBAL_RULES = [
+    ("1", "ND 店舖限制", "只能做轉出方，不可接收（ND1–ND4 / 有 Target 的 F 系列 ND 除外）",
+     "#DC2626", "rgba(220,38,38,0.08)"),
+    ("2", "最高動銷店保護", "RF 中有效銷量最高店不會被選為轉出方",
+     "#7C3AED", "rgba(124,58,237,0.08)"),
+    ("3", "避免雙重角色", "同一 SKU 的轉出店絕不能同時做接收店",
+     "#DC2626", "rgba(220,38,38,0.08)"),
+    ("4", "單件後處理", "消除 Transfer Qty = 1（優先 Rebalance，其次 Merge）",
+     "#D97706", "rgba(217,119,6,0.08)"),
+]
+
+
+def build_global_rules_svg() -> str:
+    """全局規則圖：4 條適用所有模式，垂直流程一覽。"""
+    W = 1160
+    top, row_h = 84, 76
+    H = top + len(_GLOBAL_RULES) * row_h + 16
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
+         f'viewBox="0 0 {W} {H}" font-family="{_FONT}">']
+    p.append(f'<rect x="0" y="0" width="{W}" height="{H}" rx="16" fill="#FFFFFF" '
+             f'stroke="#E2E8F0" stroke-width="1.5"/>')
+    p.append(f'<text x="28" y="40" font-size="19" font-weight="bold" fill="#0F172A">'
+             f'{_xesc("全局規則 — 4 條適用全部 30 個模式")}</text>')
+    p.append(f'<text x="28" y="62" font-size="12.5" fill="#64748B">'
+             f'{_xesc("由上而下：先過濾資格 ➜ 再配對 ➜ 最後整理單件")}</text>')
+    for i, (num, title, desc, color, bg) in enumerate(_GLOBAL_RULES):
+        y = top + i * row_h
+        p.append(f'<rect x="28" y="{y}" width="{W - 56}" height="62" rx="10" '
+                 f'fill="{bg}" stroke="{color}" stroke-width="1.5"/>')
+        p.append(f'<circle cx="62" cy="{y + 31}" r="13" fill="{color}"/>')
+        p.append(f'<text x="62" y="{y + 36}" font-size="13" font-weight="bold" '
+                 f'fill="#FFFFFF" text-anchor="middle">{num}</text>')
+        p.append(f'<text x="88" y="{y + 36}" font-size="13.5" fill="#0F172A">'
+                 f'<tspan font-weight="bold">{_xesc(title)}</tspan>'
+                 f'<tspan dx="10" fill="#334155">{_xesc(desc)}</tspan></text>')
+        if i < len(_GLOBAL_RULES) - 1:
+            p.append(f'<text x="{W // 2}" y="{y + 62 + 12}" font-size="14" '
+                     f'fill="#94A3B8" text-anchor="middle">↓</text>')
+    p.append("</svg>")
+    return "".join(p)
+
+
+_FLOOR_SAFETY_POINTS = [
+    "保底 = 上載檔 Safety Stock",
+    "固定值，不隨銷速變化",
+    "風險低 · 行為同 v2.31",
+]
+_FLOOR_TURNDAY_POINTS = [
+    "保底 = ceil(日銷速 × N日)",
+    "快銷高保底 · 滯銷低保底",
+    "零銷量 = 0，可全數轉出",
+]
+
+
+def build_floor_body_svg() -> str:
+    """保底主體圖：Safety vs Turnday 雙分支，下接 30 模式。"""
+    W = 1160
+    y_top_box, top_box_h = 80, 46
+    y_panels = 156
+    panel_w = 460
+    xs = [90, 610]
+    row_h = 54
+    panel_h = 38 + len(_FLOOR_SAFETY_POINTS) * row_h + 10
+    y_bottom = y_panels + panel_h + 36
+    H = y_bottom + 52 + 40
+    panels = [
+        ("Safety 主體", "#059669", "rgba(5,150,105,0.08)", _FLOOR_SAFETY_POINTS),
+        ("Turnday 主體", "#7C3AED", "rgba(124,58,237,0.08)", _FLOOR_TURNDAY_POINTS),
+    ]
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
+         f'viewBox="0 0 {W} {H}" font-family="{_FONT}">']
+    p.append(f'<rect x="0" y="0" width="{W}" height="{H}" rx="16" fill="#FFFFFF" '
+             f'stroke="#E2E8F0" stroke-width="1.5"/>')
+    p.append(f'<text x="28" y="40" font-size="19" font-weight="bold" fill="#0F172A">'
+             f'{_xesc("保底主體 — Safety vs Turnday（可與 30 模式任意組合）")}</text>')
+    p.append(f'<text x="28" y="62" font-size="12.5" fill="#64748B">'
+             f'{_xesc("先選保底點樣計 ➜ 再選調貨模式；兩者正交組合")}</text>')
+    p.append(f'<rect x="380" y="{y_top_box}" width="400" height="{top_box_h}" rx="10" '
+             f'fill="rgba(37,99,235,0.08)" stroke="#2563EB" stroke-width="1.5"/>')
+    p.append(f'<text x="580" y="{y_top_box + 29}" font-size="13.5" fill="#0F172A" '
+             f'text-anchor="middle">{_xesc("上載 Excel ＋ MTD數據日期（T-1）")}</text>')
+    p.append(f'<text x="580" y="{y_top_box + top_box_h + 18}" font-size="16" '
+             f'fill="#94A3B8" text-anchor="middle">↓</text>')
+    for (title, color, bg, points), x in zip(panels, xs):
+        p.append(f'<rect x="{x}" y="{y_panels}" width="{panel_w}" height="{panel_h}" '
+                 f'rx="12" fill="{bg}" stroke="{color}" stroke-width="1.5"/>')
+        p.append(f'<rect x="{x + 12}" y="{y_panels + 8}" width="150" height="26" rx="13" '
+                 f'fill="{color}"/>')
+        p.append(f'<text x="{x + 87}" y="{y_panels + 26}" font-size="13" font-weight="bold" '
+                 f'fill="#FFFFFF" text-anchor="middle">{_xesc(title)}</text>')
+        for j, pt in enumerate(points):
+            by = y_panels + 42 + j * row_h
+            p.append(f'<rect x="{x + 12}" y="{by}" width="{panel_w - 24}" height="44" rx="8" '
+                     f'fill="#FFFFFF" stroke="{color}" stroke-width="1.2"/>')
+            p.append(f'<circle cx="{x + 32}" cy="{by + 22}" r="4" fill="{color}"/>')
+            p.append(f'<text x="{x + 46}" y="{by + 27}" font-size="13" fill="#0F172A">'
+                     f'{_xesc(pt)}</text>')
+    for ax in (xs[0] + panel_w // 2, xs[1] + panel_w // 2):
+        p.append(f'<text x="{ax}" y="{y_panels + panel_h + 24}" font-size="16" '
+                 f'fill="#94A3B8" text-anchor="middle">↓</text>')
+    p.append(f'<rect x="180" y="{y_bottom}" width="800" height="52" rx="10" '
+             f'fill="rgba(217,119,6,0.12)" stroke="#D97706" stroke-width="1.8"/>')
+    p.append(f'<text x="580" y="{y_bottom + 32}" font-size="14" font-weight="bold" '
+             f'fill="#0F172A" text-anchor="middle">'
+             f'{_xesc("所有 Safety 觸點自動切換 ➜ 30 個模式同一套邏輯")}</text>')
+    p.append(f'<text x="580" y="{H - 12}" font-size="11.5" fill="#94A3B8" text-anchor="middle">'
+             f'{_xesc("固定保底不受主體影響：C1 淨存>2 / F3·NST 保留2件 / ND3·ND4 保留3件 / NST 75%上限")}</text>')
+    p.append("</svg>")
+    return "".join(p)
+
+
 _DEFAULT_BRANCHES = [
     ("清理無銷售 ND 庫存？", "D / D2", "#D97706"),
     ("有 Target 目標數量？", "F / F2 / F3 / NST", "#7C3AED"),

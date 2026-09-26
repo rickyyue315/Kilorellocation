@@ -340,29 +340,8 @@ def _render_group(group_title, icon, modes_data, group_key=None):
 
 def _render_global_rules():
     st.markdown("### 全局規則（適用於所有模式）")
-
-    flow = _flow_row([_flow_node("所有店舖資料", "blue")])
-    flow += _flow_arrow()
-    flow += _flow_row([_flow_node("ND 店舖？", "yellow")])
-    flow += _flow_row([
-        _flow_node("僅作轉出方<br>不可接收", "red"),
-        _flow_node("RF 店舖", "green"),
-    ])
-    flow += _flow_arrow("RF 最高動銷店保護")
-    flow += _flow_row([
-        _flow_node("最高銷量店保護<br>不會被選為轉出方", "purple"),
-        _flow_node("轉出候選", "green"),
-    ])
-    flow += _flow_arrow()
-    flow += _flow_row([
-        _flow_node("轉出店不可同時<br>作為同一SKU的接收店", "red"),
-    ])
-    flow += _flow_arrow("後處理")
-    flow += _flow_row([
-        _flow_node("消除單件調貨(Transfer Qty=1)<br>優先 Rebalance &#10132; 其次 Merge", "orange"),
-    ])
-
-    st.markdown(f'<div class="flow-container">{flow}</div>', unsafe_allow_html=True)
+    st.caption("以下 4 條適用全部 30 個模式，先看圖記重點。")
+    _show_svg(_td.build_global_rules_svg(), center=6)
 
     st.markdown("""
 #### 全局規則說明
@@ -382,26 +361,11 @@ v2.32.0 起，側邊欄提供兩種**保底主體**，可與全部 30 個調貨�
 - **Turnday（日銷速×日數）**：保底 = ceil(日銷速 × 自選日數 N)，讓保底隨實際銷速自動調節 —— 快銷店保底更高、滯銷店更低。
 """)
 
-    flow = _flow_row([_flow_node("上載 Excel<br>＋ MTD數據日期（通常T-1）", "blue")])
-    flow += _flow_arrow()
-    flow += _flow_row([
-        _flow_node("Safety 主體<br>保底 = 上載檔 Safety Stock", "green"),
-        _flow_node("Turnday 主體<br>保底 = ceil(日銷速 × N日)", "purple"),
-    ])
-    flow += _flow_arrow()
-    flow += _flow_row([
-        _flow_node("所有 Safety 觸點統一切換<br>轉出保底 / 缺貨目標 / 接收上限(S×2) / 補0目標(S×0.5)", "orange"),
-    ])
-    flow += _flow_arrow("正交組合")
-    flow += _flow_row([
-        _flow_node("30 個調貨模式<br>同一套邏輯運行", "blue"),
-    ])
-
-    st.markdown(f'<div class="flow-container">{flow}</div>', unsafe_allow_html=True)
+    _show_svg(_td.build_floor_body_svg(), center=6)
 
     _formula_svg = _ASSETS_DIR / 'turnday_formula.svg'
     if _formula_svg.exists():
-        st.image(_formula_svg.read_text(encoding="utf-8"), use_container_width=True)
+        _show_svg(_formula_svg.read_text(encoding="utf-8"), center=6)
 
     st.markdown("""
 **計算公式（通式）：**
@@ -416,7 +380,7 @@ v2.32.0 起，側邊欄提供兩種**保底主體**，可與全部 30 個調貨�
     _compare_svg = _ASSETS_DIR / 'turnday_compare.svg'
     if _compare_svg.exists():
         st.markdown("#### 保底效果對比（N=14日示例）")
-        st.image(_compare_svg.read_text(encoding="utf-8"), use_container_width=True)
+        _show_svg(_compare_svg.read_text(encoding="utf-8"), center=6)
 
     st.markdown("""
 **模式受影響程度：**
