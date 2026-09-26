@@ -172,14 +172,16 @@ def render_sidebar() -> Dict:
         st.markdown("---")
 
         st.markdown('<div class="side-step"><span class="side-step__num">2</span>⚙️ 選擇轉貨模式</div>', unsafe_allow_html=True)
-        st.markdown('<div class="side-hint">30 個模式一次列出（不分類）；長按捲動瀏覽，下方即時顯示必填欄位與詳解</div>', unsafe_allow_html=True)
-        transfer_mode = st.radio(
-            "選擇轉貨模式",
-            get_ui_options(),
-            key='transfer_mode',
-            help="選擇適合的調貨模式（全部 30 個模式，不分組）",
-            label_visibility="collapsed",
-        )
+        st.markdown('<div class="side-hint">30 個模式一次列出（不分類）；框內上下捲動瀏覽，下方即時顯示必填欄位與詳解</div>', unsafe_allow_html=True)
+        # 原生固定高度捲動容器（不依賴 CSS 選內部 DOM，跨版本穩定上下捲動）
+        with st.container(height=360):
+            transfer_mode = st.radio(
+                "選擇轉貨模式",
+                get_ui_options(),
+                key='transfer_mode',
+                help="選擇適合的調貨模式（全部 30 個模式，不分組）",
+                label_visibility="collapsed",
+            )
         transfer_mode = fix_mojibake_text(transfer_mode)
         mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
 

@@ -796,14 +796,7 @@ code, pre, .stCode {
     font-size: 0.78rem; line-height: 1.6; color: var(--text-secondary);
 }
 .side-summary strong { color: var(--text-primary); }
-/* 側邊欄選單：垂直上下捲動（短選單不足高度時此規則無作用，長選單自動出現直向捲軸） */
-section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] {
-    max-height: 360px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    overscroll-behavior-y: contain;
-    scroll-behavior: smooth;
-}
+/* 註：側邊欄模式選單改用 st.container(height=...) 原生捲動，不再以 CSS 限定內部 DOM。 */
 
 /* ── 25d. Result toolbar / filter row ── */
 .toolbar-card {
