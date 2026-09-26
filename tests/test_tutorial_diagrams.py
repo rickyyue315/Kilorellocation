@@ -2,6 +2,7 @@
 
 import glob
 import json
+import re
 import unittest
 
 from ui import tutorial_diagrams as td
@@ -68,6 +69,31 @@ class TestTutorialDiagrams(unittest.TestCase):
         d = td.build_decision_tree_svg()
         self.assertTrue(d.startswith("<svg"))
         self.assertIn("調貨需求", d)
+
+
+def _svg_height(svg: str) -> int:
+    m = re.search(r'height="(\d+)"', svg)
+    assert m, "SVG 缺少 height 屬性"
+    return int(m.group(1))
+
+
+class TestCompactLayout(unittest.TestCase):
+    """版面緊湊度：圖片高度設上限，一眼望清。"""
+
+    def test_logic_svg_height_bounded(self):
+        for m in _load_all_modes():
+            h = _svg_height(td.build_mode_logic_svg(m))
+            self.assertLessEqual(h, 480, f"{m.get('code')} 邏輯圖太高 ({h})")
+
+    def test_scenario_svg_height_bounded(self):
+        for m in _load_all_modes():
+            svg = td.build_mode_scenario_svg(m)
+            if svg:
+                self.assertLessEqual(_svg_height(svg), 320, f"{m.get('code')} 情境圖太高")
+
+    def test_overview_height_bounded(self):
+        groups = [("組", [(m["code"], m.get("risk", "中")) for m in _load_all_modes()[:4]], "用途", "僅同OM")]
+        self.assertLessEqual(_svg_height(td.build_overview_map_svg(groups * 4)), 560)
 
 
 if __name__ == "__main__":

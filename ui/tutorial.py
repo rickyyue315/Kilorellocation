@@ -200,9 +200,19 @@ def _load_group(group_key):
 
 # ── 圖片版教學（新增） ────────────────────────────────────────────
 
-def _show_svg(svg_str):
-    """呈現 SVG 字串（與 Turnday 教學圖做法一致）。"""
-    if svg_str:
+def _show_svg(svg_str, center=5):
+    """呈現 SVG 字串；預設收窄置中（約七成闊），一眼望清不壓迫。
+
+    center：中欄比例（全份 7），總覽／決策樹等大圖可用 center=7 全闊。
+    """
+    if not svg_str:
+        return
+    if center >= 7:
+        st.image(svg_str, use_container_width=True)
+        return
+    side = (7 - center) / 2
+    _, mid, _ = st.columns([side, center, side])
+    with mid:
         st.image(svg_str, use_container_width=True)
 
 
@@ -259,7 +269,42 @@ def _render_overview(indexed):
     for group_key, group_title, _icon in _GROUP_DEFS:
         modes = [(m["code"], m.get("risk", "中")) for gk, _, m in indexed if gk == group_key]
         groups.append((group_title, modes, _GROUP_USE[group_key], _GROUP_SCOPE[group_key]))
-    _show_svg(_td.build_overview_map_svg(groups))
+    _show_svg(_td.build_overview_map_svg(groups), center=7)
+
+
+def _render_snapshot(indexed):
+    st.markdown("### 👀 30 模式速覽（一眼望清）")
+    st.caption("先睇表搵啱場景同風險（可點擊欄頭排序），再用下方篩選／分組睇圖片詳解。")
+    import pandas as pd
+    rows = []
+    for group_key, _group_title, m in indexed:
+        code = m.get("code", "")
+        try:
+            d = get_mode_def_by_code(code)
+        except Exception:
+            d = None
+        cross = bool(d is not None and getattr(d, "cross_om_matching", False))
+        rows.append({
+            "模式": code,
+            "名稱": m.get("name", ""),
+            "用途": _td._plain(m.get("scenario", ""))[:30],
+            "風險": m.get("risk", ""),
+            "範圍": "可跨OM" if cross else "僅同OM",
+            "場景": _GROUP_USE.get(group_key, ""),
+        })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=420)
+
+
+def _render_jump(indexed):
+    codes = [m.get("code", "") for _, _, m in indexed]
+    jump = st.selectbox("🚀 直接跳去某模式（睇圖片詳解）", ["— 請選擇 —"] + codes, key="tut_jump")
+    if jump != "— 請選擇 —":
+        for group_key, _group_title, m in indexed:
+            if m.get("code") == jump:
+                _render_mode_card(m, group_key=group_key)
+                break
+        return True
+    return False
 
 
 def _render_filters(indexed):
@@ -408,7 +453,7 @@ def _render_decision_guide():
     st.markdown("### 模式選擇決策指南")
     st.markdown("根據以下問題，快速找到適合你的調貨模式：")
 
-    _show_svg(_td.build_decision_tree_svg())
+    _show_svg(_td.build_decision_tree_svg(), center=7)
 
     branches = [
         ("清理無銷售ND庫存？", "D / D2", "orange"),
@@ -470,6 +515,15 @@ def render_tutorial_page():
     st.markdown("---")
     indexed = _all_modes_index()
     _render_overview(indexed)
+
+    st.markdown("---")
+    _render_snapshot(indexed)
+
+    st.markdown("---")
+    if _render_jump(indexed):
+        st.markdown("---")
+        _render_decision_guide()
+        return
 
     st.markdown("---")
     scen, risk, om, filtered = _render_filters(indexed)

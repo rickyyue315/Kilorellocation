@@ -83,11 +83,11 @@ def build_mode_logic_svg(mode_data: dict) -> str:
     risk = str(mode_data.get("risk", "中"))
     scenario = _plain(mode_data.get("scenario", ""))
 
-    src = _collect_nodes(mode_data.get("source_flow", []))[:4]
-    dst = _collect_nodes(mode_data.get("dest_flow", []))[:4]
+    src = _collect_nodes(mode_data.get("source_flow", []))[:3]
+    dst = _collect_nodes(mode_data.get("dest_flow", []))[:3]
     raw_match = mode_data.get("match_order") or []
     matches: list = []
-    for m in raw_match[:5]:
+    for m in raw_match[:4]:
         try:
             a, b = _plain(m[0]), _plain(m[1])
         except (IndexError, TypeError):
@@ -98,10 +98,10 @@ def build_mode_logic_svg(mode_data: dict) -> str:
         matches = ["依通用規則配對"]
 
     n = max(2, len(src), len(dst), len(matches))
-    row_h, panel_top = 74, 122
-    panel_h = 46 + n * row_h + 12
+    row_h, panel_top = 64, 108
+    panel_h = 40 + n * row_h + 10
     W = 1160
-    H = panel_top + panel_h + 62
+    H = panel_top + panel_h + 54
     risk_c = _RISK_COLOR.get(risk, "#D97706")
     risk_bg = _RISK_BG.get(risk, "rgba(217,119,6,0.12)")
 
@@ -117,16 +117,14 @@ def build_mode_logic_svg(mode_data: dict) -> str:
          f'viewBox="0 0 {W} {H}" font-family="{_FONT}">']
     p.append(f'<rect x="0" y="0" width="{W}" height="{H}" rx="16" fill="#FFFFFF" '
              f'stroke="#E2E8F0" stroke-width="1.5"/>')
-    p.append(f'<text x="28" y="46" font-size="21" font-weight="bold" fill="#0F172A">'
+    p.append(f'<text x="28" y="40" font-size="19" font-weight="bold" fill="#0F172A">'
              f'{_xesc("模式 " + code + "：" + name)}</text>')
     p.append(f'<rect x="{W - 148}" y="22" width="120" height="30" rx="15" '
              f'fill="{risk_bg}" stroke="{risk_c}" stroke-width="1.5"/>')
     p.append(f'<text x="{W - 88}" y="43" font-size="14" font-weight="bold" '
              f'fill="{risk_c}" text-anchor="middle">{_xesc("風險：" + risk)}</text>')
-    p.append(f'<text x="28" y="72" font-size="13" fill="#64748B">'
-             f'{_xesc("左 → 中 → 右：誰可轉出 ➜ 先配給誰 ➜ 誰可接收　　" + _short(scenario, 52))}</text>')
-    p.append(f'<text x="28" y="96" font-size="12" fill="#94A3B8">'
-             f'轉出（綠）＝貨從哪裡來　　配對（橙）＝先後順序　　接收（藍）＝貨送到哪裡</text>')
+    p.append(f'<text x="28" y="62" font-size="12.5" fill="#64748B">'
+             f'{_xesc("左 → 中 → 右：轉出（綠）➜ 配對（橙）➜ 接收（藍）　　" + _short(scenario, 48))}</text>')
 
     for (title, color, bg, lines, empty_tip), x in zip(panels, xs):
         p.append(f'<rect x="{x}" y="{panel_top}" width="{col_w}" height="{panel_h}" '
@@ -142,8 +140,8 @@ def build_mode_logic_svg(mode_data: dict) -> str:
             if not txt:
                 continue
             is_num = i < len(lines)
-            wrapped = _wrap(txt, 19, 3)
-            box_h = 62
+            wrapped = _wrap(txt, 21, 3)
+            box_h = 56
             p.append(f'<rect x="{x + 12}" y="{by}" width="{col_w - 24}" height="{box_h}" rx="8" '
                      f'fill="#FFFFFF" stroke="{color}" stroke-width="1.2" opacity="1"/>')
             if is_num:
@@ -153,10 +151,10 @@ def build_mode_logic_svg(mode_data: dict) -> str:
                 tx = x + 52
             else:
                 tx = x + 28
-            base_y = by + (box_h // 2 + 5) if len(wrapped) == 1 else by + 22
+            base_y = by + 33 if len(wrapped) == 1 else by + 19
             for j, ln in enumerate(wrapped):
-                p.append(f'<text x="{tx}" y="{base_y + j * 17}" '
-                         f'font-size="12.5" fill="#0F172A">{_xesc(ln)}</text>')
+                p.append(f'<text x="{tx}" y="{base_y + j * 16}" '
+                         f'font-size="12" fill="#0F172A">{_xesc(ln)}</text>')
 
     for ax in (380, 760):
         p.append(f'<text x="{ax}" y="{panel_top + panel_h // 2}" font-size="30" '
@@ -216,7 +214,7 @@ def build_mode_scenario_svg(mode_data: dict) -> str:
     if stock_idx is None:
         stock_idx = 2 if len(headers) > 2 else 0
 
-    use_rows = rows[:4]
+    use_rows = rows[:3]
     parsed = []
     for r in use_rows:
         get = lambda i: _plain(r[i]) if i is not None and i < len(r) else ""
@@ -231,21 +229,21 @@ def build_mode_scenario_svg(mode_data: dict) -> str:
 
     W = 1160
     n = len(parsed)
-    H = 104 + n * 76
+    H = 96 + n * 68
     max_abs = max(1, max(abs(q) for _, _, q, _, _ in parsed))
 
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
          f'viewBox="0 0 {W} {H}" font-family="{_FONT}">']
     p.append(f'<rect x="0" y="0" width="{W}" height="{H}" rx="16" fill="#FFFFFF" '
              f'stroke="#E2E8F0" stroke-width="1.5"/>')
-    p.append(f'<text x="28" y="40" font-size="17" font-weight="bold" fill="#0F172A">'
+    p.append(f'<text x="28" y="36" font-size="16" font-weight="bold" fill="#0F172A">'
              f'{_xesc("情境範例圖解 — " + str(mode_data.get("code", "")))}</text>')
-    p.append(f'<text x="28" y="62" font-size="12" fill="#64748B">'
+    p.append(f'<text x="28" y="56" font-size="12" fill="#64748B">'
              f'橫條長度按調撥量比例繪製（綠＝轉出　藍＝接收　灰＝不參與）；詳細數字見下方表格</text>')
-    p.append(f'<line x1="28" y1="74" x2="{W - 28}" y2="74" stroke="#E2E8F0" stroke-width="1"/>')
+    p.append(f'<line x1="28" y1="68" x2="{W - 28}" y2="68" stroke="#E2E8F0" stroke-width="1"/>')
 
     for i, (shop, role, qty, after, stock) in enumerate(parsed):
-        y0 = 92 + i * 76
+        y0 = 84 + i * 68
         if "轉出" in role or "強制" in role or "來源" in role:
             color, tag = "#059669", "出"
         elif "接收" in role or "目標" in role or "補" in role:
@@ -254,26 +252,26 @@ def build_mode_scenario_svg(mode_data: dict) -> str:
             color, tag = "#94A3B8", "—"
         else:
             color, tag = ("#059669", "出") if qty < 0 else ("#2563EB", "入") if qty > 0 else ("#94A3B8", "—")
-        p.append(f'<rect x="28" y="{y0}" width="170" height="56" rx="8" fill="#F8FAFC" '
+        p.append(f'<rect x="28" y="{y0}" width="170" height="52" rx="8" fill="#F8FAFC" '
                  f'stroke="#E2E8F0" stroke-width="1.2"/>')
-        p.append(f'<text x="44" y="{y0 + 23}" font-size="14" font-weight="bold" fill="#0F172A">'
+        p.append(f'<text x="44" y="{y0 + 21}" font-size="14" font-weight="bold" fill="#0F172A">'
                  f'{_xesc(_short(shop, 12))}</text>')
-        p.append(f'<text x="44" y="{y0 + 42}" font-size="11" fill="#64748B">'
+        p.append(f'<text x="44" y="{y0 + 38}" font-size="11" fill="#64748B">'
                  f'{_xesc(_short(role, 14) + (f" · 現貨{stock}" if stock and stock != "-" else ""))}</text>')
         # 軌道＋橫條
-        p.append(f'<rect x="220" y="{y0 + 18}" width="560" height="20" rx="10" fill="#F1F5F9"/>')
+        p.append(f'<rect x="220" y="{y0 + 16}" width="560" height="20" rx="10" fill="#F1F5F9"/>')
         if qty == 0:
-            p.append(f'<text x="500" y="{y0 + 33}" font-size="12" fill="#94A3B8" text-anchor="middle">'
+            p.append(f'<text x="500" y="{y0 + 31}" font-size="12" fill="#94A3B8" text-anchor="middle">'
                      f'{_xesc("不參與" if "不" in role else "無調撥")}</text>')
         else:
             bar_len = int(30 + 500 * abs(qty) / max_abs)
             bar_len = min(bar_len, 560)
-            p.append(f'<rect x="220" y="{y0 + 18}" width="{bar_len}" height="20" rx="10" '
+            p.append(f'<rect x="220" y="{y0 + 16}" width="{bar_len}" height="20" rx="10" '
                      f'fill="{color}" opacity="0.85"/>')
-            p.append(f'<text x="792" y="{y0 + 33}" font-size="13" font-weight="bold" fill="{color}">'
+            p.append(f'<text x="792" y="{y0 + 31}" font-size="13" font-weight="bold" fill="{color}">'
                      f'{_xesc(tag + " " + str(abs(qty)) + " 件")}</text>')
         if after and after != "-":
-            p.append(f'<text x="900" y="{y0 + 33}" font-size="12" fill="#334155">'
+            p.append(f'<text x="900" y="{y0 + 31}" font-size="12" fill="#334155">'
                      f'{_xesc("調撥後 " + _short(after, 12))}</text>')
     p.append("</svg>")
     return "".join(p)
@@ -285,8 +283,8 @@ def build_overview_map_svg(groups: list) -> str:
     """30 模式總覽圖。groups: [(組名, [(code, risk)], 用途, 範圍標籤)]."""
     W = 1160
     top, gapx, gapy = 112, 16, 16
-    card_w, card_h = 266, 204
-    H = top + 2 * card_h + gapy + 52
+    card_w, card_h = 266, 158
+    H = top + 2 * card_h + gapy + 48
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
          f'viewBox="0 0 {W} {H}" font-family="{_FONT}">']
     p.append(f'<rect x="0" y="0" width="{W}" height="{H}" rx="16" fill="#FFFFFF" '
@@ -309,17 +307,31 @@ def build_overview_map_svg(groups: list) -> str:
                  f'fill="#FFFFFF" text-anchor="middle">{idx + 1}</text>')
         p.append(f'<text x="{x + 44}" y="{y + 31}" font-size="13.5" font-weight="bold" '
                  f'fill="#0F172A">{_xesc(_short(title, 15))}</text>')
-        for j, (mcode, mrisk) in enumerate(modes[:5]):
+        # 模式代碼橫向流排（● 顏色＝風險），最多 3 行，超出顯示 +N
+        cx, cy = x + 18, y + 58
+        shown, hidden = 0, 0
+        for mcode, mrisk in modes:
+            label = _short(mcode, 12)
+            w = 16 + len(label) * 12
+            if cx + w > x + card_w - 12 and shown:
+                cx = x + 18
+                cy += 20
+                if cy > y + 58 + 2 * 20:
+                    hidden = len(modes) - shown
+                    break
             dot = _RISK_COLOR.get(mrisk, "#D97706")
-            my = y + 58 + j * 20
-            p.append(f'<circle cx="{x + 24}" cy="{my - 4}" r="4" fill="{dot}"/>')
-            p.append(f'<text x="{x + 36}" y="{my}" font-size="12.5" fill="#0F172A">'
-                     f'{_xesc(_short(mcode, 20))}</text>')
-        p.append(f'<text x="{x + 16}" y="{y + card_h - 34}" font-size="12" fill="#334155">'
+            p.append(f'<circle cx="{cx + 4}" cy="{cy - 4}" r="3.5" fill="{dot}"/>')
+            p.append(f'<text x="{cx + 12}" y="{cy}" font-size="12" fill="#0F172A">'
+                     f'{_xesc(label)}</text>')
+            cx += w + 4
+            shown += 1
+        if hidden:
+            p.append(f'<text x="{cx}" y="{cy}" font-size="12" fill="#64748B">+{hidden}…</text>')
+        p.append(f'<text x="{x + 16}" y="{y + card_h - 36}" font-size="12" fill="#334155">'
                  f'{_xesc("👉 " + _short(use, 16))}</text>')
-        p.append(f'<rect x="{x + card_w - 92}" y="{y + card_h - 32}" width="76" height="22" rx="11" '
+        p.append(f'<rect x="{x + card_w - 92}" y="{y + card_h - 34}" width="76" height="22" rx="11" '
                  f'fill="#FFFFFF" stroke="{scope_c}" stroke-width="1.2"/>')
-        p.append(f'<text x="{x + card_w - 54}" y="{y + card_h - 16}" font-size="11.5" '
+        p.append(f'<text x="{x + card_w - 54}" y="{y + card_h - 18}" font-size="11.5" '
                  f'fill="{scope_c}" text-anchor="middle">{_xesc(scope)}</text>')
     p.append(f'<text x="28" y="{H - 16}" font-size="12" fill="#64748B">'
              f'選法：日常補貨→第1卡　零庫存→第4卡　清死貨→第5卡　強制清空→第6卡　指定目標→第7卡　ND互轉/撤SKU→第8卡</text>')
