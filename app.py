@@ -1,5 +1,5 @@
 """
-庫存調貨建議系統 v2.34.0 - Streamlit應用程序
+庫存調貨建議系統 v2.35.0 - Streamlit應用程序
 支持三十模式系統：A(保守轉貨)/A1(保守轉貨-轉出店舖不餘存貨1件)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/NST(New Shop Target調貨)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/ND4(ND限同OM轉貨補0及有銷售記錄)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 含模式教學分頁：30種調貨模式圖例化教學（繁體中文）
 """
@@ -32,6 +32,46 @@ from business_logic import TransferLogic
 from excel_generator import ExcelGenerator
 from services.target_utils import find_f_mode_nd_target_conflicts
 from services.turnday import apply_turnday_floor, compute_coverage_days, describe_coverage
+
+
+def _render_workflow_steps(stage: int):
+    """主流程步驟條（顯示層用，stage=1上傳/2分析/3結果/4下載）。"""
+    steps = ["📂 上傳資料", "🚀 生成建議", "📈 檢視結果", "📥 下載報表"]
+    html = '<div class="steps">'
+    for i, label in enumerate(steps, 1):
+        if i < stage:
+            cls, num = "step step--done", "✓"
+        elif i == stage:
+            cls, num = "step step--active", str(i)
+        else:
+            cls, num = "step", str(i)
+        html += f'<div class="{cls}"><span class="step__num">{num}</span>{label}</div>'
+    html += "</div>"
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def _describe_extra_params(sidebar_result: dict) -> str:
+    """將側邊欄參數濃縮為一行摘要（顯示層用）。"""
+    parts = []
+    if sidebar_result.get('b_special_receive_site_limit_option') and sidebar_result.get('mode_code') in (
+        "B2", "B2a", "B2L", "B2La", "B3", "B3a", "B3L", "B3La",
+        "E1", "E1b", "E2", "ND1", "ND2", "ND3", "ND4",
+    ):
+        parts.append(f"配對{sidebar_result['b_special_receive_site_limit_option']}")
+    if sidebar_result.get('mode_code') in ("F2", "F3", "NST"):
+        parts.append("HD可轉出" if sidebar_result.get('f2_allow_hd_transfer') else "HD不轉出")
+    if sidebar_result.get('f_fulfill_small_first'):
+        parts.append("小型目標優先")
+    if sidebar_result.get('mode_code') == "NST" and sidebar_result.get('nst_max_source_shops'):
+        parts.append(f"轉出≤{sidebar_result['nst_max_source_shops']}店")
+    if sidebar_result.get('mode_code') == "D2":
+        _d2 = {"unlimited": "不限店數", "2site_original": "限2店(原設定)", "2site_optimized": "限2店(優化版)"}
+        parts.append(_d2.get(sidebar_result.get('d2_site_limit_mode'), ""))
+    if sidebar_result.get('mode_code') == "C1":
+        parts.append(f"門檻≤{sidebar_result.get('c1_threshold')}")
+    if sidebar_result.get('mode_code') in ("C", "C1", "C2"):
+        parts.append(f"每店上限{sidebar_result.get('c1_ceiling')}件")
+    return " · ".join(p for p in parts if p)
 
 
 @st.cache_data(show_spinner=False)
@@ -88,8 +128,17 @@ with tab_tutorial:
     render_tutorial_page()
 
 with tab_system:
+    _has_results = bool(st.session_state.get('recommendations'))
+    _excel_ready_top = bool(st.session_state.get('excel_data'))
+    if _excel_ready_top:
+        _render_workflow_steps(4)
+    elif _has_results:
+        _render_workflow_steps(3)
+    else:
+        _render_workflow_steps(1)
+
     with st.container():
-        st.markdown("### 📂 資料上傳")
+        st.markdown('<div class="section-title"><span class="section-title__badge">STEP 1</span>📂 資料上傳</div>', unsafe_allow_html=True)
 
         render_upload_requirements(mode_code)
 
@@ -99,14 +148,29 @@ with tab_system:
             help="支援 .xlsx 和 .xls 格式",
         )
 
-        mtd_as_of_date = st.date_input(
-            "MTD數據日期（數據覆蓋至該日，通常T-1）",
-            value=(datetime.now() - timedelta(days=1)).date(),
-            key='mtd_as_of_date',
-            help="Turnday 保底主體用以計算日銷速的數據截止日期：覆蓋日數 = 上月日數 + 該日日號（例：8月15日 = 7月31日 + 15日 = 46日）。Safety 主體不使用此日期。"
+        date_col, hint_col = st.columns([1, 1.4])
+        with date_col:
+            mtd_as_of_date = st.date_input(
+                "MTD數據日期（數據覆蓋至該日，通常T-1）",
+                value=(datetime.now() - timedelta(days=1)).date(),
+                key='mtd_as_of_date',
+                help="Turnday 保底主體用以計算日銷速的數據截止日期：覆蓋日數 = 上月日數 + 該日日號（例：8月15日 = 7月31日 + 15日 = 46日）。Safety 主體不使用此日期。"
+            )
+        with hint_col:
+            if floor_body == FLOOR_BODY_TURNDAY:
+                st.caption(describe_coverage(mtd_as_of_date))
+            else:
+                st.caption("目前為 Safety Stock 主體，此日期僅 Turnday 主體使用，可忽略。")
+
+    if uploaded_file is None:
+        st.markdown(
+            '<div class="empty-state"><strong>👋 開始使用（3 步完成）：</strong>'
+            '<ol><li>左側邊欄確認 <strong>步驟 1 保底主體</strong> 與 <strong>步驟 2 轉貨模式</strong>（已預設 Safety＋A 模式可直接試跑）</li>'
+            '<li>上方拖放 Excel 文件（需含 Article / OM / RP Type / Site / 庫存 / 銷量 / MOQ 等基本欄位）</li>'
+            '<li>點擊「🎯 生成調貨建議」，再按「📤 準備 Excel 報表」下載</li></ol>'
+            '💡 不確定選哪個模式？先到「📖 模式教學」分頁看決策指南。</div>',
+            unsafe_allow_html=True,
         )
-        if floor_body == FLOOR_BODY_TURNDAY:
-            st.caption(describe_coverage(mtd_as_of_date))
 
     if uploaded_file is not None:
         progress_bar = st.progress(0, text="準備開始處理文件...")
@@ -181,15 +245,18 @@ with tab_system:
             progress_bar.empty()
 
             with st.container():
-                st.markdown("### 🚀 分析與建議")
+                st.markdown('<div class="section-title"><span class="section-title__badge">STEP 2</span>🚀 分析與建議</div>', unsafe_allow_html=True)
 
                 floor_body_label = (
                     "Safety Stock（現行版本）" if floor_body == FLOOR_BODY_SAFETY
                     else f"Turnday（日銷速×{int(turnday_days)}日，數據日期 {mtd_as_of_date.isoformat()}）"
                 )
+                _extra_params = _describe_extra_params(sidebar_result)
+                _extra_html = f"<br>⚙️ 參數 · {_extra_params}" if _extra_params else ""
                 st.markdown(f"""
-                <div class="surface-card">
-                    <strong>當前模式</strong> · {transfer_mode} &nbsp;|&nbsp; <strong>保底主體</strong> · {floor_body_label}
+                <div class="current-config-banner">
+                    <strong>當前模式</strong> · {transfer_mode}<br>
+                    <strong>保底主體</strong> · {floor_body_label}{_extra_html}
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -252,7 +319,9 @@ with tab_system:
 
             if recommendations:
                 with st.container():
-                    st.markdown("### 📈 分析結果")
+                    st.markdown('<div class="section-title"><span class="section-title__badge">STEP 3</span>📈 分析結果</div>', unsafe_allow_html=True)
+                    _total_qty = statistics.get('total_transfer_qty', 0)
+                    st.caption(f"共 {len(recommendations):,} 條建議 · {int(_total_qty):,} 件 · {transfer_mode}")
 
                     render_kpi_cards(statistics)
 
@@ -268,6 +337,7 @@ with tab_system:
 
                     with st.container():
                         st.markdown("---")
+                        st.markdown('<div class="section-title"><span class="section-title__badge">STEP 4</span>📥 匯出報表</div>', unsafe_allow_html=True)
                         st.success("✅ 分析完成!")
 
                 _ai_summary = st.session_state.get('ai_executive_summary', '')

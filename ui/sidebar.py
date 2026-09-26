@@ -16,6 +16,7 @@ from config import (
 )
 from models.mode import MODE_DESCRIPTIONS
 from models.mode_registry import (
+    get_mode_def_by_code,
     get_receive_limit_codes,
     get_ui_options,
 )
@@ -38,6 +39,20 @@ def _render_perf_panel():
         if st.button("清除效能記錄", key="_clear_perf"):
             clear_perf_records()
             st.rerun()
+
+
+def _required_columns_hint(mode_code: str) -> str:
+    """回傳該模式的必填特殊欄位提示（顯示層用，不影響邏輯）。"""
+    must_have = []
+    if mode_code in ("B2", "B2a", "B2L", "B2La", "B3", "B3a", "B3L", "B3La", "E1b"):
+        must_have.append("Type")
+    if mode_code in ("E1", "E1b", "E2"):
+        must_have.append("ALL（標記商品）")
+    if mode_code in ("F", "F2", "F3", "NST"):
+        must_have.append("Target")
+    if not must_have:
+        return "基本欄位即可（Article / OM / RP Type / Site / 庫存 / 銷量 / MOQ）"
+    return "除基本欄位外，另需：" + "、".join(must_have)
 
 
 def render_sidebar() -> Dict:
@@ -70,13 +85,13 @@ def render_sidebar() -> Dict:
             - ✅ F模式(目標優化) / F2模式(F指定模式) / F3模式(目標性補0) / NST模式(New Shop Target調貨)
             - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨) / ND3模式(ND限同OM轉貨-補0) / ND4模式(ND限同OM轉貨-補0及有銷售記錄)
             - ✅ 精簡SKU(限同OM) / 精簡SKU(跨OM) / 精簡SKU(退D001)
-            
+
             **類型識別與匹配:**
             - ✅ ND/RF類型智慧識別
             - ✅ 優先順序調貨匹配
             - ✅ RF轉出限制控制
             - ✅ 跨OM配對支援(B3/C2/E/F/F2/F3模式，F2/F3 Windy目標店優先同OM提取）
-            
+
             **特殊功能:**
             - ✅ D模式：避免1件餘貨
             - ✅ E1模式：標記商品強制轉出(僅同OM)
@@ -103,31 +118,36 @@ def render_sidebar() -> Dict:
             st.markdown("""
 **完整操作流程:**
 
-1. **上傳 Excel 文件**
-   - 點擊瀏覽文件或拖放文件到上傳區域
-   - 確保包含所有必需欄位
+1. **設定保底主體（步驟 1）**
+   - Safety Stock（現行版本）或 Turnday（日銷速×日數）二選一
 
-2. **選擇轉貨模式**
-   - 在側邊欄「選擇轉貨模式」中選擇適合的轉貨模式（全部 30 個模式一次列出，不分類）
+2. **選擇轉貨模式（步驟 2）**
+   - 在「選擇轉貨模式」中選擇適合的轉貨模式（全部 30 個模式一次列出，不分類）
+   - 下方會顯示該模式的必填欄位提示與詳解
+
+3. **調整模式參數（步驟 3，如有）**
    - 若選擇 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3/ND4，可設定「同一SKU下單一出貨店舖配對接收店舖」：優先1間 / 最多2間 / 不限
-   - 若選擇 NST，可設定「HD店舖轉出」及「同一SKU轉出店舖數量上限：10間/20間/不限制」
+   - 若選擇 F2/F3/NST，可設定「HD店舖轉出」；F/F2/F3/NST 可勾選「優先滿足小型目標」
+   - 若選擇 NST，可設定「同一SKU轉出店舖數量上限：10間/20間/不限制」
+   - 若選擇 D2，可設定「接收店舖數量限制」三選一；若選擇 C1，可設定補0門檻；C/C1/C2 可設定每店轉出件數上限
 
-3. **啟動分析**
+4. **上傳 Excel 並啟動分析**
+   - 主頁上傳 Excel，核對 MTD 數據日期（僅 Turnday 主體使用）
    - 點擊「生成調貨建議」按鈕開始處理
-   - 系統會自動進行數據驗證和分析
 
-4. **查看結果**
-   - 在主頁面查看KPI、圖表概覽、調貨建議和統計
-   - 展開詳細統計了解更多信息
+5. **查看結果**
+   - 在主頁面查看步驟進度、KPI、圖表概覽、調貨建議和統計
+   - 可用關鍵字篩選調貨建議表；缺口分析可用模式／角色／狀態篩選
 
-5. **下載報告**
+6. **下載報告**
    - 點擊「準備 Excel 報表」生成文件後，再點擊下載按鈕獲取報告
    - 報告包含完整的調貨建議和統計信息
             """)
 
         st.markdown("---")
 
-        st.markdown("### 🛡️ 保底主體")
+        st.markdown('<div class="side-step"><span class="side-step__num">1</span>🛡️ 保底主體</div>', unsafe_allow_html=True)
+        st.markdown('<div class="side-hint">與下方調貨模式可任意組合（2 主體 × 30 模式）</div>', unsafe_allow_html=True)
         floor_body_option = st.radio(
             "保底主體（與下方調貨模式可任意組合）",
             ["Safety Stock（現行版本）", "Turnday（日銷速×日數）"],
@@ -151,7 +171,8 @@ def render_sidebar() -> Dict:
 
         st.markdown("---")
 
-        st.markdown("### ⚙️ 選擇轉貨模式")
+        st.markdown('<div class="side-step"><span class="side-step__num">2</span>⚙️ 選擇轉貨模式</div>', unsafe_allow_html=True)
+        st.markdown('<div class="side-hint">30 個模式一次列出（不分類）；長按捲動瀏覽，下方即時顯示必填欄位與詳解</div>', unsafe_allow_html=True)
         transfer_mode = st.radio(
             "選擇轉貨模式",
             get_ui_options(),
@@ -162,10 +183,18 @@ def render_sidebar() -> Dict:
         transfer_mode = fix_mojibake_text(transfer_mode)
         mode_code = transfer_mode.split(":", 1)[0].strip() if ":" in transfer_mode else transfer_mode.strip()
 
+        st.caption(MODE_DESCRIPTIONS.get(transfer_mode, ""))
+        st.info(f"📌 必填欄位：{_required_columns_hint(mode_code)}", icon="🧾")
+
+        st.markdown('<div class="side-step"><span class="side-step__num">3</span>🧩 模式參數</div>', unsafe_allow_html=True)
+        st.markdown('<div class="side-hint">只顯示目前模式可用的參數；無參數的模式可直接到主頁上傳分析</div>', unsafe_allow_html=True)
+
         b_special_max_receive_sites_per_source: Optional[int] = None
         b_special_receive_site_limit_option = "最多 2 間"
+        _has_mode_params = False
 
         if mode_code in get_receive_limit_codes():
+            _has_mode_params = True
             b_special_receive_site_limit_option = st.radio(
                 "出貨店舖配對接收店數限制",
                 ["優先 1 間", "最多 2 間", "不限制"],
@@ -182,6 +211,7 @@ def render_sidebar() -> Dict:
 
         f2_allow_hd_transfer = False
         if mode_code in ("F2", "F3", "NST"):
+            _has_mode_params = True
             f2_hd_option = st.radio(
                 "HD 店舖轉出設定",
                 ["HD 不能轉出（預設）", "HD 可轉出（最後優先）"],
@@ -196,6 +226,7 @@ def render_sidebar() -> Dict:
 
         f_fulfill_small_first = False
         if mode_code in ("F", "F2", "F3", "NST"):
+            _has_mode_params = True
             f_fulfill_small_first = st.checkbox(
                 "優先滿足小型目標",
                 value=False,
@@ -207,6 +238,7 @@ def render_sidebar() -> Dict:
 
         nst_max_source_shops = None
         if mode_code == "NST":
+            _has_mode_params = True
             nst_shop_limit_option = st.radio(
                 "同一SKU轉出店舖數量上限",
                 ["10 間", "20 間", "不限制"],
@@ -235,6 +267,7 @@ def render_sidebar() -> Dict:
         #  - 補償接收店數量減少對總調貨量的影響
         d2_site_limit_mode = "unlimited"
         if mode_code == "D2":
+            _has_mode_params = True
             d2_option = st.radio(
                 "接收店舖數量限制",
                 ["不限店舖數量（原有設定）", "限制2間店舖接收（原有設定）", "限制2間店舖接收（優化版）"],
@@ -252,6 +285,7 @@ def render_sidebar() -> Dict:
         c1_threshold = 1
         c1_ceiling = 3
         if mode_code == "C1":
+            _has_mode_params = True
             c1_threshold = st.number_input(
                 "C1 補0門檻（補 total_available ≤ N 的店舖）",
                 min_value=0, max_value=100, value=1, step=1,
@@ -261,6 +295,7 @@ def render_sidebar() -> Dict:
         else:
             st.session_state.pop('c1_threshold', None)
         if mode_code in ("C", "C1", "C2"):
+            _has_mode_params = True
             c1_ceiling = st.slider(
                 "每店轉出件數上限",
                 min_value=3, max_value=10, value=3, step=1,
@@ -270,7 +305,19 @@ def render_sidebar() -> Dict:
         else:
             st.session_state.pop('c1_ceiling', None)
 
-        st.caption(MODE_DESCRIPTIONS.get(transfer_mode, ""))
+        if not _has_mode_params:
+            st.caption("此模式無額外參數，可直接到主頁上傳分析。")
+
+        _floor_label = "Safety Stock" if floor_body == FLOOR_BODY_SAFETY else f"Turnday×{turnday_days}日"
+        _mode_def = get_mode_def_by_code(mode_code)
+        _mode_short = _mode_def.name if _mode_def else mode_code
+        st.markdown(
+            f'<div class="side-summary"><strong>目前選擇</strong><br>'
+            f'模式：<strong>{mode_code}</strong>（{_mode_short}）<br>'
+            f'保底：{_floor_label}<br>'
+            f'欄位：{_required_columns_hint(mode_code)}</div>',
+            unsafe_allow_html=True,
+        )
 
         with st.expander(f"📋 目前模式詳解：{mode_code}", expanded=False):
             st.markdown(MODE_DOCS.get(mode_code, "（此模式暫無詳細說明，請參考「📖 模式教學」分頁。）"))

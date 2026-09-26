@@ -332,8 +332,8 @@ def _render_filters(indexed):
     return scen, risk, om, filtered
 
 
-def _render_group(group_title, icon, modes_data, group_key=None):
-    with st.expander(f"{icon} {group_title}（{len(modes_data)} 個模式 · 圖片版）", expanded=False):
+def _render_group(group_title, icon, modes_data, group_key=None, expanded=False):
+    with st.expander(f"{icon} {group_title}（{len(modes_data)} 個模式 · 圖片版）", expanded=expanded):
         for mode_data in modes_data:
             _render_mode_card(mode_data, group_key=group_key)
 
@@ -502,6 +502,7 @@ def render_tutorial_page():
             _render_mode_card(mode_data, group_key=group_key)
     else:
         st.markdown("按業務場景分為 8 組，展開查看圖片版詳細教學（每模式先看邏輯圖＋情境圖）。")
+        expand_all = st.toggle("全部展開 8 組", value=False, key="tutorial_expand_all")
         st.info(
             "💡 **保底主體提示**：以下各模式公式中的「Safety / Safety Stock」字樣，在 Turnday 主體下會自動替換為 "
             "Turnday 保底（ceil(日銷速 × N日)，計算方法見上方教學）；各模式的固定保底"
@@ -509,7 +510,7 @@ def render_tutorial_page():
         )
         for group_key, group_title, icon in _GROUP_DEFS:
             modes_data = _load_group(group_key)
-            _render_group(group_title, icon, modes_data, group_key=group_key)
+            _render_group(group_title, icon, modes_data, group_key=group_key, expanded=expand_all)
 
     st.markdown("---")
     _render_decision_guide()

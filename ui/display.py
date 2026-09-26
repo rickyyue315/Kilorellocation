@@ -145,21 +145,29 @@ def _int_column_config(df: pd.DataFrame) -> dict:
 
 
 def render_data_preview(df: pd.DataFrame, processing_stats: dict):
-    st.markdown("### 📊 資料查覽")
-    col1, col2, col3 = st.columns(3)
+    st.markdown('<div class="section-title"><span class="section-title__badge">STEP 1</span>📊 資料查覽</div>', unsafe_allow_html=True)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("總行數", processing_stats['processed_stats']['total_rows'])
     with col2:
         st.metric("商品數", df['Article'].nunique())
     with col3:
         st.metric("店鋪數", df['Site'].nunique())
+    with col4:
+        if 'RP Type' in df.columns:
+            _rp = df['RP Type'].astype(str).str.strip().str.upper().value_counts()
+            _nd = int(_rp.get('ND', 0))
+            _rf = int(_rp.get('RF', 0))
+            st.metric("ND / RF 行數", f"{_nd:,} / {_rf:,}")
+        else:
+            st.metric("欄位數", len(df.columns))
 
     st.markdown("**資料樣本（前 10 行)**")
     preview = df.head(10).copy()
     for col in preview.columns:
         if preview[col].dtype == object:
             preview[col] = preview[col].astype(str)
-    st.dataframe(preview, use_container_width=True)
+    st.dataframe(preview, use_container_width=True, hide_index=True, height=320)
 
 
 def render_kpi_cards(statistics: dict):
@@ -195,7 +203,7 @@ def render_charts(statistics: dict):
                         {'Source Type': t, 'Qty': s['qty']}
                         for t, s in source_type_stats.items()
                     ])
-                    st.bar_chart(source_df, x='Source Type', y='Qty', use_container_width=True)
+                    st.bar_chart(source_df, x='Source Type', y='Qty', use_container_width=True, height=260)
             with c2:
                 st.markdown("**接收類型分佈（件數）**")
                 if dest_type_stats:
@@ -203,7 +211,7 @@ def render_charts(statistics: dict):
                         {'Destination Type': t, 'Qty': s['qty']}
                         for t, s in dest_type_stats.items()
                     ])
-                    st.bar_chart(dest_df, x='Destination Type', y='Qty', use_container_width=True)
+                    st.bar_chart(dest_df, x='Destination Type', y='Qty', use_container_width=True, height=260)
 
         if om_stats:
             st.markdown("**按 OM 轉出 vs 接收量**")
@@ -215,7 +223,7 @@ def render_charts(statistics: dict):
                 }
                 for om, stats in om_stats.items()
             ])
-            st.bar_chart(om_df, x='OM', y=['Transfer Qty', 'Receive Qty'], use_container_width=True)
+            st.bar_chart(om_df, x='OM', y=['Transfer Qty', 'Receive Qty'], use_container_width=True, height=280)
 
         if article_stats:
             st.markdown("**Top 10 商品轉出量**")
@@ -223,7 +231,7 @@ def render_charts(statistics: dict):
                 {'Article': article, 'Total Qty': stats['total_qty']}
                 for article, stats in article_stats.items()
             ]).nlargest(10, 'Total Qty').sort_values('Total Qty')
-            st.bar_chart(top_df, x='Total Qty', y='Article', horizontal=True, use_container_width=True)
+            st.bar_chart(top_df, x='Total Qty', y='Article', horizontal=True, use_container_width=True, height=320)
 
 
 def _build_stock_lookup(df: pd.DataFrame) -> dict:
@@ -345,9 +353,9 @@ def render_results_table(recommendations: list, df: pd.DataFrame, current_run_ke
             help="僅在需要時渲染全部結果列，以減少 Zeabur 容器上的前端與傳輸負擔。"
         )
         table_df = rec_df if show_full_result_table else rec_df.head(ZEABUR_RESULT_PREVIEW_LIMIT)
-        st.dataframe(table_df, use_container_width=True, column_config=_int_column_config(table_df))
+        st.dataframe(table_df, use_container_width=True, hide_index=True, height=480, column_config=_int_column_config(table_df))
     else:
-        st.dataframe(rec_df, use_container_width=True, column_config=_int_column_config(rec_df))
+        st.dataframe(rec_df, use_container_width=True, hide_index=True, height=480, column_config=_int_column_config(rec_df))
 
 
 def _build_priority_groups(recommendations: list) -> dict:
@@ -359,9 +367,27 @@ def _build_priority_groups(recommendations: list) -> dict:
 
 
 def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_run_key: str, mode: str = None):
-    st.markdown("### 📋 調貨建議清單（按優先級分組）")
+    st.markdown('<div class="section-title"><span class="section-title__badge">STEP 3</span>📋 調貨建議清單（按優先級分組）</div>', unsafe_allow_html=True)
 
-    groups = _build_priority_groups(recommendations)
+    keyword = st.text_input(
+        "🔍 篩選調貨建議（Article / 店舖編號關鍵字）",
+        value="",
+        key=f"rec_filter_{current_run_key}",
+        help="輸入 Article 或店舖編號的一部分，即時篩選三個優先級分組的顯示結果（不影響統計與 Excel 匯出）。",
+    ).strip().upper()
+
+    if keyword:
+        _filtered = [
+            r for r in recommendations
+            if keyword in str(r.get('Article', '')).upper()
+            or keyword in str(r.get('Transfer Site', '')).upper()
+            or keyword in str(r.get('Receive Site', '')).upper()
+        ]
+        st.caption(f"篩選「{keyword}」：{len(_filtered):,} / {len(recommendations):,} 條建議")
+    else:
+        _filtered = recommendations
+
+    groups = _build_priority_groups(_filtered)
     total_recs = len(recommendations)
     total_qty = sum(r['Transfer Qty'] for r in recommendations)
 
@@ -402,13 +428,20 @@ def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_
             f"{priority_label} — {len(items):,} 條建議，共 {group_qty:,} 件",
             expanded=default_expanded,
         ):
-            cache_key = f"_display_priority_df_{current_run_key}_{priority_label}"
+            # 快取 key 包含關鍵字，避免篩選後命中未篩選的舊快取
+            cache_key = f"_display_priority_df_{current_run_key}_{priority_label}_{keyword}"
             if cache_key not in st.session_state:
                 st.session_state[cache_key] = pd.DataFrame(
                     _build_display_data(items, df, mode, stock_lookup=stock_lookup)
                 )
             group_df = st.session_state[cache_key]
-            st.dataframe(group_df, use_container_width=True, column_config=_int_column_config(group_df))
+            st.dataframe(
+                group_df,
+                use_container_width=True,
+                hide_index=True,
+                height=min(480, 120 + len(group_df) * 28),
+                column_config=_int_column_config(group_df),
+            )
 
 
 def render_ai_executive_summary_button(recommendations: list, statistics: dict, mode_name: str):
@@ -480,7 +513,7 @@ def render_statistics(statistics: dict):
                     }
                     for article, stats in article_stats.items()
                 ])
-                st.dataframe(article_df, use_container_width=True, column_config=_stats_int_config)
+                st.dataframe(article_df, use_container_width=True, hide_index=True, height=320, column_config=_stats_int_config)
 
             st.markdown("**轉出類型分佈**")
             source_type_stats = statistics.get('source_type_stats', {})
@@ -493,7 +526,7 @@ def render_statistics(statistics: dict):
                     }
                     for source_type, stats in source_type_stats.items()
                 ])
-                st.dataframe(source_df, use_container_width=True, column_config=_stats_int_config)
+                st.dataframe(source_df, use_container_width=True, hide_index=True, column_config=_stats_int_config)
 
         with col2:
             st.markdown("**按 OM 統計**")
@@ -509,7 +542,7 @@ def render_statistics(statistics: dict):
                     }
                     for om, stats in om_stats.items()
                 ])
-                st.dataframe(om_df, use_container_width=True, column_config=_stats_int_config)
+                st.dataframe(om_df, use_container_width=True, hide_index=True, column_config=_stats_int_config)
 
             st.markdown("**接收類型分佈**")
             dest_type_stats = statistics.get('dest_type_stats', {})
@@ -522,7 +555,7 @@ def render_statistics(statistics: dict):
                     }
                     for dest_type, stats in dest_type_stats.items()
                 ])
-                st.dataframe(dest_df, use_container_width=True, column_config=_stats_int_config)
+                st.dataframe(dest_df, use_container_width=True, hide_index=True, column_config=_stats_int_config)
 
 
 def render_gap_report(gap_report: dict, current_run_key: str = ""):
@@ -574,14 +607,17 @@ def render_gap_report(gap_report: dict, current_run_key: str = ""):
 
         gap_df = pd.DataFrame(rows)
 
+        # 三個篩選器並排（原本垂直堆疊佔用大量高度）
+        f1, f2, f3 = st.columns(3)
         # Mode filter
         by_mode = gap_report.get('by_mode', {})
         mode_options = ['全部'] + sorted(by_mode.keys())
-        selected_mode = st.selectbox(
-            "篩選模式",
-            options=mode_options,
-            key=f"gap_report_mode_filter_{key_suffix}",
-        )
+        with f1:
+            selected_mode = st.selectbox(
+                "篩選模式",
+                options=mode_options,
+                key=f"gap_report_mode_filter_{key_suffix}",
+            )
 
         if selected_mode != '全部':
             filtered_df = gap_df[gap_df['模式'] == selected_mode]
@@ -590,27 +626,32 @@ def render_gap_report(gap_report: dict, current_run_key: str = ""):
 
         # Role filter
         role_options = ['全部', '目的地', '來源']
-        selected_role = st.selectbox(
-            "篩選角色",
-            options=role_options,
-            key=f"gap_report_role_filter_{key_suffix}",
-        )
+        with f2:
+            selected_role = st.selectbox(
+                "篩選角色",
+                options=role_options,
+                key=f"gap_report_role_filter_{key_suffix}",
+            )
         if selected_role != '全部':
             filtered_df = filtered_df[filtered_df['角色'] == selected_role]
 
         # Status filter
         status_options = ['全部'] + sorted(gap_df['狀態'].unique())
-        selected_status = st.selectbox(
-            "篩選狀態",
-            options=status_options,
-            key=f"gap_report_status_filter_{key_suffix}",
-        )
+        with f3:
+            selected_status = st.selectbox(
+                "篩選狀態",
+                options=status_options,
+                key=f"gap_report_status_filter_{key_suffix}",
+            )
         if selected_status != '全部':
             filtered_df = filtered_df[filtered_df['狀態'] == selected_status]
 
+        st.caption(f"顯示 {len(filtered_df):,} / {len(gap_df):,} 列")
         st.dataframe(
             filtered_df,
             use_container_width=True,
+            hide_index=True,
+            height=420,
             column_config={
                 '原始需求/可轉量': st.column_config.NumberColumn(format="%d"),
                 '實際收/轉量': st.column_config.NumberColumn(format="%d"),
