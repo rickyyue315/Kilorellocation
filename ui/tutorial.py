@@ -309,13 +309,10 @@ def _render_jump(indexed):
 
 def _render_filters(indexed):
     st.markdown("### 🔍 幫我選模式")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        scen = st.selectbox("我想解決的問題…", _SCENARIO_OPTIONS, key="tut_scenario")
-    with col2:
-        risk = st.radio("風險承受度", _RISK_OPTIONS, horizontal=True, key="tut_risk")
-    with col3:
-        om = st.radio("OM 範圍", _OM_OPTIONS, horizontal=True, key="tut_om")
+    st.caption("由上而下依序選擇三個條件，即時篩出符合的模式。")
+    scen = st.selectbox("我想解決的問題…", _SCENARIO_OPTIONS, key="tut_scenario")
+    risk = st.radio("風險承受度", _RISK_OPTIONS, key="tut_risk")
+    om = st.radio("OM 範圍", _OM_OPTIONS, key="tut_om")
     filtered = []
     for group_key, _group_title, mode_data in indexed:
         if scen != "全部場景" and _GROUP_USE.get(group_key) != scen:
