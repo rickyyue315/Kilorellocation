@@ -1,5 +1,4 @@
-"""
-教學分頁 — 30 種調貨模式圖例教學（數據驅動版本）
+"""教學分頁 — 30 種調貨模式圖例教學（圖片為主＋文字為輔版本）
 """
 
 import json
@@ -7,6 +6,9 @@ import os
 from pathlib import Path
 
 import streamlit as st
+
+from models.mode_registry import get_mode_def_by_code
+from ui import tutorial_diagrams as _td
 
 _TUTORIALS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "tutorials")
 _ASSETS_DIR = Path(__file__).resolve().parent.parent / 'static' / 'tutorials'
@@ -21,6 +23,32 @@ _GROUP_DEFS = [
     ("f", "目標優化系列（F / F2 / F3）", "7"),
     ("nd_sku", "ND/SKU專項（ND1 / ND2 / ND3 / ND4 / 精簡SKU）", "8"),
 ]
+
+# 組別用途（一句話）＋範圍標籤：總覽圖與篩選器共用
+_GROUP_USE = {
+    "basic": "日常缺貨補貨",
+    "b2": "Type分類＋遊客區優先",
+    "b3": "跨OM版B2",
+    "c": "零庫存店補貨",
+    "d": "ND死貨清倉",
+    "e": "ALL標記強制清空",
+    "f": "Target指定店補貨",
+    "nd_sku": "ND互轉／撤SKU",
+}
+_GROUP_SCOPE = {
+    "basic": "僅同OM",
+    "b2": "僅同OM",
+    "b3": "可跨OM",
+    "c": "混合",
+    "d": "僅同OM",
+    "e": "混合",
+    "f": "可跨OM",
+    "nd_sku": "混合",
+}
+
+_SCENARIO_OPTIONS = ["全部場景"] + [_GROUP_USE[k] for k, _, _ in _GROUP_DEFS]
+_RISK_OPTIONS = ["全部", "低", "中", "高"]
+_OM_OPTIONS = ["全部", "僅同OM", "可跨OM"]
 
 
 def _flow_node(text, color="blue", width="auto"):
@@ -170,10 +198,99 @@ def _load_group(group_key):
         return json.load(f)
 
 
-def _render_group(group_title, icon, modes_data):
-    with st.expander(f"{icon} {group_title}", expanded=False):
-        for mode_data in modes_data:
+# ── 圖片版教學（新增） ────────────────────────────────────────────
+
+def _show_svg(svg_str):
+    """呈現 SVG 字串（與 Turnday 教學圖做法一致）。"""
+    if svg_str:
+        st.image(svg_str, use_container_width=True)
+
+
+def _mode_scope_label(mode_code):
+    try:
+        d = get_mode_def_by_code(mode_code)
+    except Exception:
+        d = None
+    if d is not None and getattr(d, "cross_om_matching", False):
+        return "🔀 可跨OM"
+    return "🔒 僅同OM"
+
+
+def _all_modes_index():
+    """[(group_key, group_title, mode_data)] 全量索引（供總覽圖＋篩選用）。"""
+    indexed = []
+    for group_key, group_title, _icon in _GROUP_DEFS:
+        for mode_data in _load_group(group_key):
+            indexed.append((group_key, group_title, mode_data))
+    return indexed
+
+
+def _render_mode_card(mode_data, group_key=None):
+    """單一模式：圖片為主（邏輯圖＋情境圖），文字收合為輔。"""
+    code = mode_data.get("code", "")
+    name = mode_data.get("name", "")
+    risk = mode_data.get("risk", "中")
+    scenario = mode_data.get("scenario", "")
+    with st.container(border=True):
+        st.markdown(
+            f'<h4 class="mode-title">模式 {code}：{name} {_risk_badge(risk)}</h4>',
+            unsafe_allow_html=True,
+        )
+        meta = f"{_mode_scope_label(code)} · 風險{risk}"
+        if group_key and group_key in _GROUP_USE:
+            meta += f" · 👉 {_GROUP_USE[group_key]}"
+        st.caption(meta)
+        st.markdown(f"**適用場景：**{scenario}")
+        _show_svg(_td.build_mode_logic_svg(mode_data))
+        scen_svg = _td.build_mode_scenario_svg(mode_data)
+        if scen_svg:
+            _show_svg(scen_svg)
+        with st.expander("📝 文字詳解（篩選流程 / 配對順序 / 範例表格 / 對比）", expanded=False):
             st.markdown(_build_mode_from_data(mode_data), unsafe_allow_html=True)
+        extra_notes = mode_data.get("extra_notes")
+        if extra_notes:
+            st.caption(f"💡 {extra_notes}")
+
+
+def _render_overview(indexed):
+    st.markdown("### 🖼️ 一圖看懂 30 種模式")
+    st.caption("先按場景選大類（8 張卡），再看每張模式圖（左轉出 → 中配對 → 右接收），最後才展開文字看數字。")
+    groups = []
+    for group_key, group_title, _icon in _GROUP_DEFS:
+        modes = [(m["code"], m.get("risk", "中")) for gk, _, m in indexed if gk == group_key]
+        groups.append((group_title, modes, _GROUP_USE[group_key], _GROUP_SCOPE[group_key]))
+    _show_svg(_td.build_overview_map_svg(groups))
+
+
+def _render_filters(indexed):
+    st.markdown("### 🔍 幫我選模式")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        scen = st.selectbox("我想解決的問題…", _SCENARIO_OPTIONS, key="tut_scenario")
+    with col2:
+        risk = st.radio("風險承受度", _RISK_OPTIONS, horizontal=True, key="tut_risk")
+    with col3:
+        om = st.radio("OM 範圍", _OM_OPTIONS, horizontal=True, key="tut_om")
+    filtered = []
+    for group_key, _group_title, mode_data in indexed:
+        if scen != "全部場景" and _GROUP_USE.get(group_key) != scen:
+            continue
+        if risk != "全部" and mode_data.get("risk") != risk:
+            continue
+        if om != "全部":
+            scope = _mode_scope_label(mode_data.get("code", ""))
+            if om == "僅同OM" and "僅同OM" not in scope:
+                continue
+            if om == "可跨OM" and "可跨OM" not in scope:
+                continue
+        filtered.append((group_key, mode_data))
+    return scen, risk, om, filtered
+
+
+def _render_group(group_title, icon, modes_data, group_key=None):
+    with st.expander(f"{icon} {group_title}（{len(modes_data)} 個模式 · 圖片版）", expanded=False):
+        for mode_data in modes_data:
+            _render_mode_card(mode_data, group_key=group_key)
 
 
 def _render_global_rules():
@@ -291,6 +408,8 @@ def _render_decision_guide():
     st.markdown("### 模式選擇決策指南")
     st.markdown("根據以下問題，快速找到適合你的調貨模式：")
 
+    _show_svg(_td.build_decision_tree_svg())
+
     branches = [
         ("清理無銷售ND庫存？", "D / D2", "orange"),
         ("有Target目標數量？", "F / F2", "purple"),
@@ -349,17 +468,30 @@ def render_tutorial_page():
     _render_floor_body_guide()
 
     st.markdown("---")
-    st.markdown("### 30 種模式教學")
-    st.markdown("按業務場景分為 8 組，展開查看詳細教學。")
-    st.info(
-        "💡 **保底主體提示**：以下各模式公式中的「Safety / Safety Stock」字樣，在 Turnday 主體下會自動替換為 "
-        "Turnday 保底（ceil(日銷速 × N日)，計算方法見上方教學）；各模式的固定保底"
-        "（C1 淨存>2、F3/NST 保留2件、ND3/ND4 保留3件、NST 75%上限）不受主體影響。"
-    )
+    indexed = _all_modes_index()
+    _render_overview(indexed)
 
-    for group_key, group_title, icon in _GROUP_DEFS:
-        modes_data = _load_group(group_key)
-        _render_group(group_title, icon, modes_data)
+    st.markdown("---")
+    scen, risk, om, filtered = _render_filters(indexed)
+
+    st.markdown("---")
+    st.markdown("### 30 種模式教學")
+    if scen != "全部場景" or risk != "全部" or om != "全部":
+        st.markdown(f"已篩出 **{len(filtered)}** 個模式（場景：{scen} · 風險：{risk} · OM：{om}），每張卡先看圖、再展開文字。")
+        if not filtered:
+            st.warning("沒有符合條件的模式，請放寬篩選（例如風險選「全部」）。")
+        for group_key, mode_data in filtered:
+            _render_mode_card(mode_data, group_key=group_key)
+    else:
+        st.markdown("按業務場景分為 8 組，展開查看圖片版詳細教學（每模式先看邏輯圖＋情境圖）。")
+        st.info(
+            "💡 **保底主體提示**：以下各模式公式中的「Safety / Safety Stock」字樣，在 Turnday 主體下會自動替換為 "
+            "Turnday 保底（ceil(日銷速 × N日)，計算方法見上方教學）；各模式的固定保底"
+            "（C1 淨存>2、F3/NST 保留2件、ND3/ND4 保留3件、NST 75%上限）不受主體影響。"
+        )
+        for group_key, group_title, icon in _GROUP_DEFS:
+            modes_data = _load_group(group_key)
+            _render_group(group_title, icon, modes_data, group_key=group_key)
 
     st.markdown("---")
     _render_decision_guide()
