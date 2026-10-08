@@ -569,26 +569,51 @@ def render_gap_report(gap_report: dict, current_run_key: str = ""):
     key_suffix = current_run_key or "default"
 
     with st.expander("📊 調貨缺口分析", expanded=False):
-        # KPI row
+        # KPI row（計數皆為「店×SKU」組數，非獨立店數）
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("未滿足店數", summary.get('total_dest_gaps', 0))
+        k1.metric("未滿足店×SKU", summary.get('total_dest_gaps', 0))
         k2.metric("缺口件數", summary.get('total_gap_qty', 0))
-        k3.metric("剩餘店數", summary.get('total_source_remaining', 0))
+        k3.metric("剩餘店×SKU", summary.get('total_source_remaining', 0))
         k4.metric("剩餘件數", summary.get('total_remaining_qty', 0))
 
+        # 分母為 0（如 E 模式無適用目的地）時顯示「不適用」，避免 0.0% 誤讀
+        dest_count = summary.get('total_dest_count', 0)
+        dest_rate = f"{summary.get('fulfillment_rate', 0)}%" if dest_count > 0 else "不適用"
+        qty_rate = f"{summary.get('qty_fulfillment_rate', 0)}%" if dest_count > 0 else "不適用"
+
         k5, k6, k7, k8 = st.columns(4)
-        k5.metric("目的地總數", summary.get('total_dest_count', 0))
-        k6.metric("目的地滿足率", f"{summary.get('fulfillment_rate', 0)}%")
-        k7.metric("來源總數", summary.get('total_source_count', 0))
-        k8.metric("來源轉出率", f"{summary.get('source_transfer_rate', 0)}%")
+        k5.metric("目的地總數", dest_count)
+        k6.metric("目的地滿足率(店×SKU)", dest_rate)
+        k7.metric("件數滿足率", qty_rate)
+        k8.metric("來源轉出率(可轉量)", f"{summary.get('source_transfer_rate', 0)}%")
+
+        over_total = summary.get('total_over_transferred_qty', 0)
+        if over_total and over_total > 0:
+            st.warning(
+                f"⚠️ 偵測到超量轉出：來源店累計轉出超出可轉量合計 {over_total} 件"
+                f"（請檢查後處理與安全庫存保護）"
+            )
+
+        st.caption(
+            "「剩餘」= 可轉量（政策上限，如 A 20%／B 50%／C 30%）− 實際轉出，非店內實體庫存；"
+            "「轉後店內庫存」= 原始庫存 − 實際轉出。"
+        )
 
         st.markdown("")
 
         # Build DataFrame for display（空值用 None 維持數值型別，比率欄存 0-100 float 供 ProgressColumn 顯示）
+        # E 模式（不適用）的數值欄為 None → 顯示為空，不會誤示 0／100%
         rows = []
         for d in details:
             is_dest = d.get('role') == '目的地'
             is_source = d.get('role') == '來源'
+            over = d.get('over_transferred_qty', 0) or 0
+            gap = d.get('gap_or_remaining')
+            gap_pct = d.get('gap_pct')
+            rem_pct = d.get('remaining_pct')
+            status_text = d.get('status', '')
+            if is_source and over > 0:
+                status_text = f"{status_text}；超額警告"
             rows.append({
                 'Article': d.get('article', ''),
                 'Site': d.get('site', ''),
@@ -597,12 +622,15 @@ def render_gap_report(gap_report: dict, current_run_key: str = ""):
                 '模式': d.get('mode', ''),
                 '原始需求/可轉量': d.get('original_need_or_surplus', 0),
                 '實際收/轉量': d.get('actual_qty', 0),
-                '缺口': d.get('gap_or_remaining', 0) if is_dest else None,
-                '剩餘': d.get('gap_or_remaining', 0) if is_source else None,
-                '達成率': round(max(100 - d.get('gap_pct', 0), 0), 1) if is_dest else None,
-                '轉出率': round(max(100 - d.get('remaining_pct', 0), 0), 1) if is_source else None,
+                '缺口': gap if is_dest else None,
+                '缺口%': gap_pct if is_dest else None,
+                '未轉出可轉量': gap if is_source else None,
+                '轉後店內庫存': d.get('after_transfer_stock') if is_source else None,
+                '超過可轉量': over if over > 0 else None,
+                '達成率': round(max(100 - gap_pct, 0), 1) if (is_dest and gap_pct is not None) else None,
+                '轉出率': round(max(100 - rem_pct, 0), 1) if (is_source and rem_pct is not None) else None,
                 '類型': d.get('type_label', ''),
-                '狀態': d.get('status', ''),
+                '狀態': status_text,
             })
 
         gap_df = pd.DataFrame(rows)
@@ -656,7 +684,10 @@ def render_gap_report(gap_report: dict, current_run_key: str = ""):
                 '原始需求/可轉量': st.column_config.NumberColumn(format="%d"),
                 '實際收/轉量': st.column_config.NumberColumn(format="%d"),
                 '缺口': st.column_config.NumberColumn(format="%d"),
-                '剩餘': st.column_config.NumberColumn(format="%d"),
+                '缺口%': st.column_config.NumberColumn(format="%.1f%%"),
+                '未轉出可轉量': st.column_config.NumberColumn(format="%d"),
+                '轉後店內庫存': st.column_config.NumberColumn(format="%d"),
+                '超過可轉量': st.column_config.NumberColumn(format="%d"),
                 '達成率': st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.1f%%"),
                 '轉出率': st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.1f%%"),
             },

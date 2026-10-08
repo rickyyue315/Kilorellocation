@@ -51,6 +51,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
    - Strategy A (Rebalance): take 1 piece from another destination with qty ≥3 in same source group, making the 1-piece line become 2.
    - Strategy B (Merge): if no donor ≥3, merge the 1-piece into the highest-sales destination in the group (measured by Last Month Sold Qty + MTD Sold Qty), then remove the 1-piece record.
    - Exception: if the source store has only 1 transferable piece for that SKU in total, the single-piece line is preserved.
+   - **Cap guard (v2.36.0)**: post-processing "+1" boosts (A1/ND4 avoid-1-remainder) must not push a source's cumulative outgoing above its transferable qty (stock minus safety, policy cap included). The largest boost that fits is applied; a boost that would exceed the cap is skipped. Violations would otherwise lower the store below its safety stock without any report/QC warning.
 8. **Floor body (v2.32.0, applies to ALL 30 modes)**: the system has two interchangeable floor bodies, orthogonal to mode selection (2 bodies x 30 modes):
    - Safety body (default): floor = uploaded Safety Stock. Behavior identical to v2.31.
    - Turnday body: floor = ceil(Daily Sold Rate x N days). Every Safety Stock touchpoint switches basis automatically: source floor (Total Available - S -> Total Available - T), source eligibility (Total Available > S -> > T), Emergency/Potential target (S -> T), Priority Zero target (max(S*0.5, 3) -> max(T*0.5, 3)), receive caps (max(S*2, 3) -> max(T*2, 3)), simplified-SKU cap (max(S*2, last-2-month sales*2) -> max(T*2, ...)).
@@ -104,7 +105,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Inherits all Mode A rules (RF Surplus Transfer, 20% cap, min 2, safety stock protection)
 - **Additional: Avoid exactly 1 remaining at source store**
   - During matching (`_adjust_a1_remainder`): if final_remaining == 1, try `transfer_qty + 1` (if source has capacity and dest can accept target_qty+1), else `transfer_qty - 1` if > 1
-  - Post-processing (`optimize_a1_avoid_one_remainder`): after all matching, if any source ends with exactly 1 remaining, add +1 to the best destination line (highest sales, capped at target_qty+1)
+  - Post-processing (`optimize_a1_avoid_one_remainder`): after all matching, if any source ends with exactly 1 remaining, add +1 to the best destination line (highest sales, capped at target_qty+1); the boost never exceeds the source's transferable qty (v2.36.0 guard, same as the matching-time check)
 - ND Shop not forced to 0, only eliminates "exactly 1" remainder
 - Goal: conservative transfer while avoiding 1-piece tail at source
 
@@ -249,6 +250,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - Windy source can only transfer to Windy destinations
 - Key change: Target Qty is used directly as needed_qty (no subtraction of current stock or pending); ND stores with Target can receive
 - **New v2.23.0**: Optional "fulfill small targets first" checkbox — when checked, Priority-1 destinations are sorted by needed_qty ASC (smallest target first); post-match gap filling allocates leftover source stock to still-unfilled destinations; Excel output includes a "Target達成分析" sheet
+- **Target達成分析 scope (v2.36.0)**: the sheet counts only user-set target destinations (F模式目標接收 / F指定模式目標接收 / NST模式目標接收). System-generated 重點補0 auto targets are excluded — their shortfall is defined as target − total available (stock + pending) and is reported in the 調貨缺口分析 sheet. This keeps the two sheets consistent (no more "fulfilled in gap report, unmet in target report").
 - Goal: Target-driven allocation, zero stock replenishment for non-Target RF sites
 
 ## Mode F2: Target-Only Optimization
@@ -413,7 +415,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - RF highest sales protected
 - No dual role source/destination
 - Priority matching order list
-- Post-processing: eliminate single-piece (qty=1) transfer lines across all modes
+- Post-processing: eliminate single-piece (qty=1) transfer lines across all modes; size-increasing boosts (A1/ND4 avoid-1-remainder) are capped by the source transferable qty (v2.36.0)
 - Special rules: 
   - B2/B2a/B2L/B2La/B3/B3a/B3L/B3La Type=L exception (full transfer or retain 2)
   - B2a/B2La/B3a/B3La Type=T no-source restriction

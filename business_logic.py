@@ -645,7 +645,10 @@ class TransferLogic:
         from services.quality_checks import run_quality_checks
         logger.info("開始執行質量檢查")
         skip_nd_check = self._is_nd_transfer_mode(mode) or mode in (self.mode_f, self.mode_f_target_only, self.mode_f3, self.mode_nst)
-        passed, errors = run_quality_checks(self.transfer_recommendations, df, skip_nd_check)
+        passed, errors = run_quality_checks(
+            self.transfer_recommendations, df, skip_nd_check,
+            pre_match_snapshots=self._pre_match_snapshots,
+        )
         self.quality_check_passed = passed
         self.quality_errors = errors
         if passed:

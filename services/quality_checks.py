@@ -2,7 +2,7 @@
 Quality check service — performs validation on transfer recommendations.
 """
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -13,6 +13,7 @@ def run_quality_checks(
     recommendations: List[Dict[str, Any]],
     df: pd.DataFrame,
     skip_nd_check: bool = False,
+    pre_match_snapshots: Optional[List[Any]] = None,
 ) -> Tuple[bool, List[str]]:
     errors: List[str] = []
     passed = True
@@ -88,7 +89,29 @@ def run_quality_checks(
                     errors.append(f"ND店鋪不能作為接收店鋪 - Site: {receive_site}, Article: {article}")
                     passed = False
 
-    # 檢查8：對於C模式(重點補0)，檢查接收店鋪的累計接收數量是否超過目標數量
+    # 檢查8：來源店累計轉出不得超過配對前的可轉出量
+    # （A1/ND4 後處理「+1」若無視可轉上限，會令店舖跌破安全庫存；此檢查負責攔截）
+    if pre_match_snapshots:
+        transferable_by_source: Dict[Any, int] = {}
+        for snap in pre_match_snapshots:
+            for s in getattr(snap, 'sources', []) or []:
+                key = (s.get('article'), str(s.get('site', '')).strip().upper())
+                transferable_by_source[key] = max(
+                    transferable_by_source.get(key, 0), int(s.get('transferable_qty', 0))
+                )
+        for (article, transfer_site), total_qty in cumulative_transfers_by_source.items():
+            key = (article, str(transfer_site).strip().upper())
+            transferable = transferable_by_source.get(key)
+            if transferable is None:
+                continue
+            if total_qty > transferable:
+                errors.append(
+                    f"累計轉出數量({total_qty})超過可轉出上限({transferable}) - "
+                    f"Article: {article}, Site: {transfer_site}"
+                )
+                passed = False
+
+    # 檢查9：對於C模式(重點補0)，檢查接收店鋪的累計接收數量是否超過目標數量
     receive_site_stats = {}
     for rec in recommendations:
         if rec.get('Destination Type') == '重點補0':

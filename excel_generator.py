@@ -13,7 +13,11 @@ import xlsxwriter
 from typing import Dict, List, Optional
 import logging
 
-from services.statistics import compute_target_fulfillment_stats, compute_nd_clearance_stats
+from services.statistics import (
+    TARGET_DEST_TYPES,
+    compute_target_fulfillment_stats,
+    compute_nd_clearance_stats,
+)
 
 # 設置日誌
 logger = logging.getLogger(__name__)
@@ -465,7 +469,10 @@ class ExcelGenerator:
                  even if no recommendations were generated for them.
         """
         logger.info("創建Target達成分析工作表")
-        fulfillment = compute_target_fulfillment_stats(recommendations, df)
+        # 只計使用者設定的目標接收點；系統自動「重點補0」目標不列入（其缺口見調貨缺口分析）
+        fulfillment = compute_target_fulfillment_stats(
+            recommendations, df, target_dest_types=TARGET_DEST_TYPES
+        )
         details = fulfillment.get('details', [])
         if not details:
             return
@@ -733,9 +740,9 @@ class ExcelGenerator:
 
         summary = gap_report.get('summary', {})
         row1_kpis = [
-            ('未滿足店數', summary.get('total_dest_gaps', 0)),
+            ('未滿足店×SKU', summary.get('total_dest_gaps', 0)),
             ('缺口件數', summary.get('total_gap_qty', 0)),
-            ('剩餘店數', summary.get('total_source_remaining', 0)),
+            ('剩餘店×SKU', summary.get('total_source_remaining', 0)),
             ('剩餘件數', summary.get('total_remaining_qty', 0)),
         ]
         for i, (label, value) in enumerate(row1_kpis):
@@ -743,11 +750,21 @@ class ExcelGenerator:
             worksheet.write(row, i * 2 + 1, value, kpi_value_fmt)
         row += 1
 
+        # 分母為 0（如 E 模式無適用目的地）時以「不適用」表示，避免 0.0% 誤讀
+        dest_count = summary.get('total_dest_count', 0)
+        dest_rate_display = (
+            f"{summary.get('fulfillment_rate', 0)}%" if dest_count > 0 else '不適用'
+        )
+        qty_rate_display = (
+            f"{summary.get('qty_fulfillment_rate', 0)}%" if dest_count > 0 else '不適用'
+        )
         row2_kpis = [
-            ('目的地總數', summary.get('total_dest_count', 0)),
-            ('目的地滿足率', f"{summary.get('fulfillment_rate', 0)}%"),
+            ('目的地總數', dest_count),
+            ('目的地滿足率(店×SKU)', dest_rate_display),
+            ('件數滿足率', qty_rate_display),
             ('來源總數', summary.get('total_source_count', 0)),
-            ('來源轉出率', f"{summary.get('source_transfer_rate', 0)}%"),
+            ('來源轉出率(可轉量)', f"{summary.get('source_transfer_rate', 0)}%"),
+            ('超量轉出件數', summary.get('total_over_transferred_qty', 0)),
         ]
         for i, (label, value) in enumerate(row2_kpis):
             worksheet.write(row, i * 2, label, kpi_label_fmt)
@@ -781,11 +798,13 @@ class ExcelGenerator:
         worksheet.set_column('F:F', 14)
         worksheet.set_column('G:G', 14)
         worksheet.set_column('H:H', 10)
-        worksheet.set_column('I:I', 10)
-        worksheet.set_column('J:J', 12)
-        worksheet.set_column('K:K', 12)
-        worksheet.set_column('L:L', 14)
+        worksheet.set_column('I:I', 13)
+        worksheet.set_column('J:J', 13)
+        worksheet.set_column('K:K', 10)
+        worksheet.set_column('L:L', 10)
         worksheet.set_column('M:M', 22)
+        worksheet.set_column('N:N', 12)
+        worksheet.set_column('O:O', 22)
         worksheet.set_default_row(18)
 
     def _write_gap_detail_section(self, worksheet, start_row, mode_details,
@@ -793,8 +812,8 @@ class ExcelGenerator:
         """Write the detail table for gap report."""
         row = start_row
         headers = ['Article', 'Site', 'OM', '角色', '模式',
-                    '原始需求/可轉量', '實際收/轉量', '缺口', '剩餘',
-                    '達成率', '轉出率', '類型', '狀態']
+                    '原始需求/可轉量', '實際收/轉量', '缺口', '未轉出可轉量', '轉後店內庫存',
+                    '達成率', '轉出率', '類型', '超過可轉量', '狀態']
         for col, h in enumerate(headers):
             worksheet.write(row, col, h, header_fmt)
         row += 1
@@ -802,20 +821,25 @@ class ExcelGenerator:
         for entry in mode_details:
             gap = entry['gap_or_remaining']
             status = entry['status']
+            warning = entry.get('over_transferred_qty', 0) or 0
             is_dest = entry['role'] == '目的地'
             is_source = entry['role'] == '來源'
-            is_ok = gap <= 0 and is_dest
+            is_ok = gap is not None and gap <= 0 and is_dest
             is_na = status.startswith('不適用')
 
             if is_na:
                 row_fmt = na_fmt
                 status_fmt = na_fmt
+            elif warning > 0:
+                row_fmt = fail_fmt
+                status_fmt = fail_fmt
             elif is_ok:
                 row_fmt = data_fmt
                 status_fmt = ok_fmt
             else:
-                row_fmt = fail_fmt if gap > 0 else data_fmt
-                status_fmt = fail_fmt if gap > 0 else ok_fmt
+                has_gap = gap is not None and gap > 0
+                row_fmt = fail_fmt if has_gap else data_fmt
+                status_fmt = fail_fmt if has_gap else ok_fmt
 
             worksheet.write(row, 0, entry.get('article', ''), data_fmt)
             worksheet.write(row, 1, entry.get('site', ''), data_fmt)
@@ -827,17 +851,25 @@ class ExcelGenerator:
             if is_dest:
                 worksheet.write(row, 7, gap, row_fmt)
                 worksheet.write(row, 8, '', data_fmt)
-                achieve_pct = round(max(100 - entry.get('gap_pct', 0), 0), 1)
-                worksheet.write(row, 9, achieve_pct, pct_fmt)
-                worksheet.write(row, 10, '', data_fmt)
+                worksheet.write(row, 9, '', data_fmt)
+                gap_pct = entry.get('gap_pct')
+                if gap_pct is None:
+                    worksheet.write(row, 10, '', data_fmt)
+                else:
+                    achieve_pct = round(max(100 - gap_pct, 0), 1)
+                    worksheet.write(row, 10, achieve_pct, pct_fmt)
+                worksheet.write(row, 11, '', data_fmt)
             else:
                 worksheet.write(row, 7, '', data_fmt)
                 worksheet.write(row, 8, gap, row_fmt)
-                worksheet.write(row, 9, '', data_fmt)
+                after_stock = entry.get('after_transfer_stock')
+                worksheet.write(row, 9, after_stock if after_stock is not None else '', data_fmt)
+                worksheet.write(row, 10, '', data_fmt)
                 transfer_pct = round(max(100 - entry.get('remaining_pct', 0), 0), 1)
-                worksheet.write(row, 10, transfer_pct, pct_fmt)
-            worksheet.write(row, 11, entry.get('type_label', ''), data_fmt)
-            worksheet.write(row, 12, status, status_fmt)
+                worksheet.write(row, 11, transfer_pct, pct_fmt)
+            worksheet.write(row, 12, entry.get('type_label', ''), data_fmt)
+            worksheet.write(row, 13, warning if warning > 0 else '', row_fmt)
+            worksheet.write(row, 14, status, status_fmt)
             row += 1
 
         return row
@@ -850,9 +882,9 @@ class ExcelGenerator:
         row += 1
 
         mini_kpis = [
-            ('未滿足', mode_summary.get('total_dest_gaps', 0)),
+            ('未滿足店×SKU', mode_summary.get('total_dest_gaps', 0)),
             ('缺口件', mode_summary.get('total_gap_qty', 0)),
-            ('剩餘店', mode_summary.get('total_source_remaining', 0)),
+            ('剩餘店×SKU', mode_summary.get('total_source_remaining', 0)),
             ('剩餘件', mode_summary.get('total_remaining_qty', 0)),
         ]
         for i, (label, value) in enumerate(mini_kpis):

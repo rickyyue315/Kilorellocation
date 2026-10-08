@@ -83,11 +83,24 @@ def compute_transfer_statistics(recommendations: List[Dict[str, Any]]) -> Dict[s
     }
 
 
+# 使用者設定的目標接收類型（「重點補0」等系統自動補0目標不屬於此類，
+# 其缺口以「調貨缺口分析」的 receiving 基準（目標 − 現有庫存）為準）
+TARGET_DEST_TYPES = frozenset({
+    'F模式目標接收', 'F指定模式目標接收', 'NST模式目標接收',
+})
+
+
 def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]],
-                                     df: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
+                                     df: Optional[pd.DataFrame] = None,
+                                     target_dest_types: Optional[frozenset] = None) -> Dict[str, Any]:
     """
-    From F/F2/F3 recommendations, compute per-(Article, Receive Site) target fulfillment.
-    Only considers recs with a 'Target Qty' > 0 that came from target-mode matching.
+    From F/F2/F3/NST recommendations, compute per-(Article, Receive Site) target fulfillment.
+    Only considers user-set Target destinations (target-mode matching).
+
+    If `target_dest_types` is provided, recommendations are further filtered to those
+    Destination Type values so system-generated auto targets (e.g. 「重點補0」自動補0目標)
+    are not mixed into target fulfillment. When omitted, all recs with 'Target Qty' > 0
+    are used (backward-compatible).
 
     If `df` (the raw uploaded DataFrame) is provided, also includes Target>0 rows that
     have zero actual received (no recommendations generated), so every target is visible.
@@ -113,6 +126,8 @@ def compute_target_fulfillment_stats(recommendations: List[Dict[str, Any]],
     for rec in recommendations:
         target_qty = rec.get('Target Qty')
         if target_qty is None or target_qty <= 0:
+            continue
+        if target_dest_types is not None and rec.get('Destination Type') not in target_dest_types:
             continue
         key = (rec['Article'], str(rec.get('Receive Site', '')).strip().upper())
         entry = fulfillment_map[key]
@@ -364,7 +379,11 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
 
     For each (article, site) pair, computes:
       - Destination role: needed_qty vs actual_received → gap (缺口)
-      - Source role: transferable_qty vs actual_transferred_out → remaining (剩餘)
+        E 模式（強制調撥）目的地無數值（None），標示「不適用(強制調撥)」。
+      - Source role: transferable_qty vs actual_transferred_out → 未轉出可轉量
+        「可轉出」是政策上限（如 A 20%／B 50%／C 30%），非店內實體庫存；
+        另附 after_transfer_stock（轉後店內庫存 = 原始庫存 − 實際轉出）
+        與 over_transferred_qty（超出可轉量，>0 表示後處理超量轉出）。
 
     Returns:
         dict with:
@@ -377,6 +396,8 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
             'total_dest_gaps': 0, 'total_gap_qty': 0,
             'total_source_remaining': 0, 'total_remaining_qty': 0,
             'fulfillment_rate': 0.0, 'total_dest_count': 0, 'total_source_count': 0,
+            'total_needed_qty': 0, 'total_received_qty': 0, 'qty_fulfillment_rate': 0.0,
+            'source_transfer_rate': 0.0, 'total_over_transferred_qty': 0,
         }, 'details': [], 'by_mode': {}}
 
     # E-mode name check (強制轉出 does not have meaningful destination gaps)
@@ -418,6 +439,9 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
     total_source_remaining = 0
     total_source_count = 0
     total_fulfilled_dest = 0
+    total_needed_qty = 0
+    total_received_qty = 0
+    total_over_transferred_qty = 0
 
     # Destination-side gaps
     for key, d in dest_pre_match.items():
@@ -425,9 +449,10 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
         actual = received_total.get(key, 0)
         is_e = _is_e_mode(d['mode'])
         if is_e:
-            gap = 0
+            # 強制調撥：目的地無缺口概念，數值欄留空（None），避免 0／100% 造成誤讀
+            gap = None
             status = '不適用(強制調撥)'
-            gap_pct = 0.0
+            gap_pct = None
         else:
             gap = max(d['needed_qty'] - actual, 0)
             gap_pct = round(gap / d['needed_qty'] * 100, 1) if d['needed_qty'] > 0 else 0.0
@@ -439,6 +464,8 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
             if gap <= 0:
                 total_fulfilled_dest += 1
             total_dest_count += 1
+            total_needed_qty += d['needed_qty']
+            total_received_qty += actual
 
         details.append({
             'article': art,
@@ -450,6 +477,7 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
             'actual_qty': actual,
             'gap_or_remaining': gap,
             'gap_pct': gap_pct,
+            'over_transferred_qty': 0,
             'type_label': d.get('dest_type', ''),
             'status': status,
         })
@@ -458,13 +486,25 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
     for key, s in source_pre_match.items():
         art, site = key
         actual = transferred_total.get(key, 0)
+        # 未轉出可轉量 = 可轉出（政策上限，如 A 20%／B 50%／C 30%）− 實際轉出
         remaining = max(s['transferable_qty'] - actual, 0)
         rem_pct = round(remaining / s['transferable_qty'] * 100, 1) if s['transferable_qty'] > 0 else 0.0
-        status = '已配完' if remaining <= 0 else f'尚有剩餘(剩{remaining}件)'
+        over_transferred = max(actual - s['transferable_qty'], 0)
+        if over_transferred > 0:
+            status = f'已超出可轉量({over_transferred}件)'
+        elif remaining > 0:
+            status = f'尚有剩餘(剩{remaining}件)'
+        else:
+            status = '已配完'
         if remaining > 0:
             total_source_remaining += 1
             total_remaining_qty += remaining
+        if over_transferred > 0:
+            total_over_transferred_qty += over_transferred
         total_source_count += 1
+
+        # 轉後店內庫存 = 原始庫存 − 實際轉出（可為 0；負值代表超賣，保留負值供檢查）
+        after_transfer_stock = s.get('original_stock', 0) - actual
 
         details.append({
             'article': art,
@@ -476,6 +516,8 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
             'actual_qty': actual,
             'gap_or_remaining': remaining,
             'remaining_pct': rem_pct,
+            'after_transfer_stock': after_transfer_stock,
+            'over_transferred_qty': over_transferred,
             'type_label': s.get('source_type', ''),
             'status': status,
         })
@@ -497,6 +539,11 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
     source_transfer_rate = round(
         total_transferred / total_transferable * 100, 1
     ) if total_transferable > 0 else 0.0
+
+    # 件數滿足率：實際收貨總件數 ÷ 目的地需求總件數（排除 E 模式不適用目的地）
+    qty_fulfillment_rate = round(
+        total_received_qty / total_needed_qty * 100, 1
+    ) if total_needed_qty > 0 else 0.0
 
     # ── 4. by-mode breakdown ──
     by_mode: Dict[str, Dict] = {}
@@ -535,6 +582,10 @@ def compute_gap_report(snapshots: List[PreMatchSnapshot],
             'total_dest_count': total_dest_count,
             'total_source_count': total_source_count,
             'source_transfer_rate': source_transfer_rate,
+            'total_needed_qty': total_needed_qty,
+            'total_received_qty': total_received_qty,
+            'qty_fulfillment_rate': qty_fulfillment_rate,
+            'total_over_transferred_qty': total_over_transferred_qty,
         },
         'details': details,
         'by_mode': by_mode,

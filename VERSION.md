@@ -1,5 +1,37 @@
 # 版本更新記錄
 
+## v2.36.0 (2026-10-08)
+
+### 調貨缺口分析與 Target達成一致性修正（含模式邏輯變更）
+
+#### 變更說明
+- **F 模式 Target達成 vs 缺口分析矛盾修正**：`compute_target_fulfillment_stats` 新增 `target_dest_types` 過濾；「Target達成分析」只計使用者設定 Target 的接收點（F模式目標接收／F指定模式目標接收／NST模式目標接收），系統自動補0的「重點補0」目標（目標 = max(Safety×0.5,3)、缺口基準為目標−現有庫存）改以「調貨缺口分析」為準。修正前同一店會在 Target 表顯示「未達成」、缺口表顯示「已滿足」。
+  - 注意：配對與分配邏輯不變，自動補0目標店仍會如常收貨，僅報表統計口徑改變；實收為 0 的自動補0店（原本只在 Target 表以「未達成」呈現）請改看「調貨缺口分析」的未滿足列。
+- **來源可轉量上限保護（A1/ND4 模式邏輯）**：後處理「消除餘 1 件」的 +1 增益改為受來源可轉量限制（與匹配階段 `_adjust_a1_remainder` 一致），餘量不足時不增益。修正前可令店舖轉出超過可轉量、跌破安全庫存，且報表無法察覺（剩餘被截成 0、來源轉出率可超過 100%）。
+- **品質檢查新增第 8 項**：來源店累計轉出不得超過配對前可轉出量（`perform_quality_checks` 傳入 pre-match 快照）。
+- **缺口分析超量轉出可見化**：來源列新增 `after_transfer_stock`（轉後店內庫存）與 `over_transferred_qty`（超過可轉量）；超量時狀態顯示「已超出可轉量(N件)」，KPI 新增「超量轉出件數」，UI 顯示警告列。
+- **E 模式（強制調撥）顯示修正**：目的地缺口值改為 None（不適用），不再顯示 0／達成率 100% 的假象；目的地總數為 0 時「目的地滿足率」顯示「不適用」而非 0.0%。
+- **缺口分析 KPI 與欄位語義**：KPI 改名「未滿足店×SKU／剩餘店×SKU」（原「店數」實為店×SKU 組數）；新增「件數滿足率」（Σ實收 ÷ Σ需求）；來源「剩餘」欄更名「未轉出可轉量」並補充說明（可轉量為政策上限，非店內實體庫存），來源轉出率標示「(可轉量)」；「轉出率」ProgressColumn 上限改為 100 顯示，超量另以警告欄呈現。
+- **D 模式缺口語義確認**：D 模式目的地的真實未滿足需求（如 RF 缺貨）維持如實顯示；`test_d_mode_no_dest_gap` 正名為 `test_d_mode_dest_partially_fulfilled` 並補上缺口 > 0 斷言。
+- **測試新增**：`tests/test_gap_report_flow.py`（F 模式 Target/缺口一致性、A1 後處理上限防護、E 模式不適用顯示、D 模式部分滿足）；`tests/test_gap_report.py` 補超量轉出、件數滿足率、E 模式 None 值案例。
+
+#### 修改檔案
+- `services/statistics.py` — `TARGET_DEST_TYPES`、`compute_target_fulfillment_stats(target_dest_types=)`、缺口報表超量／件數滿足率／E 模式 None
+- `services/post_processing.py` — `_source_remaining_capacity`／`_cap_group_boosts_remaining`，A1/ND4 後處理 +1 加上上限防護
+- `services/quality_checks.py` — 新增來源累計轉出 ≤ 可轉量檢查（可選傳入 pre-match 快照）
+- `business_logic.py` — `perform_quality_checks` 傳入快照
+- `ui/display.py` — 缺口 KPI 改名與新增、超量警告、欄位語義（未轉出可轉量／轉後店內庫存／超過可轉量／缺口%）
+- `excel_generator.py` — Target 表只計使用者目標、缺口表新欄位與 KPI、E 模式留空
+- `tests/test_gap_report.py`、`tests/test_gap_report_flow.py`（新增）
+- `config.py` — VERSION bump 至 v2.36.0
+- `app.py` — docstring 版本更新
+- `README.md`、`調貨模式詳解.txt`、`transfer_logic_ai_brief.md`、`data/tutorials/basic.json`、`data/tutorials/f.json` — 同步修正說明
+
+#### 文件同步
+- `README.md` / `VERSION.md` / `config.py` / `app.py` / `調貨模式詳解.txt` / `transfer_logic_ai_brief.md` / `data/tutorials/basic.json` / `data/tutorials/f.json` 已同步；模式邏輯變更屬 A1/ND4 後處理上限（影響總覽配對優先級陳述）與 F 模式報表界定，教學內容已於相關模式卡補註。
+
+---
+
 ## v2.35.0 (2026-09-26)
 
 ### 全介面優化（無模式邏輯變更）

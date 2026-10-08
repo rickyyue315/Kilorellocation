@@ -119,6 +119,7 @@ is_not_highest_sold = effective_sold < max_sold_qty
   - `_get_record_sales_total`（輔助：計算接收店總銷量）
   - Hook：`generate_transfer_recommendations` 末段（`all_recommendations = self._optimize_single_piece_transfers(...)`）
 - **與 D 模式餘貨邏輯的關係**：互補不衝突。D 模式處理「轉出後出貨店剩餘庫存避免 1 件」；本規則處理「每筆調貨記錄的調貨數量避免 1 件」。
+- **來源可轉量上限保護（v2.36.0 新增）**：A1/ND4 後處理「消除餘 1 件」的 +1 增益，只可在來源店之可轉量（庫存 − 保底，含比例上限）餘額內套用；餘額不足時增益降為 0。匹配階段的 `_adjust_a1_remainder` 本來就有此檢查，後處理階段於 v2.36.0 補上，避免店舖轉出超過可轉量、跌破安全庫存；品質檢查同步新增「來源累計轉出 ≤ 可轉量」驗證。
 
 ---
 
@@ -1161,7 +1162,8 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 **新功能（v2.23.0 新增）：**
 - **「優先滿足小型目標」選項**：可在側邊欄勾選，勾選後 Priority-1 目標店按 needed_qty 升序排序（小型目標優先），最大化達成目標數量
 - **配對後缺口填補**：主要配對完成後，若有剩餘來源庫存，自動分配給尚未滿足的目標店
-- **Target達成分析 Excel 工作表**：獨立工作表顯示每組 (Article, Site) 的 Target Qty 與 Actual Received 對比、Gap、Status（達成/部分達成/未達成），以及彙總 KPI（總目標數、達成數、達成率、總差距）
+- **Target達成分析 Excel 工作表**：獨立工作表顯示每組 (Article, Site) 的 Target Qty 與 Actual Received 對比、Gap、Status（達成/部分達成/未達成），以及彙總 KPI（總目標數、達成數、達成率、總差距）；只計使用者設定 Target 的接收點（v2.36.0 修正）
+  - **計入範圍（v2.36.0 修正）**：只計使用者設定 Target 的接收點（F模式目標接收／F指定模式目標接收／NST模式目標接收）。系統自動補0的「重點補0」接收點（目標 = max(Safety×0.5, 3)）不列入本表——其缺口基準是「目標 − 現有庫存（含在途）」，以「調貨缺口分析」工作表為準，避免同一店在兩表中一表顯示已滿足、另一表顯示未達成。
 
 **轉出規則：**
 - ND店鋪可全數轉出（若有 Target 則不轉出，改為接收方）
@@ -1188,7 +1190,7 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 **新功能（v2.23.0 新增）：**
 - **「優先滿足小型目標」選項**：可在側邊欄勾選，勾選後 Priority-1 目標店按 needed_qty 升序排序（小型目標優先），最大化達成目標數量
 - **配對後缺口填補**：主要配對完成後，若有剩餘來源庫存，自動分配給尚未滿足的目標店
-- **Target達成分析 Excel 工作表**：獨立工作表顯示每組 (Article, Site) 的 Target Qty 與 Actual Received 對比、Gap、Status（達成/部分達成/未達成），以及彙總 KPI（總目標數、達成數、達成率、總差距）
+- **Target達成分析 Excel 工作表**：獨立工作表顯示每組 (Article, Site) 的 Target Qty 與 Actual Received 對比、Gap、Status（達成/部分達成/未達成），以及彙總 KPI（總目標數、達成數、達成率、總差距）；只計使用者設定 Target 的接收點（v2.36.0 修正）
 
 **接收規則：**
 1. Target 有數字：直接按 Target Qty 安排接收（不論 ND/RF，不考慮 Pending Received）
@@ -1223,7 +1225,7 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 **新功能（v2.23.0 新增）：**
 - **「優先滿足小型目標」選項**：可在側邊欄勾選，勾選後 Priority-1 目標店按 needed_qty 升序排序（小型目標優先），最大化達成目標數量
 - **配對後缺口填補**：主要配對完成後，若有剩餘來源庫存，自動分配給尚未滿足的目標店
-- **Target達成分析 Excel 工作表**：獨立工作表顯示每組 (Article, Site) 的 Target Qty 與 Actual Received 對比、Gap、Status（達成/部分達成/未達成），以及彙總 KPI（總目標數、達成數、達成率、總差距）
+- **Target達成分析 Excel 工作表**：獨立工作表顯示每組 (Article, Site) 的 Target Qty 與 Actual Received 對比、Gap、Status（達成/部分達成/未達成），以及彙總 KPI（總目標數、達成數、達成率、總差距）；只計使用者設定 Target 的接收點（v2.36.0 修正）
 
 **接收規則：**
 1. Target 有數字：直接按 Target Qty 安排接收（不論 ND/RF，不考慮 Pending Received）

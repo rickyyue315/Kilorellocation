@@ -68,6 +68,68 @@ def refresh_recommendation_fields(recommendations: List[Dict], mode: str, create
         rec['Notes'] = create_note_fn(source_info, dest_info, receive_before, qty, mode)
 
 
+def _source_remaining_capacity(rec: Dict[str, Any]) -> int:
+    """
+    計算某筆建議的來源店（Article + Transfer Site + Transfer OM）在後處理增益前的剩餘可轉量。
+
+    = 原始庫存 − 目前已排定的轉出量 − After Transfer Stock（0 表示無上限資訊）。
+
+    例：來源庫存 10、可轉 5，首筆轉 5 後 After Transfer Stock = 5 → 後續增益只剩 5-5=0 件。
+    """
+    try:
+        original = int(rec.get('Original Stock', 0) or 0)
+        after = int(rec.get('After Transfer Stock', 0) or 0)
+        qty = int(rec.get('Transfer Qty', 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+    if after <= 0:
+        return 0
+    return max(original - after - qty, 0)
+
+
+def _cap_group_boosts_remaining(optimized: List[Dict]) -> List[Dict]:
+    """
+    過濾後處理「+1」增益：來源店累計轉出不得超過其可轉量。
+
+    後處理（A1/ND4 消除餘 1 件）原本無視來源可轉上限，可能轉出超過
+    可轉量甚至令店舖跌破安全庫存。此處按 (Article, Transfer Site, Transfer OM)
+    群組依序套用增益；每組以 _source_remaining_capacity 判斷餘量，當 +1 會超出
+    剩餘可轉量時自動降為可在上限內的最大增益（可能為 0），後續同組記錄不再增益。
+    """
+    if not optimized:
+        return optimized
+
+    group_remaining: Dict[Tuple[str, str, str], int] = {}
+    for rec in optimized:
+        key = (
+            str(rec.get('Article', '')),
+            str(rec.get('Transfer Site', '')),
+            str(rec.get('Transfer OM', '')),
+        )
+        if key not in group_remaining:
+            group_remaining[key] = _source_remaining_capacity(rec)
+
+    for rec in reversed(optimized):
+        key = (
+            str(rec.get('Article', '')),
+            str(rec.get('Transfer Site', '')),
+            str(rec.get('Transfer OM', '')),
+        )
+        try:
+            qty = int(rec.get('Transfer Qty', 0) or 0)
+        except (TypeError, ValueError):
+            qty = 0
+        remaining = group_remaining.get(key, 0)
+        if remaining > 0:
+            added = min(1, remaining)
+            rec['Transfer Qty'] = qty + added
+            group_remaining[key] = remaining - added
+        else:
+            rec['Transfer Qty'] = qty
+
+    return optimized
+
+
 def optimize_single_piece_transfers(recommendations: List[Dict], mode: str, create_note_fn) -> List[Dict]:
     if not recommendations:
         return recommendations
@@ -244,8 +306,11 @@ def optimize_a1_avoid_one_remainder(recommendations: List[Dict]) -> bool:
             int(r.get('Transfer Qty', 0) or 0),
         ))
 
-        best['Transfer Qty'] = int(best.get('Transfer Qty', 0) or 0) + 1
-        has_change = True
+        # 後處理增益不得超出來源可轉量（超量會令店舖跌破安全庫存且缺口報表無法察覺）
+        before = int(best.get('Transfer Qty', 0) or 0)
+        _cap_group_boosts_remaining([best])
+        if int(best.get('Transfer Qty', 0) or 0) != before:
+            has_change = True
 
     return has_change
 
@@ -296,7 +361,10 @@ def optimize_nd4_avoid_one_remainder(recommendations: List[Dict]) -> bool:
             int(r.get('Transfer Qty', 0) or 0),
         ))
 
-        best['Transfer Qty'] = int(best.get('Transfer Qty', 0) or 0) + 1
-        has_change = True
+        # 後處理增益不得超出來源可轉量（同 A1：避免超量轉出跌破安全庫存）
+        before = int(best.get('Transfer Qty', 0) or 0)
+        _cap_group_boosts_remaining([best])
+        if int(best.get('Transfer Qty', 0) or 0) != before:
+            has_change = True
 
     return has_change

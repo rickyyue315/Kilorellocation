@@ -208,7 +208,8 @@ class TestComputeGapReport:
         dest_details = [d for d in result['details'] if d['role'] == '目的地']
         assert len(dest_details) == 1
         assert dest_details[0]['status'] == '不適用(強制調撥)'
-        assert dest_details[0]['gap_or_remaining'] == 0
+        # 數值欄留空（None）而非 0，避免顯示 0／100% 造成誤讀
+        assert dest_details[0]['gap_or_remaining'] is None
 
     def test_e_mode_excluded_from_fulfillment_rate(self):
         """E-mode destinations should not count in fulfillment_rate denominator."""
@@ -232,17 +233,21 @@ class TestComputeGapReport:
         assert summary['total_dest_count'] == 1
         assert summary['fulfillment_rate'] == 100.0
 
-    def test_d_mode_no_dest_gap(self):
-        """D mode has sources but destinations may exist; gap works normally."""
+    def test_d_mode_dest_partially_fulfilled(self):
+        """D mode 目的地的真實未滿足需求會如實顯示（非隱藏、非強制 0）。"""
         sources = [_make_source('SITE01', 'OM1', 10, source_type='ND清貨轉出',
                                 original_stock=10)]
         dests = [_make_dest('SITE02', 'OM1', 5)]
         snap = capture_pre_match_snapshot(sources, dests, 'ART001', '清貨轉貨')
 
-        recs = [_make_rec('ART001', 'SITE01', 'SITE02', 5)]
+        # 需求 5、實收 2 → 缺口 3（D 模式的 RF 目的地是真實缺貨需求）
+        recs = [_make_rec('ART001', 'SITE01', 'SITE02', 2)]
 
         result = compute_gap_report([snap], recs)
-        assert result['summary']['total_dest_gaps'] == 0  # fully fulfilled
+        assert result['summary']['total_dest_gaps'] == 1
+        assert result['summary']['total_gap_qty'] == 3
+        dest_details = [d for d in result['details'] if d['role'] == '目的地']
+        assert dest_details[0]['status'] == '未滿足(缺口3件)'
 
     def test_multiple_articles(self):
         """Multiple articles in snapshot should be handled correctly."""
@@ -387,3 +392,58 @@ class TestComputeGapReport:
         assert 'remaining_pct' in src_details[0]
         assert src_details[0]['remaining_pct'] == 70.0  # 7/10 remaining
         assert 'gap_pct' not in src_details[0]
+
+    def test_source_after_transfer_stock_and_over_transfer(self):
+        """來源列附轉後店內庫存；超量轉出會被標示而非截成 0 悄悄帶過。"""
+        sources = [_make_source('S01', 'OM1', 5, original_stock=10)]
+        dests = [_make_dest('S02', 'OM1', 5), _make_dest('S03', 'OM1', 5)]
+        snap = capture_pre_match_snapshot(sources, dests, 'ART001', '保守轉貨')
+
+        # 可轉量 5，實際轉出 8（後處理 +1 超量情境）→ 超出 3
+        recs = [
+            _make_rec('ART001', 'S01', 'S02', 5),
+            _make_rec('ART001', 'S01', 'S03', 3),
+        ]
+
+        result = compute_gap_report([snap], recs)
+        src = [d for d in result['details'] if d['role'] == '來源'][0]
+        assert src['after_transfer_stock'] == 2      # 10 - 8
+        assert src['over_transferred_qty'] == 3      # 8 - 5
+        assert src['status'] == '已超出可轉量(3件)'
+        assert result['summary']['total_over_transferred_qty'] == 3
+
+    def test_e_mode_dest_values_none(self):
+        """E 模式目的地無數值（None），不會顯示 0／100% 的假象。"""
+        snap = capture_pre_match_snapshot(
+            [_make_source('S01', 'OM1', 10)],
+            [_make_dest('S02', 'OM1', 5)],
+            'ART001', '強制轉出',
+        )
+        recs = [_make_rec('ART001', 'S01', 'S02', 3)]
+
+        result = compute_gap_report([snap], recs)
+        dest = [d for d in result['details'] if d['role'] == '目的地'][0]
+        assert dest['gap_or_remaining'] is None
+        assert dest['gap_pct'] is None
+        assert dest['status'] == '不適用(強制調撥)'
+        # 不列入目的地統計與件數滿足率
+        assert result['summary']['total_dest_count'] == 0
+        assert result['summary']['total_needed_qty'] == 0
+
+    def test_qty_fulfillment_rate(self):
+        """件數滿足率 = 實收總件數 ÷ 需求總件數（與店×SKU 計數滿足率互補）。"""
+        snap = capture_pre_match_snapshot(
+            [_make_source('S01', 'OM1', 10)],
+            [_make_dest('S02', 'OM1', 90), _make_dest('S03', 'OM1', 10)],
+            'ART001', '保守轉貨',
+        )
+        recs = [_make_rec('ART001', 'S01', 'S02', 90)]
+
+        result = compute_gap_report([snap], recs)
+        summary = result['summary']
+        # 店×SKU 滿足率：1/2 = 50%（S03 完全未收）
+        assert summary['fulfillment_rate'] == 50.0
+        # 件數滿足率：90/100 = 90%（S02 幾乎補滿）
+        assert summary['total_needed_qty'] == 100
+        assert summary['total_received_qty'] == 90
+        assert summary['qty_fulfillment_rate'] == 90.0
