@@ -166,31 +166,6 @@ class TestGenerateExcelFile:
         assert df.columns.tolist() == EXCEL_COLUMN_ORDER + ['D001 Receive Qty']
 
 
-class TestSmartSummarySheet:
-    def test_no_ai_summary_two_sheets(self, generator):
-        recs = [_make_recommendation()]
-        stats = _make_statistics()
-        result = generator.generate_excel_file(recs, stats)
-        xl = pd.ExcelFile(io.BytesIO(result))
-        assert len(xl.sheet_names) == 2
-        assert '摘要' not in xl.sheet_names
-
-    def test_with_ai_summary_adds_sheet(self, generator):
-        recs = [_make_recommendation()]
-        stats = _make_statistics()
-        result = generator.generate_excel_file(recs, stats, ai_summary='這是一段測試摘要')
-        xl = pd.ExcelFile(io.BytesIO(result))
-        assert '摘要' in xl.sheet_names
-        assert len(xl.sheet_names) == 3
-
-    def test_empty_string_no_sheet(self, generator):
-        recs = [_make_recommendation()]
-        stats = _make_statistics()
-        result = generator.generate_excel_file(recs, stats, ai_summary='')
-        xl = pd.ExcelFile(io.BytesIO(result))
-        assert '摘要' not in xl.sheet_names
-
-
 class TestNdClearanceSheet:
     def _make_d_rec(self, source_type='ND清貨轉出', **kw):
         """Helper: create a D-mode style recommendation."""

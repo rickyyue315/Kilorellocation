@@ -91,39 +91,11 @@ KiLo 是基於 Streamlit 的庫存調貨建議系統，依據庫存、銷量、�
 - 內建店舖預設資料（缺少 OM/Type 時自動補值）。
 - 輸出 Excel（調貨建議 + 統計摘要）。
 - **優先級分組**：所有調貨建議按 🔴高優先 / 🟡中優先 / 🟢低優先 自動分組，優先處理高件數、強制轉出、退 D001 等重要建議。
-- **可選 AI 執行摘要**：可手動生成結果摘要（需 OpenRouter API key，預設關閉）。
-
-## AI 功能說明（可選）
-
-系統支援一個非阻塞 AI 場景，預設關閉（`AI_ENABLED=false`），不會影響既有調貨流程：
-
-1. **AI 執行摘要**：調貨建議生成後，點擊「🤖 生成執行摘要」按鈕可獲得一段約 150 字的繁體中文重點摘要（整體規模、優先級分佈、需關注事項）。只傳聚合統計資料（總數、件數、優先級分佈），不傳 Article/Site/OM 明細。
-
-### 啟用 AI 功能
-
-**本地開發**：設定環境變數
-
-```powershell
-$env:OPENROUTER_API_KEY="sk-or-v1-xxxxx"
-$env:AI_ENABLED="true"
-```
-
-**Zeabur 部署**：在 Service Secrets 設定
-
-```text
-OPENROUTER_API_KEY=sk-or-v1-xxxxx
-AI_ENABLED=true
-AI_MODEL=deepseek/deepseek-v4-flash
-AI_REQUEST_TIMEOUT=30
-```
-
-**AI 安全承諾**：AI 功能只提供可選摘要，不會修改確定性調貨結果；缺少 API key 或 AI 失敗時核心流程完整可用。優先級分組為純確定性規則，永遠 100% 可用。
 
 ## 系統需求
 
 - Python 3.13（見 `runtime.txt`，部署與本機需一致）
-- 依賴（版本見 `requirements.txt`）：`pandas`、`numpy`、`openpyxl`、`python-calamine`、`streamlit`、`xlsxwriter`、`ftfy`、`httpx`
-- AI 功能（可選）：OpenRouter API key（見下方 AI 功能說明）
+- 依賴（版本見 `requirements.txt`）：`pandas`、`numpy`、`openpyxl`、`python-calamine`、`streamlit`、`xlsxwriter`、`ftfy`
 
 ## 安裝與執行
 
@@ -190,7 +162,6 @@ streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.hea
    | `KILO_ZEABUR_RESULT_PREVIEW_LIMIT` | `1000` | Zeabur 結果表預覽行數上限 |
    | `KILO_FIX_MOJIBAKE` | `0` | 啟用亂碼修補 |
    | `KILO_PERF_TIMING` | `0` | 啟用效能計時面板 |
-   | `AI_ENABLED` / `OPENROUTER_API_KEY` | – | 可選 AI 執行摘要（見 AI 功能說明） |
 
 ## 輸入資料欄位
 
@@ -306,7 +277,6 @@ python -m pytest tests/test_b2_b3_source_receive_site_limit.py tests/test_b2_pri
 - `business_logic.py`：來源/接收識別與配對規則
 - `services/matching_engine.py`：核心配對引擎（轉移量計算、前置過濾、多回合匹配）
 - `services/prioritizer.py`：優先級分組引擎（確定性規則）
-- `services/ai_client.py`：AI API 封裝（OpenRouter、可選執行摘要）
 - `data_processor.py`：Excel 讀取、驗證、欄位標準化、預設資料補齊
 - `excel_generator.py`：報表匯出
 - `ui/tutorial.py`：模式教學分頁（28 種模式圖例化教學）

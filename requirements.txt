@@ -6,7 +6,6 @@ python-calamine==0.6.2
 xlsxwriter==3.2.9
 streamlit==1.51.0
 ftfy==6.3.1
-httpx==0.28.1
 
 # ── 開發/測試 ──
 pytest==9.0.2

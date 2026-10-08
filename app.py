@@ -1,5 +1,5 @@
 """
-庫存調貨建議系統 v2.36.0 - Streamlit應用程序
+庫存調貨建議系統 v2.37.0 - Streamlit應用程序
 支持三十模式系統：A(保守轉貨)/A1(保守轉貨-轉出店舖不餘存貨1件)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/NST(New Shop Target調貨)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/ND4(ND限同OM轉貨補0及有銷售記錄)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 含模式教學分頁：30種調貨模式圖例化教學（繁體中文）
 """
@@ -23,7 +23,6 @@ from ui.display import (
     render_results_by_priority,
     render_statistics,
     render_download_button,
-    render_ai_executive_summary_button,
     render_gap_report,
 )
 from ui.tutorial import render_tutorial_page
@@ -263,8 +262,7 @@ with tab_system:
             nst_max_source_shops = sidebar_result.get('nst_max_source_shops')
             current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{d2_site_limit_mode}_{c1_threshold}_{c1_ceiling}_{f_fulfill_small_first}_{nst_max_source_shops}_{floor_body}_{turnday_days}_{mtd_as_of_date.isoformat()}_{uploaded_file.name}_{uploaded_file.size}"
             if st.session_state.get('_run_key') != current_run_key:
-                for k in ['recommendations', 'statistics', 'gap_report', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name',
-                          'ai_executive_summary']:
+                for k in ['recommendations', 'statistics', 'gap_report', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name']:
                     st.session_state.pop(k, None)
                 for k in [k for k in st.session_state if k.startswith('_display_df_')]:
                     st.session_state.pop(k)
@@ -333,17 +331,13 @@ with tab_system:
 
                     render_gap_report(st.session_state.get('gap_report', {}), current_run_key)
 
-                    render_ai_executive_summary_button(recommendations, statistics, st.session_state.get('active_mode_name', ''))
-
                     with st.container():
                         st.markdown("---")
                         st.markdown('<div class="section-title"><span class="section-title__badge">STEP 4</span>📥 匯出報表</div>', unsafe_allow_html=True)
                         st.success("✅ 分析完成!")
 
-                _ai_summary = st.session_state.get('ai_executive_summary', '')
-                _excel_cache_key = f"{current_run_key}_{hash(_ai_summary)}" if _ai_summary else current_run_key
                 _excel_ready = (
-                    st.session_state.get('excel_run_key') == _excel_cache_key
+                    st.session_state.get('excel_run_key') == current_run_key
                     and 'excel_data' in st.session_state
                 )
                 if not _excel_ready:
@@ -359,13 +353,12 @@ with tab_system:
                                 recommendations,
                                 statistics,
                                 mode=st.session_state.get('active_mode_name', ''),
-                                ai_summary=_ai_summary or None,
                                 df=df,
                                 gap_report=st.session_state.get('gap_report', {}),
                                 floor_body_label=floor_body_label,
                             )
                             st.session_state['excel_filename'] = excel_generator.output_filename
-                            st.session_state['excel_run_key'] = _excel_cache_key
+                            st.session_state['excel_run_key'] = current_run_key
                             _excel_ready = True
 
                 if _excel_ready:

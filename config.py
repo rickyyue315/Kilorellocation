@@ -4,7 +4,7 @@
 
 import os
 
-VERSION = "v2.36.0"
+VERSION = "v2.37.0"
 
 ZEABUR_ENV_KEYS = [
     'ZEABUR',
@@ -37,12 +37,6 @@ def _get_env_bool(name: str, default: bool) -> bool:
 
 IS_ZEABUR_RUNTIME = _is_zeabur_runtime()
 ZEABUR_RESULT_PREVIEW_LIMIT = _get_env_int('KILO_ZEABUR_RESULT_PREVIEW_LIMIT', 1000)
-
-# ── AI 整合（僅執行摘要可選功能）─────────────────────────────────
-
-AI_DEFAULT_MODEL = os.getenv('AI_MODEL', 'deepseek/deepseek-v4-flash')
-AI_ENABLED = _get_env_bool('AI_ENABLED', False)
-AI_REQUEST_TIMEOUT = _get_env_int('AI_REQUEST_TIMEOUT', 30)
 
 # ── Magic Numbers (business_logic.py) ──────────────────────────────
 

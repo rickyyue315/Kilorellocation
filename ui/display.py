@@ -444,52 +444,6 @@ def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_
             )
 
 
-def render_ai_executive_summary_button(recommendations: list, statistics: dict, mode_name: str):
-    from services.ai_client import is_ai_enabled, chat_completion
-    from config import AI_DEFAULT_MODEL
-    import json
-
-    if not is_ai_enabled():
-        return
-
-    if st.button("🤖 生成執行摘要", use_container_width=True,
-                 help="AI 分析結果摘要（可選功能，非必要）", type="primary", key="ai_exec_summary"):
-        with st.spinner("AI 生成中..."):
-            summary_data = {
-                'total_recs': statistics.get('total_recommendations', 0),
-                'total_qty': statistics.get('total_transfer_qty', 0),
-                'unique_articles': statistics.get('unique_articles', 0),
-                'unique_oms': statistics.get('unique_oms', 0),
-                'mode': mode_name,
-                'high_priority_count': sum(1 for r in recommendations if r.get('Priority') == '🔴高優先'),
-                'high_priority_qty': sum(r['Transfer Qty'] for r in recommendations if r.get('Priority') == '🔴高優先'),
-                'medium_priority_count': sum(1 for r in recommendations if r.get('Priority') == '🟡中優先'),
-                'medium_priority_qty': sum(r['Transfer Qty'] for r in recommendations if r.get('Priority') == '🟡中優先'),
-                'source_type_distribution': statistics.get('source_type_stats', {}),
-                'dest_type_distribution': statistics.get('dest_type_stats', {}),
-            }
-            messages = [
-                {
-                    "role": "system",
-                    "content": "你是一個庫存調貨系統的分析助手。請根據以下聚合數據，生成一段約150字以內的繁體中文執行摘要，重點說明：①整體規模 ②優先級分佈 ③需要立即關注的事項。純文字輸出，無需markdown格式。"
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(summary_data, ensure_ascii=False)
-                }
-            ]
-            result = chat_completion(messages, model=AI_DEFAULT_MODEL, temperature=0.1, max_tokens=512)
-            if result:
-                st.session_state['ai_executive_summary'] = result
-            else:
-                st.warning("AI 摘要生成失敗：API 返回空內容，請檢查模型設定或稍後再試。")
-
-    summary = st.session_state.get('ai_executive_summary')
-    if summary:
-        with st.expander("📊 AI 執行摘要", expanded=False):
-            st.markdown(summary)
-
-
 def render_statistics(statistics: dict):
     _stats_int_config = {
         col: st.column_config.NumberColumn(format="%d")

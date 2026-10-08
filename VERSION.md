@@ -1,5 +1,27 @@
 # 版本更新記錄
 
+## v2.37.0 (2026-10-08)
+
+### 移除 AI 執行摘要功能
+
+#### 變更說明
+- **移除 AI 執行摘要**：刪除「🤖 生成執行摘要」按鈕及其結果展示（`ui/display.py` 的 `render_ai_executive_summary_button()`）。
+- **移除 Excel「摘要」工作表**：`excel_generator.py` 的 `generate_excel_file()` 不再接受 `ai_summary` 參數，`create_smart_summary_sheet()` 一併刪除；統計摘要、Target達成分析、缺口分析等工作表不受影響。
+- **移除 AI 客戶端**：刪除 `services/ai_client.py` 及 `tests/test_ai_client.py`；`config.py` 的 AI 設定（`AI_ENABLED`、`AI_DEFAULT_MODEL`、`AI_REQUEST_TIMEOUT`）一併移除。
+- **依賴變更**：`requirements.txt` 移除 `httpx`（僅 AI 客戶端使用）。
+- **注意**：調貨演算法、優先級分組、品質檢查、Excel 其他輸出均無變化。部署環境中的 `OPENROUTER_API_KEY` / `AI_ENABLED` 等環境變數可以移除，移除後不再產生任何影響。
+
+#### 修改檔案
+- `app.py` — 移除 AI 摘要按鈕與 Excel 快取 key 的 AI 相依，版本號更新
+- `ui/display.py` — 移除 `render_ai_executive_summary_button()`
+- `excel_generator.py` — 移除 `ai_summary` 參數與「摘要」工作表
+- `config.py` — 移除 AI 設定，`VERSION` 更新為 v2.37.0
+- `services/ai_client.py` — 刪除
+- `tests/test_ai_client.py` — 刪除
+- `tests/test_excel_generator.py` — 移除 `TestSmartSummarySheet` 測試類別
+- `requirements.txt` — 移除 `httpx`
+- `README.md` — 移除 AI 功能說明、環境變數與專案結構中的 AI 項目
+
 ## v2.36.0 (2026-10-08)
 
 ### 調貨缺口分析與 Target達成一致性修正（含模式邏輯變更）
