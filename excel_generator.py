@@ -34,6 +34,13 @@ EXCEL_COLUMN_WIDTHS: List[int] = [
     14, 12, 25, 12, 12, 8, 18, 15, 18, 18, 20, 12, 12, 8, 18, 15, 15, 22, 10, 25, 75,
 ]
 
+# 需要整欄突出顯示的欄位：標題底色 / 數據底色 / 文字顏色
+HIGHLIGHT_COLUMN_STYLES: Dict[str, Dict[str, str]] = {
+    'Transfer Site': {'header_bg': '#2F5597', 'bg': '#DDEBF7', 'font': '#1F4E78'},
+    'Receive Site': {'header_bg': '#548235', 'bg': '#E2EFDA', 'font': '#375623'},
+    'Transfer Qty': {'header_bg': '#C55A11', 'bg': '#FCE4D6', 'font': '#C00000'},
+}
+
 class ExcelGenerator:
     """Excel輸出類 v2.10.0"""
     
@@ -166,6 +173,38 @@ class ExcelGenerator:
             fmt = notes_format if col_name == 'Notes' else data_format
             width = EXCEL_COLUMN_WIDTHS[idx] if col_name != 'D001 Receive Qty' else 18
             worksheet.set_column(idx, idx, width, fmt)
+
+        # 突出顯示指定欄位（標題與整欄數據）
+        for col_idx, col_name in enumerate(cols):
+            style = HIGHLIGHT_COLUMN_STYLES.get(col_name)
+            if not style:
+                continue
+            header_hl_format = workbook.add_format({
+                'bold': True,
+                'text_wrap': True,
+                'valign': 'top',
+                'bg_color': style['header_bg'],
+                'font_color': '#FFFFFF',
+                'border': 1,
+                'font_name': 'Arial',
+                'font_size': 10
+            })
+            cell_hl_format = workbook.add_format({
+                'border': 1,
+                'text_wrap': True,
+                'valign': 'top',
+                'bg_color': style['bg'],
+                'font_color': style['font'],
+                'bold': True,
+                'font_name': 'Arial',
+                'font_size': 10
+            })
+            worksheet.write(0, col_idx, col_name, header_hl_format)
+            for row_idx, value in enumerate(df[col_name], start=1):
+                if pd.isna(value):
+                    worksheet.write_blank(row_idx, col_idx, None, cell_hl_format)
+                else:
+                    worksheet.write(row_idx, col_idx, value, cell_hl_format)
 
         # 設置標題行高度與預設行高（避免逐行設定）
         worksheet.set_row(0, 40)
