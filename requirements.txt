@@ -1,4 +1,4 @@
-# ── 執行期依賴（鎖定為已通過 354 項測試的版本，確保 Zeabur 部署與本機一致）──
+# ── 執行期依賴（鎖定為已通過測試的版本，確保 Streamlit Community Cloud 部署與本機一致）──
 pandas==2.3.3
 numpy==2.4.2
 openpyxl==3.1.5

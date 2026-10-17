@@ -468,7 +468,7 @@ print(ftfy.fix_text('ç³»çµ±'))  # 應輸出「系統」
 | 編碼修復 | 手動逐文件修 | `ftfy.fix_text` 全局自動修復 |
 | Streamlit 文字 | 可能在某些環境亂碼 | `_patch_streamlit_text_rendering` 攔截所有文字方法 |
 | 啟用方式 | 預設啟用 | `KILO_FIX_MOJIBAKE=1` 環境變數控制，避免不必要的 CPU 開銷 |
-| Zeabur 雲端 | 同樣亂碼 | Linux 容器無需啟用修復，避免額外開銷 |
+| 雲端（Linux 容器） | 同樣亂碼 | Linux 容器無需啟用修復，避免額外開銷 |
 
 ---
 
@@ -488,9 +488,9 @@ start = time.time()
 df, stats = _cached_preprocess(uploaded_file.getvalue())
 print(f"預處理耗時: {time.time() - start:.2f}s")
 
-# 確認 Zeabur 限制
-print(f"IS_ZEABUR: {IS_ZEABUR_RUNTIME}")
-print(f"Result limit: {ZEABUR_RESULT_PREVIEW_LIMIT}")
+# 確認雲端環境偵測與結果預覽上限
+print(f"IS_CLOUD: {IS_CLOUD_RUNTIME}")
+print(f"Result limit: {CLOUD_RESULT_PREVIEW_LIMIT}")
 ```
 
 **改善前後對比：**
@@ -498,7 +498,7 @@ print(f"Result limit: {ZEABUR_RESULT_PREVIEW_LIMIT}")
 | 項目 | 改善前 | 改善後 |
 |------|--------|--------|
 | Excel 解析 | 每次渲染重複 | `@st.cache_data` 快取（相同文件只解析一次） |
-| 結果展示 | 全量渲染 | Zeabur 環境預設只顯示前 1000 行，可展開 |
+| 結果展示 | 全量渲染 | 雲端環境預設只顯示前 1000 行，可展開 |
 | Excel 生成 | 每次渲染重算 | `session_state` 快取，只在分析結果變化時重算 |
 | 庫存查詢 | 逐行 iterrows | 預建字典 `_stock_lookup`，O(1) 查詢 |
 
@@ -592,7 +592,7 @@ print(f"空值統計:\n{df_check.isnull().sum()}")
 | 預設填充 | 逐行 iterrows + dict lookup | 向量化 map + 預建字典 | ~10x 加速 |
 | 結果展示庫存查詢 | 逐行 iterrows | 預建 `_stock_lookup` 字典 O(1) | ~100x 加速 |
 | Excel 文件生成 | 磁碟 I/O | BytesIO 記憶體操作 | 消除磁碟延遲 + 並發安全 |
-| 大型結果渲染 | 全量渲染 | Zeabur 限制前 1000 行 + 可展開 | 頁面響應速度大幅提升 |
+| 大型結果渲染 | 全量渲染 | 雲端環境限制前 1000 行 + 可展開 | 頁面響應速度大幅提升 |
 
 ### 5.4 可靠性改善對比
 

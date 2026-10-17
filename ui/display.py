@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 from typing import Optional
 
-from config import IS_ZEABUR_RUNTIME, ZEABUR_RESULT_PREVIEW_LIMIT
+from config import IS_CLOUD_RUNTIME, CLOUD_RESULT_PREVIEW_LIMIT
 from models.mode_registry import get_mode_families
 
 
@@ -336,23 +336,23 @@ def render_results_table(recommendations: list, df: pd.DataFrame, current_run_ke
 
     total_recs = len(rec_df)
     use_preview_limit = (
-        IS_ZEABUR_RUNTIME
-        and ZEABUR_RESULT_PREVIEW_LIMIT > 0
-        and total_recs > ZEABUR_RESULT_PREVIEW_LIMIT
+        IS_CLOUD_RUNTIME
+        and CLOUD_RESULT_PREVIEW_LIMIT > 0
+        and total_recs > CLOUD_RESULT_PREVIEW_LIMIT
     )
 
     if use_preview_limit:
         st.info(
-            f"Zeabur 效能模式：目前先顯示前 {ZEABUR_RESULT_PREVIEW_LIMIT:,} 行，"
+            f"雲端效能模式：目前先顯示前 {CLOUD_RESULT_PREVIEW_LIMIT:,} 行，"
             "避免大型結果表拖慢頁面。完整結果仍可下載，亦可按需展開。"
         )
         show_full_result_table = st.checkbox(
             "載入完整調貨建議表",
             value=False,
             key=f"show_full_result_table_{current_run_key}",
-            help="僅在需要時渲染全部結果列，以減少 Zeabur 容器上的前端與傳輸負擔。"
+            help="僅在需要時渲染全部結果列，以減少雲端容器（Streamlit Community Cloud）上的前端與傳輸負擔。"
         )
-        table_df = rec_df if show_full_result_table else rec_df.head(ZEABUR_RESULT_PREVIEW_LIMIT)
+        table_df = rec_df if show_full_result_table else rec_df.head(CLOUD_RESULT_PREVIEW_LIMIT)
         st.dataframe(table_df, use_container_width=True, hide_index=True, height=480, column_config=_int_column_config(table_df))
     else:
         st.dataframe(rec_df, use_container_width=True, hide_index=True, height=480, column_config=_int_column_config(rec_df))

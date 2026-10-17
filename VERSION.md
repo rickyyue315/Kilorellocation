@@ -1,5 +1,37 @@
 # 版本更新記錄
 
+## v2.38.0 (2026-10-17)
+
+### 部署平台遷移：Zeabur → Streamlit Community Cloud（share.streamlit.io）
+
+#### 變更說明
+- **雲端環境偵測一般化**：`config.py` 新增 `IS_CLOUD_RUNTIME`，同時偵測 Streamlit Community Cloud（`/mount/src` repo 掛載路徑、`IS_STREAMLIT_CLOUD`／`STREAMLIT_CLOUD`／`STREAMLIT_SHARING_MODE` 環境變數）與 Zeabur 舊變數；可用 `KILO_RUNTIME=cloud|local` 強制指定。原 `IS_ZEABUR_RUNTIME`／`ZEABUR_RESULT_PREVIEW_LIMIT` 保留為向後相容別名。
+- **Secrets 讀取**：新增 `config.get_setting()`，讀取順序為環境變數 → `st.secrets`（Community Cloud 只提供 Secrets TOML 輸入框；根層級鍵值在 Streamlit 解析 secrets 時會同步寫入環境變數）。`app.py` 的 `KILO_LOG_LEVEL`、`KILO_FIX_MOJIBAKE` 改用此函式。
+- **預覽上限設定更名**：`KILO_CLOUD_RESULT_PREVIEW_LIMIT`（舊名 `KILO_ZEABUR_RESULT_PREVIEW_LIMIT` 仍相容）；結果表提示文字「Zeabur 效能模式」改為「雲端效能模式」。
+- **`.streamlit/config.toml`**：移除 `fileWatcherType = "none"`（Community Cloud 強制 `runOnSave = true`，需保留檔案監看才能自動重跑）；補註 Community Cloud 會覆寫的設定項目（`showErrorDetails`／`fastReruns`／`runOnSave`／`enableXsrfProtection`／`gatherUsageStats`）。
+- **`.streamlit/secrets.toml.example`**：改為 Community Cloud Secrets 面板說明與現行可選設定（AI 相關鍵值已於 v2.37.0 移除）。
+- **部署文件與檔案**：README 的「Zeabur 部署」章節改寫為「Streamlit Community Cloud 部署」（部署步驟、Python 版本須於 Advanced settings 手動選擇、依賴與設定覆寫、雲端效能模式、休眠與日誌限制）；`Dockerfile`、`Procfile` 去除 Zeabur 字樣並標註為選用（Community Cloud 不讀取這些檔案）。
+- **注意**：調貨演算法、優先級分組、品質檢查、Excel 輸出與模式教學內容均無變化。
+
+#### 修改檔案
+- `config.py` — `IS_CLOUD_RUNTIME`、`get_setting()`、`CLOUD_RESULT_PREVIEW_LIMIT`、向後相容別名；`VERSION` bump 至 v2.38.0
+- `app.py` — 改用 `IS_CLOUD_RUNTIME` 與 `get_setting()`、移除未使用的 `import os`、docstring 版本更新
+- `ui/display.py` — 雲端效能模式文字與常數更名
+- `tests/test_p2_refactoring_integration.py` — 新增 `TestCloudDeploymentCompatibility`（雲端設定匯入、`get_setting()`、雲端偵測、相容別名）
+- `.streamlit/config.toml`、`.streamlit/secrets.toml.example`
+- `Dockerfile`、`Procfile`、`requirements.txt`、`README.md`
+
+#### 部署遷移步驟（一次性）
+1. `share.streamlit.io` → Create app → 選擇 repo `rickyyue315/Kilorellocation`、branch `main`、main file `app.py`。
+2. Advanced settings → Python version 選 `3.11`（Community Cloud 不採用 `runtime.txt`）。
+3. 選用設定（Secrets）依 `.streamlit/secrets.toml.example` 內容貼上。
+4. Deploy 後確認：資料上載與分析、Excel 下載、模式教學分頁、雲端效能模式提示正常。
+
+#### 文件同步
+- `README.md`／`VERSION.md`／`config.py`／`app.py` 已同步；`ui/tutorial.py`、`調貨模式詳解.txt`、`transfer_logic_ai_brief.md` 無需變更（無模式新增／移除／邏輯修改）。
+
+---
+
 ## v2.37.0 (2026-10-08)
 
 ### 移除 AI 執行摘要功能

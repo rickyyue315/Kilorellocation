@@ -1,4 +1,4 @@
-# KiLo 庫存調貨建議系統 v2.35.0
+# KiLo 庫存調貨建議系統 v2.38.0
 
 ## 系統概述
 
@@ -94,7 +94,7 @@ KiLo 是基於 Streamlit 的庫存調貨建議系統，依據庫存、銷量、�
 
 ## 系統需求
 
-- Python 3.13（見 `runtime.txt`，部署與本機需一致）
+- Python 3.11（與 CI 及 Streamlit Community Cloud 建議設定一致；目前鎖定版本亦相容 3.11–3.13）
 - 依賴（版本見 `requirements.txt`）：`pandas`、`numpy`、`openpyxl`、`python-calamine`、`streamlit`、`xlsxwriter`、`ftfy`
 
 ## 安裝與執行
@@ -140,28 +140,44 @@ streamlit run app.py
 
 預設網址：`http://localhost:8501`
 
-## Zeabur 部署
+## Streamlit Community Cloud 部署（share.streamlit.io）
 
-專案內含 `Dockerfile`、`Procfile` 與 `.dockerignore`，Zeabur 會自動偵測並以明確的啟動命令運行：
+本專案為標準 Streamlit 應用，**不需要 Docker**：Community Cloud 直接讀取 `requirements.txt`（安裝依賴）、`.streamlit/config.toml`（介面與伺服器設定）與 `app.py`（進入點）。
 
-```bash
-streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.headless=true
-```
+### 部署步驟
 
-### 部署設定建議
+1. 登入 <https://share.streamlit.io>，於右上角點 **Create app** → 「Yup, I have an app」。
+2. 填入 Repository（`rickyyue315/Kilorellocation`）、Branch（`main`）、Main file path（`app.py`）。
+3. 點 **Advanced settings**：
+   - **Python version**：選 **3.11**（必填步驟，說明見下方第 1 點）。
+   - **Secrets**（選用）：可直接貼上 `.streamlit/secrets.toml.example` 的內容。
+4. 點 **Deploy!**；之後每次 push 到 `main` 分支都會自動重新部署（依賴變更需數分鐘重新安裝）。
 
-1. **偵測方式**：Zeabur 會優先使用 `Dockerfile`（鎖定 Python 3.13、layer cache 加速重建）。
-2. **Port**：啟動命令已讀取 Zeabur 注入的 `PORT` 環境變數，無需手動設定。
-3. **Health Check**：在 Zeabur Service 的 Networking/Health Check 設定路徑為 `/_stcore/health`（Streamlit 內建健康端點，回傳 `ok`），避免部署後被誤判為 unhealthy 而重啟循環。
-4. **上傳大小**：`maxUploadSize` 已對齊應用層 50MB 上限（`.streamlit/config.toml`），防止小容器因大型暫存而 OOM。
-5. **環境變數**：
+### 部署注意事項
+
+1. **Python 版本需在 UI 選擇**：Community Cloud **不會**採用 `runtime.txt` 或 `.python-version`，預設會使用較新的 Python 版本；請於 Advanced settings（或部署後的 App settings）選擇 `3.11`。目前鎖定的依賴有 3.11–3.14 的預編譯 wheel，但 `numpy==2.4.2` 最低需求為 Python 3.11。
+2. **依賴安裝**：`requirements.txt` 版本已鎖定並通過測試；無需 `packages.txt`（`python-calamine`／`openpyxl`／`xlsxwriter` 皆有 Linux wheel，無需 apt 套件）。
+3. **設定覆寫**：Community Cloud 會強制覆寫 `showErrorDetails`、`fastReruns`、`runOnSave`、`enableXsrfProtection`、`gatherUsageStats`；其餘 `.streamlit/config.toml` 設定（主題、`maxUploadSize = 50`）照常生效。
+4. **上傳大小**：`maxUploadSize` 已對齊應用層 50MB 上限，避免大型暫存造成容器記憶體壓力。
+5. **雲端效能模式**：偵測到雲端環境（`/mount/src` 掛載路徑、`STREAMLIT_CLOUD` 或 Zeabur 舊環境變數）時，結果表預設只渲染前 1,000 列並提供「載入完整調貨建議表」勾選項；完整資料不受影響，Excel 匯出仍是全量。
+6. **環境變數 / Secrets**（全部選用）：
 
    | 變數 | 預設 | 說明 |
    | --- | --- | --- |
-   | `KILO_LOG_LEVEL` | `WARNING`（Zeabur）/ `INFO`（本機） | 日誌層級 |
-   | `KILO_ZEABUR_RESULT_PREVIEW_LIMIT` | `1000` | Zeabur 結果表預覽行數上限 |
-   | `KILO_FIX_MOJIBAKE` | `0` | 啟用亂碼修補 |
+   | `KILO_LOG_LEVEL` | `WARNING`（雲端）/ `INFO`（本機） | 日誌層級 |
+   | `KILO_CLOUD_RESULT_PREVIEW_LIMIT` | `1000` | 雲端結果表預覽行數上限（`0` = 不限制；舊名 `KILO_ZEABUR_RESULT_PREVIEW_LIMIT` 仍相容） |
+   | `KILO_FIX_MOJIBAKE` | `0` | 啟用亂碼修補（Windows 上載亂碼時用；Linux 雲端環境不需要） |
    | `KILO_PERF_TIMING` | `0` | 啟用效能計時面板 |
+   | `KILO_RUNTIME` | 自動偵測 | 強制指定 `cloud` / `local` |
+
+   設定方式：`share.streamlit.io` → App → **Settings → Secrets**（TOML 格式；根層級鍵值會同步成為環境變數，`config.get_setting()` 會依序讀取環境變數與 Secrets）。
+7. **檔案系統為臨時性**：容器重啟後會回到 Git 版本；本系統只做記憶體內處理與下載輸出，不會寫入檔案，資料不會遺失。
+8. **閒置休眠**：免費方案閒置一段時間後會休眠，下次開啟需數十秒喚醒，屬正常現象。
+9. **查看日誌**：App 頁面右側的 Cloud logs 僅對具備 repo 寫入權限的成員可見。
+
+### 其他平台（Docker，選用）
+
+`Dockerfile`、`Procfile` 與 `.dockerignore` 保留作為自架或其他容器主機的備援；**Streamlit Community Cloud 不會讀取這些檔案**。
 
 ## 輸入資料欄位
 
@@ -280,6 +296,9 @@ python -m pytest tests/test_b2_b3_source_receive_site_limit.py tests/test_b2_pri
 - `data_processor.py`：Excel 讀取、驗證、欄位標準化、預設資料補齊
 - `excel_generator.py`：報表匯出
 - `ui/tutorial.py`：模式教學分頁（28 種模式圖例化教學）
+- `config.py`：版本、環境偵測（雲端／本機）、Secrets 讀取、Magic Numbers
+- `.streamlit/config.toml`：Streamlit 介面與伺服器設定（本機與 Community Cloud 共用）
+- `.streamlit/secrets.toml.example`：Secrets 設定範本（Community Cloud Secrets 面板／本機 secrets.toml）
 - `調貨模式詳解.txt`：中文規則細節
 - `VERSION.md`：版本紀錄
 
@@ -305,5 +324,5 @@ python -m pytest tests/test_b2_b3_source_receive_site_limit.py tests/test_b2_pri
 
 ## 版本
 
-- 目前版本：`v2.35.0`
+- 目前版本：`v2.38.0`
 - 詳細異動請見 `VERSION.md`

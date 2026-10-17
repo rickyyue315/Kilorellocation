@@ -1,5 +1,7 @@
-# KiLo 庫存調貨建議系統 — Zeabur / 通用 Docker 映像
-# 鎖定 Python 版本以確保 Zeabur 部署與本機開發環境一致
+# KiLo 庫存調貨建議系統 — 通用 Docker 映像（選用）
+# 注意：Streamlit Community Cloud（share.streamlit.io）不使用 Dockerfile，
+#       本檔僅保留給自架或其他容器主機（Railway / Render / VPS…）備用。
+# 鎖定 Python 版本以確保容器部署與本機開發環境一致。
 FROM python:3.11-slim
 
 # 效能與穩定性：停用位元組碼快取（容器內不需要）、管線輸出即時 flush
@@ -19,7 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 再複製應用程式碼（變動頻率較高）
 COPY . .
 
-# Streamlit 預設埠；Zeabur 會注入 PORT 環境變數
+# Streamlit 預設埠；若主機注入 PORT 環境變數則自動沿用
 ENV STREAMLIT_SERVER_PORT=8501
 EXPOSE 8501
 

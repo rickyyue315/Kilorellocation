@@ -245,7 +245,7 @@ class TestStreamlitAppImport:
     def test_import_app_modules(self):
         """測試應用核心模組可以導入"""
         try:
-            from config import VERSION, IS_ZEABUR_RUNTIME
+            from config import VERSION, IS_CLOUD_RUNTIME
             from models.mode import MODE_NAME_MAP
             from business_logic import TransferLogic
             from excel_generator import ExcelGenerator
@@ -277,17 +277,40 @@ class TestStreamlitAppImport:
             assert hasattr(logic, mode_attr), f"Missing mode: {mode_attr}"
 
 
-class TestZeaburCompatibility:
-    """測試 Zeabur 部署兼容性"""
+class TestCloudDeploymentCompatibility:
+    """測試雲端部署兼容性（Streamlit Community Cloud）"""
 
-    def test_zeabur_config_import(self):
-        """測試 Zeabur 配置可以導入"""
-        from config import IS_ZEABUR_RUNTIME, ZEABUR_RESULT_PREVIEW_LIMIT
-        assert isinstance(IS_ZEABUR_RUNTIME, bool)
-        assert isinstance(ZEABUR_RESULT_PREVIEW_LIMIT, int)
+    def test_cloud_config_import(self):
+        """測試雲端配置可以導入"""
+        from config import IS_CLOUD_RUNTIME, CLOUD_RESULT_PREVIEW_LIMIT, IS_ZEABUR_RUNTIME, ZEABUR_RESULT_PREVIEW_LIMIT
+        assert isinstance(IS_CLOUD_RUNTIME, bool)
+        assert isinstance(CLOUD_RESULT_PREVIEW_LIMIT, int)
+        # 向後相容別名
+        assert IS_ZEABUR_RUNTIME == IS_CLOUD_RUNTIME
+        assert ZEABUR_RESULT_PREVIEW_LIMIT == CLOUD_RESULT_PREVIEW_LIMIT
+
+    def test_get_setting_env_and_default(self, monkeypatch):
+        """get_setting 優先讀環境變數，未設定時回傳預設值"""
+        from config import get_setting
+
+        monkeypatch.setenv('KILO_TEST_SETTING', 'abc')
+        assert get_setting('KILO_TEST_SETTING', 'default') == 'abc'
+        assert get_setting('KILO_TEST_SETTING_MISSING', 'default') == 'default'
+
+    def test_cloud_runtime_detection_flags(self, monkeypatch):
+        """雲端偵測可由 STREAMLIT_CLOUD 環境變數與 KILO_RUNTIME 覆寫觸發"""
+        import config
+
+        monkeypatch.setenv('KILO_RUNTIME', 'cloud')
+        assert config._is_cloud_runtime() is True
+        monkeypatch.setenv('KILO_RUNTIME', 'local')
+        assert config._is_cloud_runtime() is False
+        monkeypatch.delenv('KILO_RUNTIME')
+        monkeypatch.setenv('STREAMLIT_CLOUD', '1')
+        assert config._is_cloud_runtime() is True
 
     def test_display_module_import(self):
-        """測試 display 模組可以導入（Zeabur 使用）"""
+        """測試 display 模組可以導入（雲端部署使用）"""
         try:
             from ui.display import (
                 render_upload_requirements,

@@ -4,8 +4,20 @@
 
 import os
 
-VERSION = "v2.37.0"
+VERSION = "v2.38.0"
 
+# ── 執行環境偵測（Streamlit Community Cloud / 其他雲端容器 / 本機）──────
+
+# Streamlit Community Cloud 未提供官方環境變數，社群通用做法為檢查 repo 掛載路徑
+# /mount/src（Community Cloud 容器固定把 repo 掛載於此）。
+STREAMLIT_CLOUD_MOUNT_PATH = '/mount/src'
+STREAMLIT_CLOUD_ENV_KEYS = [
+    'IS_STREAMLIT_CLOUD',
+    'STREAMLIT_CLOUD',
+    'STREAMLIT_SHARING_MODE',
+]
+
+# Zeabur 環境變數（服務已結束，僅保留偵測以相容既有部署紀錄）
 ZEABUR_ENV_KEYS = [
     'ZEABUR',
     'ZEABUR_PROJECT_ID',
@@ -14,12 +26,31 @@ ZEABUR_ENV_KEYS = [
 ]
 
 
-def _is_zeabur_runtime() -> bool:
-    return any(os.getenv(key) for key in ZEABUR_ENV_KEYS)
+def get_setting(name: str, default=None):
+    """讀取設定值：環境變數優先，其次 st.secrets（Streamlit Community Cloud 的 Secrets 面板）。
+
+    Community Cloud 只提供 Secrets（TOML）輸入框；根層級的字串／數字鍵值在 Streamlit
+    解析 secrets 時會同步寫入 os.environ，此函式同時涵蓋「secrets 尚未被解析」與
+    「本機以環境變數啟動」兩種情況。
+    """
+    value = os.getenv(name)
+    if value not in (None, ''):
+        return value
+
+    try:
+        import streamlit as st
+
+        if st.runtime.exists() and name in st.secrets:
+            return str(st.secrets[name])
+    except Exception:
+        # 非 Streamlit runtime（例如純 pytest）或 secrets 不存在
+        pass
+
+    return default
 
 
 def _get_env_int(name: str, default: int) -> int:
-    value = os.getenv(name, '').strip()
+    value = str(get_setting(name, '')).strip()
     if not value:
         return default
     try:
@@ -29,14 +60,41 @@ def _get_env_int(name: str, default: int) -> int:
 
 
 def _get_env_bool(name: str, default: bool) -> bool:
-    value = os.getenv(name, '').strip().lower()
+    value = str(get_setting(name, '')).strip().lower()
     if not value:
         return default
     return value in ('1', 'true', 'yes', 'y', 'on')
 
 
-IS_ZEABUR_RUNTIME = _is_zeabur_runtime()
-ZEABUR_RESULT_PREVIEW_LIMIT = _get_env_int('KILO_ZEABUR_RESULT_PREVIEW_LIMIT', 1000)
+def _is_streamlit_cloud_runtime() -> bool:
+    if any(os.getenv(key) for key in STREAMLIT_CLOUD_ENV_KEYS):
+        return True
+    return os.path.isdir(STREAMLIT_CLOUD_MOUNT_PATH)
+
+
+def _is_zeabur_runtime() -> bool:
+    return any(os.getenv(key) for key in ZEABUR_ENV_KEYS)
+
+
+def _is_cloud_runtime() -> bool:
+    """是否於雲端部署環境執行；可用 KILO_RUNTIME=cloud|local 強制指定。"""
+    override = str(os.getenv('KILO_RUNTIME', '')).strip().lower()
+    if override in ('cloud', 'local'):
+        return override == 'cloud'
+    return _is_streamlit_cloud_runtime() or _is_zeabur_runtime()
+
+
+IS_CLOUD_RUNTIME = _is_cloud_runtime()
+
+# 雲端結果表預覽上限（0 = 不限制）；舊變數名 KILO_ZEABUR_RESULT_PREVIEW_LIMIT 仍相容
+CLOUD_RESULT_PREVIEW_LIMIT = _get_env_int(
+    'KILO_CLOUD_RESULT_PREVIEW_LIMIT',
+    _get_env_int('KILO_ZEABUR_RESULT_PREVIEW_LIMIT', 1000),
+)
+
+# 向後相容別名（Zeabur 時期命名）
+IS_ZEABUR_RUNTIME = IS_CLOUD_RUNTIME
+ZEABUR_RESULT_PREVIEW_LIMIT = CLOUD_RESULT_PREVIEW_LIMIT
 
 # ── Magic Numbers (business_logic.py) ──────────────────────────────
 
