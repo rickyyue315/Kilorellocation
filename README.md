@@ -94,8 +94,8 @@ KiLo 是基於 Streamlit 的庫存調貨建議系統，依據庫存、銷量、�
 
 ## 系統需求
 
-- Python 3.11（與 CI 及 Streamlit Community Cloud 建議設定一致；目前鎖定版本亦相容 3.11–3.13）
-- 依賴（版本見 `requirements.txt`）：`pandas`、`numpy`、`openpyxl`、`python-calamine`、`streamlit`、`xlsxwriter`、`ftfy`
+- Python 3.13（建議；支援 3.11–3.13，**Python 3.14 不支援**，原因見下方部署注意事項）
+- 依賴（版本見 `requirements.txt`）：`pandas`、`numpy`、`openpyxl`、`python-calamine`、`streamlit`、`pyarrow`、`xlsxwriter`、`ftfy`
 
 ## 安裝與執行
 
@@ -149,14 +149,17 @@ streamlit run app.py
 1. 登入 <https://share.streamlit.io>，於右上角點 **Create app** → 「Yup, I have an app」。
 2. 填入 Repository（`rickyyue315/Kilorellocation`）、Branch（`main`）、Main file path（`app.py`）。
 3. 點 **Advanced settings**：
-   - **Python version**：選 **3.11**（必填步驟，說明見下方第 1 點）。
+   - **Python version**：選 **3.13**（必填步驟，切勿選 3.14；說明見下方第 1 點）。
    - **Secrets**（選用）：可直接貼上 `.streamlit/secrets.toml.example` 的內容。
 4. 點 **Deploy!**；之後每次 push 到 `main` 分支都會自動重新部署（依賴變更需數分鐘重新安裝）。
 
 ### 部署注意事項
 
-1. **Python 版本需在 UI 選擇**：Community Cloud **不會**採用 `runtime.txt` 或 `.python-version`，預設會使用較新的 Python 版本；請於 Advanced settings（或部署後的 App settings）選擇 `3.11`。目前鎖定的依賴有 3.11–3.14 的預編譯 wheel，但 `numpy==2.4.2` 最低需求為 Python 3.11。
-2. **依賴安裝**：`requirements.txt` 版本已鎖定並通過測試；無需 `packages.txt`（`python-calamine`／`openpyxl`／`xlsxwriter` 皆有 Linux wheel，無需 apt 套件）。
+1. **Python 版本必須在部署時選 3.13**（或 3.11／3.12）：
+   - Community Cloud **不會**採用 `runtime.txt` 或 `.python-version`，只認 Advanced settings 的選單；選錯無法在 App settings 內更改，**必須刪除 App，再用相同 subdomain 重新部署**（官方文件：「Upgrade your app's Python version」）。
+   - **不要選 3.14**：`streamlit==1.51.0` 限制 `pyarrow<22`，而 `pyarrow 21.0.0` 沒有 cp314 wheel（僅 cp39–cp313），建置時會退回原始碼編譯 Arrow C++，因容器內無 `cmake` 而失敗（錯誤訊息類似 `error: command 'cmake' failed: No such file or directory`）。
+   - 支援範圍：Python 3.11–3.13（`numpy==2.4.2` 最低需求 3.11；`pyarrow==21.0.0`、`pandas==2.3.3`、`python-calamine==0.6.2` 皆有 3.11–3.13 wheel）。
+2. **依賴安裝**：`requirements.txt` 版本已鎖定並通過測試（含 `pyarrow==21.0.0`，由 `streamlit==1.51.0` 的 `pyarrow<22` 上限決定）；無需 `packages.txt`（`python-calamine`／`openpyxl`／`xlsxwriter`／`pyarrow` 皆有 Linux wheel，無需 apt 套件、無需 cmake）。
 3. **設定覆寫**：Community Cloud 會強制覆寫 `showErrorDetails`、`fastReruns`、`runOnSave`、`enableXsrfProtection`、`gatherUsageStats`；其餘 `.streamlit/config.toml` 設定（主題、`maxUploadSize = 50`）照常生效。
 4. **上傳大小**：`maxUploadSize` 已對齊應用層 50MB 上限，避免大型暫存造成容器記憶體壓力。
 5. **雲端效能模式**：偵測到雲端環境（`/mount/src` 掛載路徑、`STREAMLIT_CLOUD` 或 Zeabur 舊環境變數）時，結果表預設只渲染前 1,000 列並提供「載入完整調貨建議表」勾選項；完整資料不受影響，Excel 匯出仍是全量。

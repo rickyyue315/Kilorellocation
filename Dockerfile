@@ -1,8 +1,9 @@
 # KiLo 庫存調貨建議系統 — 通用 Docker 映像（選用）
 # 注意：Streamlit Community Cloud（share.streamlit.io）不使用 Dockerfile，
 #       本檔僅保留給自架或其他容器主機（Railway / Render / VPS…）備用。
-# 鎖定 Python 版本以確保容器部署與本機開發環境一致。
-FROM python:3.11-slim
+# 鎖定 Python 版本（3.13）以確保容器部署與本機開發環境一致；
+# 勿改用 3.14：streamlit 1.51 限制 pyarrow<22，pyarrow 21 無 cp314 wheel。
+FROM python:3.13-slim
 
 # 效能與穩定性：停用位元組碼快取（容器內不需要）、管線輸出即時 flush
 ENV PYTHONDONTWRITEBYTECODE=1 \

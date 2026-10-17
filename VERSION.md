@@ -1,5 +1,30 @@
 # 版本更新記錄
 
+## v2.38.1 (2026-10-17)
+
+### 修正 Streamlit Community Cloud 建置失敗（Python 3.14 不相容）
+
+#### 變更說明
+- **問題**：首次部署 Community Cloud 時 App 使用 **Python 3.14.8** 建置，`streamlit==1.51.0` 依賴 `pyarrow<22,>=7.0`，而 `pyarrow 21.0.0` 沒有 cp314 wheel（僅 cp39–cp313），pip／uv 退回原始碼編譯 Arrow C++，容器內無 `cmake` 而失敗（`error: command 'cmake' failed: No such file or directory`）。
+- **部署結論**：Community Cloud 的 Python 版本**只能在部署精靈的 Advanced settings 選擇**（`runtime.txt`／`.python-version` 不被採用），且**部署後無法更改**——必須刪除 App，再以相同 subdomain 重新部署並選 **Python 3.13（或 3.11／3.12）**。
+- **版本對齊**：本機開發為 Python 3.13，故將 CI（`.github/workflows/ci.yml`）、`runtime.txt`、`Dockerfile` 一併統一為 **3.13**（原為 3.11），避免再次出現「部署／本機不一致」。
+- **依賴鎖定**：`requirements.txt` 明確加入 `pyarrow==21.0.0`（由 `streamlit 1.51` 的 `<22` 上限決定），並加註 Python 3.14 不支援的原因；無需 `packages.txt`／cmake。
+- **注意**：調貨演算法、優先級分組、品質檢查、Excel 輸出與模式教學內容均無變化。
+
+#### 修改檔案
+- `requirements.txt` — 新增 `pyarrow==21.0.0` 與 Python 版本支援註解
+- `.github/workflows/ci.yml` — Python 3.11 → 3.13
+- `runtime.txt` — python-3.11 → python-3.13
+- `Dockerfile` — `python:3.11-slim` → `python:3.13-slim`
+- `README.md` — 系統需求、部署步驟與注意事項（Python 版本選擇、3.14 失敗原因、刪除重建流程）
+- `config.py` — `VERSION` bump 至 v2.38.1
+- `app.py` — docstring 版本更新
+
+#### 文件同步
+- `README.md`／`VERSION.md`／`config.py`／`app.py` 已同步；`ui/tutorial.py`、`調貨模式詳解.txt`、`transfer_logic_ai_brief.md` 無需變更（無模式新增／移除／邏輯修改）。
+
+---
+
 ## v2.38.0 (2026-10-17)
 
 ### 部署平台遷移：Zeabur → Streamlit Community Cloud（share.streamlit.io）

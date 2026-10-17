@@ -15,7 +15,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          # 與本機開發／Streamlit Community Cloud 部署版本一致（勿用 3.14，pyarrow 21 無 cp314 wheel）
+          python-version: '3.13'
           cache: pip
 
       - name: Install dependencies

@@ -1,10 +1,16 @@
 # ── 執行期依賴（鎖定為已通過測試的版本，確保 Streamlit Community Cloud 部署與本機一致）──
+# 注意：支援 Python 3.11–3.13（建議 3.13）。
+#       Python 3.14 不支援：streamlit 1.51.0 限制 pyarrow<22，而 pyarrow 21.0.0 沒有
+#       cp314 wheel（只有 cp39–cp313），pip/uv 會改為原始碼編譯 Arrow C++ 而失敗
+#       （Container 內無 cmake）。Community Cloud 的 Python 版本需在部署時選定，
+#       部署後無法更改（須刪除 App 後以相同 subdomain 重新部署）。
 pandas==2.3.3
 numpy==2.4.2
 openpyxl==3.1.5
 python-calamine==0.6.2
 xlsxwriter==3.2.9
 streamlit==1.51.0
+pyarrow==21.0.0
 ftfy==6.3.1
 
 # ── 開發/測試 ──
