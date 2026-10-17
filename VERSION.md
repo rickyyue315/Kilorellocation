@@ -1,5 +1,31 @@
 # 版本更新記錄
 
+## v2.38.2 (2026-10-17)
+
+### 套件升級：支援 Python 3.14（解決 Community Cloud 建置失敗根因）
+
+#### 變更說明
+- **根因**：Community Cloud 以 **Python 3.14.8** 建置（平台預設且部署後不可更改），而 `streamlit==1.51.0` 限制 `pyarrow<22`，`pyarrow 21.0.0` 又沒有 cp314 wheel → 建置時退回原始碼編譯 Arrow C++，容器內無 `cmake` 而失敗。
+- **修法（不依賴平台選單）**：升級 `streamlit==1.52.2`（自 1.52 起移除 pyarrow 上限）並鎖定 `pyarrow==22.0.0`（提供 cp310–cp314 wheel），使 Python 3.11–3.14 全部可直接安裝 wheel。
+- **altair 明確鎖版**：`altair==5.5.0`（streamlit 1.52 允許 `altair<7`，不鎖會抓到 6.x；鎖版維持原驗證版本與圖表輸出一致）。
+- **CI 改為矩陣**：`.github/workflows/ci.yml` 於 **3.13（本機）與 3.14（Cloud 預設）** 雙版本執行測試；`runtime.txt`／`Dockerfile` 維持 3.13。
+- **驗證**：以乾淨虛擬環境（Python 3.13.7，全新 venv 安裝 `requirements.txt`）執行 424 項測試全數通過；另以 `AppTest` 實跑 `app.py`（0 例外、0 警告，含模式教學分頁）與 Arrow 渲染煙霧測試（`st.dataframe`／`st.bar_chart`／`st.download_button`，pyarrow 22 路徑）。
+- **部署操作**：既有「建置失敗」的 App **無需刪除**，push 後於 App 右上角 **Manage app → Reboot** 即重新安裝依賴。
+- **注意**：調貨演算法、優先級分組、品質檢查、Excel 輸出與模式教學內容均無變化。
+
+#### 修改檔案
+- `requirements.txt` — `streamlit 1.51.0 → 1.52.2`、`pyarrow 21.0.0 → 22.0.0`、新增 `altair==5.5.0`，更新版本選擇說明
+- `.github/workflows/ci.yml` — 測試矩陣 `['3.13', '3.14']`
+- `README.md` — 系統需求改為 Python 3.11–3.14；部署注意事項改寫（含 `Manage app → Reboot` 指引）
+- `Dockerfile` — 版本註解更新
+- `config.py` — `VERSION` bump 至 v2.38.2
+- `app.py` — docstring 版本更新
+
+#### 文件同步
+- `README.md`／`VERSION.md`／`config.py`／`app.py` 已同步；`ui/tutorial.py`、`調貨模式詳解.txt`、`transfer_logic_ai_brief.md` 無需變更（無模式新增／移除／邏輯修改）。
+
+---
+
 ## v2.38.1 (2026-10-17)
 
 ### 修正 Streamlit Community Cloud 建置失敗（Python 3.14 不相容）

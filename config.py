@@ -4,7 +4,7 @@
 
 import os
 
-VERSION = "v2.38.1"
+VERSION = "v2.38.2"
 
 # ── 執行環境偵測（Streamlit Community Cloud / 其他雲端容器 / 本機）──────
 
