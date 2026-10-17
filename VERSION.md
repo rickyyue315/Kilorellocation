@@ -1,5 +1,46 @@
 # 版本更新記錄
 
+## v2.38.3 (2026-10-17)
+
+### 針對 Streamlit Community Cloud 免費方案（約 1GB RAM）的資源防護
+
+#### 背景（實測數據，純 Python、未含 Streamlit server 開銷）
+| 輸入規模 | XLSX | DataFrame | 峰值 RSS | 配對耗時 | Excel 匯出 |
+| --- | --- | --- | --- | --- | --- |
+| 2 萬行 | 1.0 MB | 8.8 MB | 172 MB | 2.6 s | 1.7 s |
+| 20 萬行 | 10.2 MB | 88.6 MB | 748 MB | 26 s | 17 s |
+
+原本的上傳上限 50MB 約等於 100 萬行，遠超 1GB 容器可承受範圍，且快取無上限、列數預覽只套用主結果表。
+
+#### 變更說明
+- **雲端上傳上限**：新增 `KILO_CLOUD_MAX_UPLOAD_MB`（預設 **8MB**；本機維持 50MB），`FILE_SIZE_LIMIT_BYTES` 依環境自動套用，錯誤訊息顯示實際上限。
+- **雲端列數守衛**：新增 `KILO_CLOUD_MAX_ROWS`（預設 **120,000 行**，`0` = 不限制）與 `DataProcessor.enforce_row_limit()`，在讀檔後（最便宜階段）即中止並給出可行建議，避免平台以資源限制中斷整個 App。
+- **結果表預覽擴及所有大表**：新增 `_limit_rows()`（純函式）與 `_maybe_limit_rows()`，套用於調貨建議表、**優先級分組表**、**缺口分析表**（原本僅主結果表）；統計與 Excel 匯出仍為全量。
+- **快取上限**：`app.py` 預處理快取與 `ui/tutorial.py` 教學快取加上 `max_entries=2`，避免多次上傳的 DataFrame 累積佔用記憶體（Cloud 常見 OOM 原因）。
+- **介面提示**：上傳區新增「雲端資源設定」caption（單檔上限／列數上限／預覽列數），讓使用者事前知道限制。
+- **注意**：調貨演算法、優先級分組、品質檢查、Excel 輸出與模式教學內容均無變化。
+
+#### 修改檔案
+- `config.py` — `CLOUD_MAX_UPLOAD_MB`／`CLOUD_MAX_ROWS`／`MAX_UPLOAD_MB`／`MAX_ROWS`，`VERSION` bump 至 v2.38.3
+- `data_processor.py` — `enforce_row_limit()`、上傳大小訊息改用實際上限
+- `ui/display.py` — `_limit_rows()`／`_maybe_limit_rows()` 與三處套用、上傳區資源提示
+- `app.py`、`ui/tutorial.py` — 快取 `max_entries=2`、docstring 版本
+- `tests/test_cloud_guards.py`（新增，10 項測試）
+- `README.md`、`.streamlit/secrets.toml.example` — 雲端資源上限與新環境變數說明
+
+#### 驗證
+- 434 項測試全數通過（424 + 新增 10）；`AppTest` 於雲端模式（`KILO_RUNTIME=cloud`）與本機模式實跑 `app.py`：0 例外、0 錯誤、0 警告，雲端模式正確顯示「單檔上限 8MB · 雲端列數上限 120,000 行 · 雲端結果表預覽 1,000 列」。
+
+#### 文件同步
+- `README.md`／`VERSION.md`／`config.py`／`app.py` 已同步；`ui/tutorial.py`、`調貨模式詳解.txt`、`transfer_logic_ai_brief.md` 無需變更（無模式新增／移除／邏輯修改）。
+
+#### 待辦（P1，未實作）
+- `use_container_width` → `width="stretch"`（20 處；目前可用但已進入棄用期，只在 console 產生提示）
+- Excel 匯出改 `constant_memory` 以降低大型結果的峰值記憶體
+- 讀檔 `usecols` 只載入必要欄位（需先確認來源檔欄位清單）
+
+---
+
 ## v2.38.2 (2026-10-17)
 
 ### 套件升級：支援 Python 3.14（解決 Community Cloud 建置失敗根因）

@@ -13,7 +13,7 @@ import logging
 
 from config import (
     REQUIRED_COLUMNS, OPTIONAL_COLUMNS, INTEGER_COLUMNS, STRING_COLUMNS,
-    OUTLIER_CAP, FILE_SIZE_LIMIT_BYTES,
+    OUTLIER_CAP, FILE_SIZE_LIMIT_BYTES, MAX_UPLOAD_MB, MAX_ROWS,
 )
 
 logger = logging.getLogger(__name__)
@@ -256,9 +256,9 @@ class DataProcessor:
         if not (file_name.endswith('.xlsx') or file_name.endswith('.xls')):
             return False, "文件格式不正確，請上傳.xlsx或.xls格式的Excel文件"
         
-        # 檢查文件大小（限制為50MB）
+        # 檢查文件大小（本機 50MB；雲端容器採較保守上限，見 config.MAX_UPLOAD_MB）
         if hasattr(uploaded_file, 'size') and uploaded_file.size > FILE_SIZE_LIMIT_BYTES:
-            return False, "文件大小超過限制（最大50MB）"
+            return False, f"文件大小超過限制（最大 {MAX_UPLOAD_MB}MB）"
         
         return True, ""
     
@@ -430,6 +430,21 @@ class DataProcessor:
         logger.info("有效銷量計算完成")
         return df_processed
     
+    def enforce_row_limit(self, df: pd.DataFrame) -> None:
+        """雲端行數守衛：超過上限即中止，避免把 1GB 容器撐爆（MAX_ROWS=0 表示不限制）。
+
+        讀檔後立即檢查，讓使用者在最便宜的階段就得到明確訊息，
+        而不是等到配對／匯出階段才被平台的資源限制中斷。
+        """
+        limit = MAX_ROWS
+        if limit and len(df) > limit:
+            raise ValueError(
+                f"資料量超出雲端上限：{len(df):,} 行 > {limit:,} 行。"
+                f"雲端免費方案約 1GB 記憶體，請先縮小匯出範圍（例如只保留需要的 OM／店舖），"
+                f"或改用本機版執行。若確有需要在雲端放寬，可於 Secrets 設定 "
+                f"KILO_CLOUD_MAX_ROWS（0 = 不限制，風險自負）。"
+            )
+
     def preprocess_data(self, file_path_or_buffer) -> Tuple[pd.DataFrame, Dict]:
         """
         完整的數據預處理流程
@@ -444,6 +459,9 @@ class DataProcessor:
         
         # 讀取Excel文件
         df = self.read_excel_file(file_path_or_buffer)
+
+        # 雲端行數守衛（本機不啟用）
+        self.enforce_row_limit(df)
         
         # 驗證欄位
         if not self.validate_columns(df):

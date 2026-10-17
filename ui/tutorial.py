@@ -191,7 +191,7 @@ def _build_mode_from_data(mode_data):
     return "\n".join(parts)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=2)
 def _load_group(group_key):
     path = os.path.join(_TUTORIALS_DIR, f"{group_key}.json")
     with open(path, "r", encoding="utf-8") as f:

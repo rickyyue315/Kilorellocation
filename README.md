@@ -162,21 +162,33 @@ streamlit run app.py
 2. **依賴安裝**：`requirements.txt` 版本已鎖定並通過測試（`streamlit==1.52.2`、`pyarrow==22.0.0`、`altair==5.5.0`）；無需 `packages.txt`（全部套件皆有 Linux wheel，無需 apt 套件、無需 cmake）。
 3. **設定覆寫**：Community Cloud 會強制覆寫 `showErrorDetails`、`fastReruns`、`runOnSave`、`enableXsrfProtection`、`gatherUsageStats`；其餘 `.streamlit/config.toml` 設定（主題、`maxUploadSize = 50`）照常生效。
 4. **上傳大小**：`maxUploadSize` 已對齊應用層 50MB 上限，避免大型暫存造成容器記憶體壓力。
-5. **雲端效能模式**：偵測到雲端環境（`/mount/src` 掛載路徑、`STREAMLIT_CLOUD` 或 Zeabur 舊環境變數）時，結果表預設只渲染前 1,000 列並提供「載入完整調貨建議表」勾選項；完整資料不受影響，Excel 匯出仍是全量。
-6. **環境變數 / Secrets**（全部選用）：
+5. **雲端效能模式**：偵測到雲端環境（`/mount/src` 掛載路徑、`STREAMLIT_CLOUD` 或 Zeabur 舊環境變數）時，**所有大型表格**（調貨建議表、優先級分組表、缺口分析表）預設只渲染前 1,000 列並提供「載入完整…」勾選項；統計與 Excel 匯出仍使用全量資料。
+6. **雲端資源防護（免費方案約 1GB RAM、共享 CPU）**：
+
+   | 機制 | 雲端預設 | 本機 | 說明 |
+   | --- | --- | --- | --- |
+   | 單檔上傳上限 | **8MB** | 50MB | 讀檔前即擋下；由 `KILO_CLOUD_MAX_UPLOAD_MB` 調整 |
+   | 列數上限 | **120,000 行** | 無限制 | 讀檔後立即檢查並顯示明確訊息；由 `KILO_CLOUD_MAX_ROWS` 調整（`0` = 不限制） |
+   | 結果表預覽 | 1,000 列 | 全量 | 由 `KILO_CLOUD_RESULT_PREVIEW_LIMIT` 調整 |
+   | 快取上限 | `max_entries=2` | 同 | 避免多次上傳的 DataFrame 累積佔用記憶體 |
+
+   實測參考（純 Python、未含 Streamlit server 開銷）：2 萬行 ≈ 172MB 峰值、20 萬行 ≈ 748MB 峰值。實務上「1MB 以下／2 萬行內」的檔案在雲端非常安全；超過 12 萬行建議先縮小匯出範圍或改用本機執行。
+7. **環境變數 / Secrets**（全部選用）：
 
    | 變數 | 預設 | 說明 |
    | --- | --- | --- |
    | `KILO_LOG_LEVEL` | `WARNING`（雲端）/ `INFO`（本機） | 日誌層級 |
+   | `KILO_CLOUD_MAX_UPLOAD_MB` | `8` | 雲端單檔上傳上限（MB） |
+   | `KILO_CLOUD_MAX_ROWS` | `120000` | 雲端列數上限（`0` = 不限制，風險自負） |
    | `KILO_CLOUD_RESULT_PREVIEW_LIMIT` | `1000` | 雲端結果表預覽行數上限（`0` = 不限制；舊名 `KILO_ZEABUR_RESULT_PREVIEW_LIMIT` 仍相容） |
    | `KILO_FIX_MOJIBAKE` | `0` | 啟用亂碼修補（Windows 上載亂碼時用；Linux 雲端環境不需要） |
    | `KILO_PERF_TIMING` | `0` | 啟用效能計時面板 |
    | `KILO_RUNTIME` | 自動偵測 | 強制指定 `cloud` / `local` |
 
    設定方式：`share.streamlit.io` → App → **Settings → Secrets**（TOML 格式；根層級鍵值會同步成為環境變數，`config.get_setting()` 會依序讀取環境變數與 Secrets）。
-7. **檔案系統為臨時性**：容器重啟後會回到 Git 版本；本系統只做記憶體內處理與下載輸出，不會寫入檔案，資料不會遺失。
-8. **閒置休眠**：免費方案閒置一段時間後會休眠，下次開啟需數十秒喚醒，屬正常現象。
-9. **查看日誌**：App 頁面右側的 Cloud logs 僅對具備 repo 寫入權限的成員可見。
+8. **檔案系統為臨時性**：容器重啟後會回到 Git 版本；本系統只做記憶體內處理與下載輸出，不會寫入檔案，資料不會遺失。
+9. **閒置休眠**：免費方案閒置一段時間後會休眠，下次開啟需數十秒喚醒，屬正常現象。
+10. **查看日誌**：App 頁面右側的 Cloud logs 僅對具備 repo 寫入權限的成員可見。
 
 ### 其他平台（Docker，選用）
 

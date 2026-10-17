@@ -6,7 +6,12 @@ import streamlit as st
 import pandas as pd
 from typing import Optional
 
-from config import IS_CLOUD_RUNTIME, CLOUD_RESULT_PREVIEW_LIMIT
+from config import (
+    IS_CLOUD_RUNTIME,
+    CLOUD_RESULT_PREVIEW_LIMIT,
+    MAX_UPLOAD_MB,
+    MAX_ROWS,
+)
 from models.mode_registry import get_mode_families
 
 
@@ -15,6 +20,35 @@ def _is_b_special_mode(mode: Optional[str]) -> bool:
     if not mode:
         return False
     return mode in get_mode_families().get('b_special', set())
+
+
+def _limit_rows(df: pd.DataFrame, limit: int) -> pd.DataFrame:
+    """純函式：limit > 0 且列數超過時，回傳前 limit 列（供雲端效能模式使用）。"""
+    if limit and limit > 0 and len(df) > limit:
+        return df.head(limit)
+    return df
+
+
+def _maybe_limit_rows(df: pd.DataFrame, label: str, key_suffix: str) -> pd.DataFrame:
+    """雲端效能模式：大型表格先只渲染前 N 列，需要時再展開。
+
+    針對 Community Cloud（約 1GB、共享 CPU）降低前端渲染與 websocket 傳輸負擔；
+    只影響畫面呈現，統計與 Excel 匯出仍使用全量資料。
+    """
+    if not (IS_CLOUD_RUNTIME and CLOUD_RESULT_PREVIEW_LIMIT > 0 and len(df) > CLOUD_RESULT_PREVIEW_LIMIT):
+        return df
+
+    st.info(
+        f"雲端效能模式：{label}先顯示前 {CLOUD_RESULT_PREVIEW_LIMIT:,} 列（共 {len(df):,} 列），"
+        "避免大型表格拖慢頁面。完整資料不受影響，Excel 匯出仍是全量。"
+    )
+    show_all = st.checkbox(
+        f"載入完整{label}",
+        value=False,
+        key=f"show_full_{key_suffix}",
+        help="僅在需要時渲染全部結果列，以減少雲端容器上的前端與傳輸負擔。",
+    )
+    return df if show_all else _limit_rows(df, CLOUD_RESULT_PREVIEW_LIMIT)
 
 
 def render_upload_requirements(mode_code: str):
@@ -121,6 +155,12 @@ def render_upload_requirements(mode_code: str):
             - F2模式:未填Target的店舖不會接收
             - F2模式HD轉出選項:預設HD不能轉到HA/HB/HC；可切換為「HD可轉出（最後優先）」，此時HD來源排在最低優先級
             """)
+
+    _limits = [f"單檔上限 {MAX_UPLOAD_MB}MB"]
+    if MAX_ROWS:
+        _limits.append(f"雲端列數上限 {MAX_ROWS:,} 行")
+        _limits.append(f"雲端結果表預覽 {CLOUD_RESULT_PREVIEW_LIMIT:,} 列")
+    st.caption("⚙️ 雲端資源設定：" + " · ".join(_limits) + ("" if MAX_ROWS else "（本機執行無雲端限制）"))
 
 
 # 結果表中的整數欄位（兩種 schema 聯集），顯示時套用 column_config 數字格式
@@ -334,28 +374,8 @@ def render_results_table(recommendations: list, df: pd.DataFrame, current_run_ke
         st.session_state[cache_key] = pd.DataFrame(_build_display_data(recommendations, df, mode))
     rec_df = st.session_state[cache_key]
 
-    total_recs = len(rec_df)
-    use_preview_limit = (
-        IS_CLOUD_RUNTIME
-        and CLOUD_RESULT_PREVIEW_LIMIT > 0
-        and total_recs > CLOUD_RESULT_PREVIEW_LIMIT
-    )
-
-    if use_preview_limit:
-        st.info(
-            f"雲端效能模式：目前先顯示前 {CLOUD_RESULT_PREVIEW_LIMIT:,} 行，"
-            "避免大型結果表拖慢頁面。完整結果仍可下載，亦可按需展開。"
-        )
-        show_full_result_table = st.checkbox(
-            "載入完整調貨建議表",
-            value=False,
-            key=f"show_full_result_table_{current_run_key}",
-            help="僅在需要時渲染全部結果列，以減少雲端容器（Streamlit Community Cloud）上的前端與傳輸負擔。"
-        )
-        table_df = rec_df if show_full_result_table else rec_df.head(CLOUD_RESULT_PREVIEW_LIMIT)
-        st.dataframe(table_df, use_container_width=True, hide_index=True, height=480, column_config=_int_column_config(table_df))
-    else:
-        st.dataframe(rec_df, use_container_width=True, hide_index=True, height=480, column_config=_int_column_config(rec_df))
+    table_df = _maybe_limit_rows(rec_df, "調貨建議表", f"results_table_{current_run_key}")
+    st.dataframe(table_df, use_container_width=True, hide_index=True, height=480, column_config=_int_column_config(table_df))
 
 
 def _build_priority_groups(recommendations: list) -> dict:
@@ -435,6 +455,9 @@ def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_
                     _build_display_data(items, df, mode, stock_lookup=stock_lookup)
                 )
             group_df = st.session_state[cache_key]
+            group_df = _maybe_limit_rows(
+                group_df, f"{priority_label}建議表", f"priority_{current_run_key}_{priority_label}"
+            )
             st.dataframe(
                 group_df,
                 use_container_width=True,
@@ -629,8 +652,9 @@ def render_gap_report(gap_report: dict, current_run_key: str = ""):
             filtered_df = filtered_df[filtered_df['狀態'] == selected_status]
 
         st.caption(f"顯示 {len(filtered_df):,} / {len(gap_df):,} 列")
+        gap_view_df = _maybe_limit_rows(filtered_df, "缺口分析表", f"gap_{current_run_key}")
         st.dataframe(
-            filtered_df,
+            gap_view_df,
             use_container_width=True,
             hide_index=True,
             height=420,

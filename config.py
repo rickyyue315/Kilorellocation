@@ -4,7 +4,7 @@
 
 import os
 
-VERSION = "v2.38.2"
+VERSION = "v2.38.3"
 
 # ── 執行環境偵測（Streamlit Community Cloud / 其他雲端容器 / 本機）──────
 
@@ -86,6 +86,13 @@ def _is_cloud_runtime() -> bool:
 
 IS_CLOUD_RUNTIME = _is_cloud_runtime()
 
+# ── 雲端資源防護（Streamlit Community Cloud 免費方案約 1GB RAM、共享 CPU）──
+# 實測（純 Python、未含 Streamlit server 開銷）：2 萬行 ≈ 172MB 峰值、20 萬行 ≈ 748MB 峰值。
+# 因此雲端採用較保守的上傳上限與行數守衛；本機開發不受影響。
+#   0 = 停用該項限制（本機 FILE_SIZE_LIMIT_BYTES 固定 50MB、無行數上限）
+CLOUD_MAX_UPLOAD_MB = _get_env_int('KILO_CLOUD_MAX_UPLOAD_MB', 8)
+CLOUD_MAX_ROWS = _get_env_int('KILO_CLOUD_MAX_ROWS', 120000)
+
 # 雲端結果表預覽上限（0 = 不限制）；舊變數名 KILO_ZEABUR_RESULT_PREVIEW_LIMIT 仍相容
 CLOUD_RESULT_PREVIEW_LIMIT = _get_env_int(
     'KILO_CLOUD_RESULT_PREVIEW_LIMIT',
@@ -142,7 +149,14 @@ TURNDAY_MAX_DAYS = 60
 # ── Magic Numbers (data_processor.py) ──────────────────────────────
 
 OUTLIER_CAP = 100000
-FILE_SIZE_LIMIT_BYTES = 50 * 1024 * 1024
+
+# 上傳上限：本機 50MB；雲端採較保守上限（1GB 容器）
+LOCAL_MAX_UPLOAD_MB = 50
+MAX_UPLOAD_MB = CLOUD_MAX_UPLOAD_MB if IS_CLOUD_RUNTIME else LOCAL_MAX_UPLOAD_MB
+FILE_SIZE_LIMIT_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+
+# 行數守衛：僅雲端啟用（0 = 不限制）；超過即中止，避免容器 OOM
+MAX_ROWS = CLOUD_MAX_ROWS if IS_CLOUD_RUNTIME else 0
 
 # ── 欄位定義 (data_processor.py) ──────────────────────────────────
 
