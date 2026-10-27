@@ -71,5 +71,9 @@ debug/
 .DS_Store
 Thumbs.db
 
+# Local agent/tooling state
+.workbuddy/
+.zcode/
+
 # Streamlit secrets
 .streamlit/secrets.toml

@@ -96,14 +96,17 @@ KiLo 是基於 Streamlit 的庫存調貨建議系統，依據庫存、銷量、�
 
 - Python 3.11–3.14（Community Cloud 目前預設 3.14，可直接部署；本機與 CI 驗證於 3.13／3.14）
 - 依賴（版本見 `requirements.txt`）：`pandas`、`numpy`、`openpyxl`、`python-calamine`、`streamlit`、`pyarrow`、`altair`、`xlsxwriter`、`ftfy`
+- ⚠️ **altair 必須與 Python 版本配對**：`altair` 5.5.x 在 Python 3.14 匯入即失敗
+  （`_TypedDictMeta.__new__() got an unexpected keyword argument 'closed'`，圖表步驟會整個掛掉）。
+  `requirements.txt` 已用環境標記分流（`<3.14` → 5.5.0、`>=3.14` → 6.0.0），
+  請一律用 `pip install -r requirements.txt` 安裝，不要手動指定 altair 版本。
 
 ## 安裝與執行
 
 ### Windows
 
-1. 直接執行 `run.bat`。
-1. 系統會建立虛擬環境並安裝依賴。
-1. 自動啟動 Streamlit。
+1. 雙擊 `run_system.bat`（使用專案內 `.venv\Scripts\python.exe` 啟動，port 8501）。
+1. 若 `.venv` 不存在或依賴缺漏，先依下方「手動安裝」建立環境。
 
 ### Linux / macOS
 
@@ -119,11 +122,11 @@ chmod +x run.sh
 
 ### 手動安裝
 
-1. 建立並啟用虛擬環境：
+1. 建立並啟用虛擬環境（`run_system.bat` 讀的是 `.venv`，名稱請保持一致）：
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 ```
 
 1. 安裝依賴：

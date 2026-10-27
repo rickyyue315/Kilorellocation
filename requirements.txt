@@ -6,7 +6,12 @@
 #   在 Python 3.14 上會退回原始碼編譯 Arrow C++ 而失敗（容器無 cmake）。
 #   → streamlit 1.52 起移除 pyarrow 上限，故升級至 1.52.2 並鎖定 pyarrow==22.0.0
 #     （提供 cp310–cp314 wheel，任何受支援的 Python 版本都能直接安裝 wheel）。
-#   → altair 明確鎖 5.5.0（streamlit 1.52 允許 altair<7，不鎖會抓到 6.x，維持原驗證版本）。
+#   → altair 依 Python 版本分流（v2.38.4）：
+#     altair 5.5.x 的 schema 以 class X(TypedDict, closed=True) 定義，且版本守衛寫成
+#     「Python >= 3.14 就改用內建 typing.TypedDict」；但 3.14 的 typing.TypedDict 尚未支援
+#     PEP 728 的 closed，匯入時即拋 `_TypedDictMeta.__new__() got an unexpected keyword
+#     argument 'closed'`（圖表步驟整個失敗）。altair 6.x 的守衛是 >= 3.15，可正常運作，
+#     故 3.14 一律用 6.x，3.13 以下維持已驗證的 5.5.0。
 pandas==2.3.3
 numpy==2.4.2
 openpyxl==3.1.5
@@ -14,7 +19,10 @@ python-calamine==0.6.2
 xlsxwriter==3.2.9
 streamlit==1.52.2
 pyarrow==22.0.0
-altair==5.5.0
+altair==5.5.0; python_version < "3.14"
+altair==6.0.0; python_version >= "3.14"
+# PEP 728（TypedDict closed）支援自 4.13 起；altair 在 Python < 3.15 會用到，勿降級
+typing_extensions>=4.13.0
 ftfy==6.3.1
 
 # ── 開發/測試 ──

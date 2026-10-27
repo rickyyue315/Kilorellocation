@@ -1,5 +1,49 @@
 # 版本更新記錄
 
+## v2.38.4 (2026-10-27)
+
+### 修正 Python 3.14 部署下的圖表崩潰（`_TypedDictMeta.__new__() got an unexpected keyword argument 'closed'`）
+
+#### 問題現象
+上傳檔案後流程跑到 STEP 3 圖表時，畫面顯示「處理文件時發生錯誤: `_TypedDictMeta.new() got an unexpected keyword argument 'closed'`」，整份調貨建議與 Excel 匯出隨之失敗（該段被 `app.py` 的外層 `except` 攔截）。本機（Python 3.11）完全正常，只有 Community Cloud（Python 3.14）會發生。
+
+#### 根因
+- `st.bar_chart` 會在首次渲染時才惰性匯入 Streamlit 的圖表後端 **Altair**。
+- Altair 5.5.0 的 schema 以 `class X(TypedDict, closed=True)` 定義（PEP 728），而它的版本守衛寫成
+  `if sys.version_info >= (3, 14): from typing import TypedDict`——在 Python 3.14 上改用**內建** `typing.TypedDict`。
+- Python 3.14 的 `typing.TypedDict` 尚未實作 `closed`，於是類別建立時直接拋
+  `_TypedDictMeta.__new__() got an unexpected keyword argument 'closed'`；Altair 6.x 的守衛是 `>= 3.15`，不受影響。
+- v2.38.2 為了「維持原驗證版本」而明確鎖 `altair==5.5.0`，反而在 3.14 部署上種下此問題。
+
+#### 變更說明
+- **依賴分流**：`altair==5.5.0; python_version < "3.14"` / `altair==6.0.0; python_version >= "3.14"`，
+  並加入 `typing_extensions>=4.13.0`（PEP 728 支援起點，Altair 在 Python < 3.15 會用到）。
+- **圖表容錯**：`render_charts()` 拆出 `_render_chart_bars()` 並包上 `try/except`；圖表後端失敗只顯示
+  「圖表暫時無法顯示；調貨建議、統計與 Excel 匯出不受影響」＋可行動提示（`_chart_error_hint()`），
+  不再讓輔助圖表中斷整個調貨流程。
+- **文件**：README 系統需求補充 altair 與 Python 的配對警告、安裝說明對齊實際的 `.venv` / `run_system.bat`
+  （原文寫的 `run.bat` / `run.sh` 在 repo 內並不存在）。
+- **注意**：調貨演算法、優先級分組、品質檢查、Excel 輸出與雲端資源守衛（v2.38.3）均無變化。
+
+#### 修改檔案
+- `requirements.txt` — altair 依 Python 版本分流、新增 `typing_extensions` 下限
+- `ui/display.py` — `render_charts()` 容錯拆分、新增 `_chart_error_hint()`
+- `tests/test_chart_fallback.py` — 新增（7 項測試：提示文案、例外不外洩、依賴標記防退化）
+- `README.md` — altair／Python 配對警告、`run_system.bat` 與 `.venv` 安裝說明
+- `config.py`、`app.py` — `VERSION` bump 至 v2.38.4
+- `.gitignore` — 忽略 `.workbuddy/`、`.zcode/` 本機工具目錄
+
+#### 驗證
+- 以 Python 3.14 直接複現原始錯誤（`class X(TypedDict, closed=True)` → 同字串 TypeError），確認根因。
+- Python 3.14 + altair 6.0.0 + streamlit 1.55 實跑 `st.bar_chart`：0 例外。
+- Python 3.11（本機 `.venv`）`requirements.txt` 標記解析：3.11 選 5.5.0、3.14 選 6.0.0，互斥正確。
+- `AppTest` 跑 `render_charts`：正常路徑 0 例外 0 警告；模擬後端拋錯時正確降級為警告＋提示。
+- 測試：441 項全數通過（434 + 新增 7）。
+
+#### 文件同步
+- `README.md`／`VERSION.md`／`config.py`／`app.py` 已同步；`ui/tutorial.py`、`調貨模式詳解.txt`、
+  `transfer_logic_ai_brief.md` 無需變更（無模式新增／移除／邏輯修改）。
+
 ## v2.38.3 (2026-10-17)
 
 ### 針對 Streamlit Community Cloud 免費方案（約 1GB RAM）的資源防護

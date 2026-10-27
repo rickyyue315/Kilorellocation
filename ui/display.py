@@ -225,7 +225,11 @@ def render_kpi_cards(statistics: dict):
 
 
 def render_charts(statistics: dict):
-    """圖表概覽 — 轉出/接收類型、OM 分佈與 Top 商品長條圖（跟隨深色主題）。"""
+    """圖表概覽 — 轉出/接收類型、OM 分佈與 Top 商品長條圖（跟隨深色主題）。
+
+    圖表屬輔助資訊：後端（Streamlit 內部的 Altair）匯入失敗時只提示、不拋錯，
+    以免整個調貨流程被圖表問題中斷（例如 Python 3.14 誤裝 altair 5.x）。
+    """
     article_stats = statistics.get('article_stats', {})
     om_stats = statistics.get('om_stats', {})
     source_type_stats = statistics.get('source_type_stats', {})
@@ -234,44 +238,66 @@ def render_charts(statistics: dict):
         return
 
     with st.expander("📈 圖表概覽", expanded=False):
-        if source_type_stats or dest_type_stats:
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown("**轉出類型分佈（件數）**")
-                if source_type_stats:
-                    source_df = pd.DataFrame([
-                        {'Source Type': t, 'Qty': s['qty']}
-                        for t, s in source_type_stats.items()
-                    ])
-                    st.bar_chart(source_df, x='Source Type', y='Qty', use_container_width=True, height=260)
-            with c2:
-                st.markdown("**接收類型分佈（件數）**")
-                if dest_type_stats:
-                    dest_df = pd.DataFrame([
-                        {'Destination Type': t, 'Qty': s['qty']}
-                        for t, s in dest_type_stats.items()
-                    ])
-                    st.bar_chart(dest_df, x='Destination Type', y='Qty', use_container_width=True, height=260)
+        try:
+            _render_chart_bars(article_stats, om_stats, source_type_stats, dest_type_stats)
+        except Exception as exc:  # noqa: BLE001 - 圖表不應中斷主流程
+            st.warning("⚠️ 圖表暫時無法顯示；調貨建議、統計與 Excel 匯出不受影響。")
+            st.caption(_chart_error_hint(exc))
 
-        if om_stats:
-            st.markdown("**按 OM 轉出 vs 接收量**")
-            om_df = pd.DataFrame([
-                {
-                    'OM': om,
-                    'Transfer Qty': stats.get('transfer_qty', stats.get('total_qty', 0)),
-                    'Receive Qty': stats.get('receive_qty', 0),
-                }
-                for om, stats in om_stats.items()
-            ])
-            st.bar_chart(om_df, x='OM', y=['Transfer Qty', 'Receive Qty'], use_container_width=True, height=280)
 
-        if article_stats:
-            st.markdown("**Top 10 商品轉出量**")
-            top_df = pd.DataFrame([
-                {'Article': article, 'Total Qty': stats['total_qty']}
-                for article, stats in article_stats.items()
-            ]).nlargest(10, 'Total Qty').sort_values('Total Qty')
-            st.bar_chart(top_df, x='Total Qty', y='Article', horizontal=True, use_container_width=True, height=320)
+def _chart_error_hint(exc: Exception) -> str:
+    """把圖表後端錯誤轉成可操作的提示。"""
+    message = str(exc)
+    if "closed" in message and "TypedDict" in message:
+        return (
+            "原因：圖表後端 Altair 與目前 Python 版本不相容"
+            "（Python 3.14 搭配 altair 5.x 會觸發 TypedDict 'closed' 錯誤）。"
+            "請執行 `pip install -r requirements.txt` 重裝依賴"
+            "（3.14 會自動安裝 altair 6.x），或改用 Python 3.11／3.13 執行。"
+        )
+    return f"錯誤詳情：{type(exc).__name__}: {message}"
+
+
+def _render_chart_bars(article_stats: dict, om_stats: dict, source_type_stats: dict, dest_type_stats: dict):
+    """實際繪製圖表（可能因 Altair 版本不相容而拋錯，由呼叫方容錯）。"""
+    if source_type_stats or dest_type_stats:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**轉出類型分佈（件數）**")
+            if source_type_stats:
+                source_df = pd.DataFrame([
+                    {'Source Type': t, 'Qty': s['qty']}
+                    for t, s in source_type_stats.items()
+                ])
+                st.bar_chart(source_df, x='Source Type', y='Qty', use_container_width=True, height=260)
+        with c2:
+            st.markdown("**接收類型分佈（件數）**")
+            if dest_type_stats:
+                dest_df = pd.DataFrame([
+                    {'Destination Type': t, 'Qty': s['qty']}
+                    for t, s in dest_type_stats.items()
+                ])
+                st.bar_chart(dest_df, x='Destination Type', y='Qty', use_container_width=True, height=260)
+
+    if om_stats:
+        st.markdown("**按 OM 轉出 vs 接收量**")
+        om_df = pd.DataFrame([
+            {
+                'OM': om,
+                'Transfer Qty': s.get('transfer_qty', s.get('total_qty', 0)),
+                'Receive Qty': s.get('receive_qty', 0),
+            }
+            for om, s in om_stats.items()
+        ])
+        st.bar_chart(om_df, x='OM', y=['Transfer Qty', 'Receive Qty'], use_container_width=True, height=280)
+
+    if article_stats:
+        st.markdown("**Top 10 商品轉出量**")
+        top_df = pd.DataFrame([
+            {'Article': article, 'Total Qty': s['total_qty']}
+            for article, s in article_stats.items()
+        ]).nlargest(10, 'Total Qty').sort_values('Total Qty')
+        st.bar_chart(top_df, x='Total Qty', y='Article', horizontal=True, use_container_width=True, height=320)
 
 
 def _build_stock_lookup(df: pd.DataFrame) -> dict:
