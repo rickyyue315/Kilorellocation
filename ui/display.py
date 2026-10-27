@@ -207,7 +207,7 @@ def render_data_preview(df: pd.DataFrame, processing_stats: dict):
     for col in preview.columns:
         if preview[col].dtype == object:
             preview[col] = preview[col].astype(str)
-    st.dataframe(preview, use_container_width=True, hide_index=True, height=320)
+    st.dataframe(preview, width="stretch", hide_index=True, height=320)
 
 
 def render_kpi_cards(statistics: dict):
@@ -269,7 +269,7 @@ def _render_chart_bars(article_stats: dict, om_stats: dict, source_type_stats: d
                     {'Source Type': t, 'Qty': s['qty']}
                     for t, s in source_type_stats.items()
                 ])
-                st.bar_chart(source_df, x='Source Type', y='Qty', use_container_width=True, height=260)
+                st.bar_chart(source_df, x='Source Type', y='Qty', width="stretch", height=260)
         with c2:
             st.markdown("**接收類型分佈（件數）**")
             if dest_type_stats:
@@ -277,7 +277,7 @@ def _render_chart_bars(article_stats: dict, om_stats: dict, source_type_stats: d
                     {'Destination Type': t, 'Qty': s['qty']}
                     for t, s in dest_type_stats.items()
                 ])
-                st.bar_chart(dest_df, x='Destination Type', y='Qty', use_container_width=True, height=260)
+                st.bar_chart(dest_df, x='Destination Type', y='Qty', width="stretch", height=260)
 
     if om_stats:
         st.markdown("**按 OM 轉出 vs 接收量**")
@@ -289,7 +289,7 @@ def _render_chart_bars(article_stats: dict, om_stats: dict, source_type_stats: d
             }
             for om, s in om_stats.items()
         ])
-        st.bar_chart(om_df, x='OM', y=['Transfer Qty', 'Receive Qty'], use_container_width=True, height=280)
+        st.bar_chart(om_df, x='OM', y=['Transfer Qty', 'Receive Qty'], width="stretch", height=280)
 
     if article_stats:
         st.markdown("**Top 10 商品轉出量**")
@@ -297,7 +297,7 @@ def _render_chart_bars(article_stats: dict, om_stats: dict, source_type_stats: d
             {'Article': article, 'Total Qty': s['total_qty']}
             for article, s in article_stats.items()
         ]).nlargest(10, 'Total Qty').sort_values('Total Qty')
-        st.bar_chart(top_df, x='Total Qty', y='Article', horizontal=True, use_container_width=True, height=320)
+        st.bar_chart(top_df, x='Total Qty', y='Article', horizontal=True, width="stretch", height=320)
 
 
 def _build_stock_lookup(df: pd.DataFrame) -> dict:
@@ -401,7 +401,7 @@ def render_results_table(recommendations: list, df: pd.DataFrame, current_run_ke
     rec_df = st.session_state[cache_key]
 
     table_df = _maybe_limit_rows(rec_df, "調貨建議表", f"results_table_{current_run_key}")
-    st.dataframe(table_df, use_container_width=True, hide_index=True, height=480, column_config=_int_column_config(table_df))
+    st.dataframe(table_df, width="stretch", hide_index=True, height=480, column_config=_int_column_config(table_df))
 
 
 def _build_priority_groups(recommendations: list) -> dict:
@@ -486,7 +486,7 @@ def render_results_by_priority(recommendations: list, df: pd.DataFrame, current_
             )
             st.dataframe(
                 group_df,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 height=min(480, 120 + len(group_df) * 28),
                 column_config=_int_column_config(group_df),
@@ -516,7 +516,7 @@ def render_statistics(statistics: dict):
                     }
                     for article, stats in article_stats.items()
                 ])
-                st.dataframe(article_df, use_container_width=True, hide_index=True, height=320, column_config=_stats_int_config)
+                st.dataframe(article_df, width="stretch", hide_index=True, height=320, column_config=_stats_int_config)
 
             st.markdown("**轉出類型分佈**")
             source_type_stats = statistics.get('source_type_stats', {})
@@ -529,7 +529,7 @@ def render_statistics(statistics: dict):
                     }
                     for source_type, stats in source_type_stats.items()
                 ])
-                st.dataframe(source_df, use_container_width=True, hide_index=True, column_config=_stats_int_config)
+                st.dataframe(source_df, width="stretch", hide_index=True, column_config=_stats_int_config)
 
         with col2:
             st.markdown("**按 OM 統計**")
@@ -545,7 +545,7 @@ def render_statistics(statistics: dict):
                     }
                     for om, stats in om_stats.items()
                 ])
-                st.dataframe(om_df, use_container_width=True, hide_index=True, column_config=_stats_int_config)
+                st.dataframe(om_df, width="stretch", hide_index=True, column_config=_stats_int_config)
 
             st.markdown("**接收類型分佈**")
             dest_type_stats = statistics.get('dest_type_stats', {})
@@ -558,7 +558,7 @@ def render_statistics(statistics: dict):
                     }
                     for dest_type, stats in dest_type_stats.items()
                 ])
-                st.dataframe(dest_df, use_container_width=True, hide_index=True, column_config=_stats_int_config)
+                st.dataframe(dest_df, width="stretch", hide_index=True, column_config=_stats_int_config)
 
 
 def render_gap_report(gap_report: dict, current_run_key: str = ""):
@@ -681,7 +681,7 @@ def render_gap_report(gap_report: dict, current_run_key: str = ""):
         gap_view_df = _maybe_limit_rows(filtered_df, "缺口分析表", f"gap_{current_run_key}")
         st.dataframe(
             gap_view_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             height=420,
             column_config={
@@ -706,6 +706,6 @@ def render_download_button(excel_data: bytes, excel_filename: str, current_run_k
         file_name=excel_filename,
         mime=_mime,
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key=f"download_excel_{current_run_key}",
     )

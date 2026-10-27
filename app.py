@@ -1,5 +1,5 @@
 """
-庫存調貨建議系統 v2.38.4 - Streamlit應用程序
+庫存調貨建議系統 v2.38.5 - Streamlit應用程序
 支持三十模式系統：A(保守轉貨)/A1(保守轉貨-轉出店舖不餘存貨1件)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/NST(New Shop Target調貨)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/ND4(ND限同OM轉貨補0及有銷售記錄)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 含模式教學分頁：30種調貨模式圖例化教學（繁體中文）
 """
@@ -235,7 +235,7 @@ with tab_system:
                     with st.expander("檢視 ND + Target>0 明細", expanded=False):
                         st.dataframe(
                             f_mode_conflicts[preview_cols].head(50),
-                            use_container_width=True,
+                            width="stretch",
                         )
 
             render_data_preview(df, processing_stats)
@@ -267,7 +267,7 @@ with tab_system:
                     st.session_state.pop(k)
                 st.session_state['_run_key'] = current_run_key
 
-            if st.button("🎯 生成調貨建議", type="primary", use_container_width=True):
+            if st.button("🎯 生成調貨建議", type="primary", width="stretch"):
                 with st.status("分析中...", expanded=True) as status:
                     st.write("演算法運行中，生成調貨建議...")
                     mode_name = MODE_NAME_MAP.get(mode_code, "目標優化")
@@ -343,7 +343,7 @@ with tab_system:
                     # 惰性生成：按下才產生 Excel，避免大型結果的無謂等待
                     if st.button(
                         "📤 準備 Excel 報表",
-                        use_container_width=True,
+                        width="stretch",
                         help="按下後才生成 Excel 文件；生成完成會出現下載按鈕。大型結果可節省等待時間。",
                     ):
                         with st.spinner("生成 Excel 文件..."):

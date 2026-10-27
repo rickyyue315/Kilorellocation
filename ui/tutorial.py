@@ -208,12 +208,12 @@ def _show_svg(svg_str, center=5):
     if not svg_str:
         return
     if center >= 7:
-        st.image(svg_str, use_container_width=True)
+        st.image(svg_str, width="stretch")
         return
     side = (7 - center) / 2
     _, mid, _ = st.columns([side, center, side])
     with mid:
-        st.image(svg_str, use_container_width=True)
+        st.image(svg_str, width="stretch")
 
 
 def _mode_scope_label(mode_code):
@@ -292,7 +292,7 @@ def _render_snapshot(indexed):
             "範圍": "可跨OM" if cross else "僅同OM",
             "場景": _GROUP_USE.get(group_key, ""),
         })
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=420)
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True, height=420)
 
 
 def _render_jump(indexed):

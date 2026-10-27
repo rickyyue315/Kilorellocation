@@ -1,5 +1,38 @@
 # 版本更新記錄
 
+## v2.38.5 (2026-10-27)
+
+### 全面遷移 `use_container_width` → `width="stretch"`（消除雲端日誌洪水）
+
+#### 問題現象
+Community Cloud 日誌每次 rerun 都被數十條 `Please replace use_container_width with width` 洗版（每個元件各一條），
+真正的錯誤訊息被埋掉；官方公告該參數 2025-12-31 後移除，屆時會直接失效。
+
+#### 變更說明
+- **19 處一次性遷移**（`app.py` 3 處、`ui/display.py` 13 處、`ui/tutorial.py` 3 處）：
+  `st.dataframe`／`st.bar_chart`／`st.button`／`st.download_button`／`st.image` 一律改用 `width="stretch"`。
+- **版本對齊**：本機 `.venv` 升級至 `streamlit==1.52.2` + `pyarrow==22.0.0`，與 Cloud 及 `requirements.txt` 一致
+  （先前停在 1.51／21，屬落後狀態）。
+- **防退化測試**：新增 `tests/test_streamlit_api_compat.py`（2 項），掃描 `app.py` 與 `ui/*.py`，
+  一旦 `use_container_width` 回流即測試失敗。
+- **行為不變**：`st.dataframe`／`st.bar_chart` 的 `width` 預設本就是 `"stretch"`；
+  `st.button`／`st.download_button`／`st.image` 預設為 `"content"`，故這些元件仍需顯式指定 `"stretch"` 才維持原本滿版外觀。
+- **注意**：調貨邏輯、Excel 輸出、圖表資料內容均無變化。
+
+#### 修改檔案
+- `app.py`、`ui/display.py`、`ui/tutorial.py` — 19 處參數遷移
+- `tests/test_streamlit_api_compat.py` — 新增（防已棄用參數回流）
+- `config.py`、`app.py` — `VERSION` bump 至 v2.38.5
+
+#### 驗證
+- Streamlit 1.52.2 + pyarrow 22.0.0 下 `AppTest` 實跑 `app.py`：0 例外、0 警告，stderr 再無 `use_container_width` 訊息。
+- 專項冒煙（`st.dataframe`／`st.bar_chart` 四張圖／`st.image` SVG／`st.button`／`st.download_button`）：0 例外、0 警告。
+- 測試：443 項全數通過（441 + 新增 2）。
+
+#### 文件同步
+- `README.md`／`VERSION.md`／`config.py`／`app.py` 已同步；`ui/tutorial.py` 僅參數替換，教學內容不變；
+  `調貨模式詳解.txt`、`transfer_logic_ai_brief.md` 無需變更（無模式新增／移除／邏輯修改）。
+
 ## v2.38.4 (2026-10-27)
 
 ### 修正 Python 3.14 部署下的圖表崩潰（`_TypedDictMeta.__new__() got an unexpected keyword argument 'closed'`）
