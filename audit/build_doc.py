@@ -25,6 +25,15 @@ OUT_MD = OUT_DIR / "KiLo_30模式邏輯審查.md"
 E = html.escape
 RISK_CLASS = {"低": "r-low", "低中": "r-midlow", "中": "r-mid", "中高": "r-highmid", "高": "r-high"}
 
+FLOOR_ROWS = [
+    ("全面受影響", "A / A1 / B / C / C2 / B2 系列 / E1 / E1b / E2 / D / D2 / ND1 / ND2 / 精簡 SKU ×2",
+     "轉出保底與接收目標全部改用 T（S → T）"),
+    ("部分受影響", "C1、F / F2 / F3、NST、ND3 / ND4",
+     "只有接收端的 Safety 觸點切換（例：補 0 目標 max(S×0.5,3) → max(T×0.5,3)）"),
+    ("上限語義", "B2 系列 / E1 / 精簡 SKU",
+     "接收上限 max(S×2,3) → max(T×2,3)，即 2N 日用量；補 0 目標變成 N/2 日用量"),
+]
+
 
 def tint(hex_color: str, alpha: str = "14") -> str:
     return hex_color + alpha
@@ -111,6 +120,93 @@ def svg_decision_tree() -> str:
             chip_x += w + 7
     parts.append("</svg>")
     return "".join(parts)
+
+
+def svg_turnday_flow() -> str:
+    """Turnday 三步計算：覆蓋日數 → 日銷速 → 保底。"""
+    steps = [
+        ("1", "覆蓋日數", "Coverage Days", "7 月 31 日 ＋ MTD 15 日", "＝ 46 日",
+         "上月日數 ＋ MTD 數據日期日號", "#0f766e"),
+        ("2", "日銷速", "Daily Sold Rate", "Effective Sold 92 件 ÷ 46 日", "＝ 2.0 件/日",
+         "Last Month 62 ＋ MTD 30（系統加總）", "#0f766e"),
+        ("3", "Turnday 保底", "ceil(日銷速 × N)", "ceil(2.0 件/日 × 14 日)", "＝ 28 件",
+         "N 由側邊欄自選 3–60 日，預設 14", "#b45309"),
+    ]
+    parts = ['<svg viewBox="0 0 1100 240" role="img" aria-label="Turnday 保底三步計算">']
+    parts.append('<defs><marker id="arrowTD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker></defs>')
+    for i, (num, title, en, expr, result, note, color) in enumerate(steps):
+        x = 24 + i * 361
+        parts.append(f'<rect x="{x}" y="20" width="330" height="204" rx="14" fill="#ffffff" stroke="#e2e8f0"/>')
+        parts.append(f'<circle cx="{x + 34}" cy="58" r="15" fill="{color}"/>')
+        parts.append(svg_text([num], x + 34, 63, 13, 0, 700, "#ffffff", "middle"))
+        parts.append(svg_text([title], x + 58, 54, 15, 0, 700, "#0f172a"))
+        parts.append(svg_text([en], x + 58, 72, 10.5, 0, 400, "#94a3b8"))
+        parts.append(svg_text([expr], x + 22, 112, 13, 0, 500, "#475569"))
+        parts.append(svg_text([result], x + 22, 152, 26, 0, 800, color))
+        parts.append(svg_text([note], x + 22, 188, 10.5, 0, 400, "#64748b"))
+        if i < 2:
+            parts.append(f'<line x1="{x + 334}" y1="122" x2="{x + 355}" y2="122" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arrowTD)"/>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def svg_floor_compare() -> str:
+    """同一批店舖：Safety 固定保底 vs Turnday 隨銷速調節。"""
+    rows = [
+        ("快銷店", "RF・高動銷", "近 46 日 92 件・2.0 件/日", 5, 28,
+         "Turnday 28 ≈ 2 週用量（更保守・防斷貨）", "#92400e", True, False),
+        ("慢銷店", "RF・低動銷", "近 46 日 23 件・0.5 件/日", 5, 7,
+         "Turnday 7 — 保底下降・釋放庫存", "#92400e", False, False),
+        ("零銷量店", "RF・近期無售出", "近 46 日 0 件・0 件/日", 5, 0,
+         "Turnday 0 — 存貨可全數轉出（清走死貨）", "#b91c1c", False, True),
+    ]
+    x0, x1 = 270.0, 1040.0
+    scale = (x1 - x0) / 28
+    parts = ['<svg viewBox="0 0 1100 478" role="img" aria-label="Safety 與 Turnday 保底對比">']
+    parts.append(svg_text(["示例：Safety Stock = 5、N = 14 日、覆蓋 46 日（條長按件數等比例）"], 24, 28, 11, 0, 400, "#64748b"))
+    # legend
+    parts.append('<rect x="800" y="16" width="12" height="12" rx="3" fill="#e2e8f0" stroke="#cbd5e1"/>')
+    parts.append(svg_text(["Safety（固定）"], 818, 26, 11, 0, 400, "#475569"))
+    parts.append('<rect x="966" y="16" width="12" height="12" rx="3" fill="#fef3c7" stroke="#f59e0b"/>')
+    parts.append(svg_text(["Turnday（動態）"], 984, 26, 11, 0, 400, "#92400e"))
+    # grid + axis
+    for tick in (0, 7, 14, 21, 28):
+        tx = x0 + tick * scale
+        parts.append(f'<line x1="{tx}" y1="48" x2="{tx}" y2="424" stroke="#eef2f7" stroke-width="1"/>')
+        parts.append(svg_text([f"{tick} 件" if tick == 28 else str(tick)], tx, 441, 10.5, 0, 400, "#94a3b8", "end" if tick == 28 else "middle"))
+    parts.append(f'<line x1="{x0}" y1="424" x2="{x1}" y2="424" stroke="#cbd5e1" stroke-width="1.5"/>')
+    for i, (name, kind, sales, safety, turnday, note, note_color, inside, dashed) in enumerate(rows):
+        top = 52 + i * 130
+        parts.append(svg_text([name], 24, top + 16, 15, 0, 700, "#0f172a"))
+        parts.append(svg_text([kind], 24, top + 34, 10.5, 0, 400, "#94a3b8"))
+        parts.append(svg_text([sales], 24, top + 50, 10.5, 0, 400, "#64748b"))
+        # Safety bar
+        sw = safety * scale
+        parts.append(f'<rect x="{x0}" y="{top + 54}" width="{sw:.1f}" height="13" rx="3" fill="#e2e8f0" stroke="#cbd5e1"/>')
+        parts.append(svg_text([f"Safety {safety}"], x0 + sw + 8, top + 65, 11, 0, 700, "#475569"))
+        # Turnday bar
+        tw = turnday * scale
+        if dashed:
+            parts.append(f'<rect x="{x0}" y="{top + 73}" width="66" height="15" rx="3" fill="#fff7ed" stroke="#f59e0b" stroke-dasharray="4 3"/>')
+            parts.append(svg_text(["0"], x0 + 12, top + 85, 11, 0, 700, "#b45309"))
+            parts.append(svg_text([note], x0 + 80, top + 85, 11, 0, 600, note_color))
+        else:
+            parts.append(f'<rect x="{x0}" y="{top + 73}" width="{tw:.1f}" height="15" rx="3" fill="#fef3c7" stroke="#f59e0b"/>')
+            if inside:
+                parts.append(svg_text([note], x0 + tw - 10, top + 85, 11, 0, 700, note_color, "end"))
+            else:
+                parts.append(svg_text([note], x0 + tw + 8, top + 85, 11, 0, 700, note_color))
+    parts.append(svg_text(["Turnday 讓保底隨實際銷速自動調節：快銷更高（防斷貨）、慢銷更低（釋放庫存）、零銷量歸零（清死貨）；Safety 主體一律沿用上載檔的固定值。"], 24, 468, 11, 0, 400, "#64748b"))
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def floor_table() -> str:
+    body = "".join(
+        f"<tr><td><b>{E(a)}</b></td><td>{E(b)}</td><td>{E(c)}</td></tr>" for a, b, c in FLOOR_ROWS
+    )
+    return ("<table class='tbl floor-tbl'><thead><tr><th>類別</th><th>模式</th><th>Turnday 下的變化</th></tr></thead><tbody>"
+            + body + "</tbody></table>")
 
 
 def mode_flow_svg(mode: dict) -> str:
@@ -577,6 +673,7 @@ p{margin:0 0 12px}
 .tbl .qty{font-weight:800;color:#0f766e}
 .tbl .type{font-size:12px;color:#475569}
 .tbl .total td{background:#f8fafc;font-weight:700;color:var(--ink)}
+.floor-tbl td:first-child{white-space:nowrap}
 .summary td{font-size:12.8px}
 .summary td:nth-child(5){color:var(--muted);max-width:330px}
 .input-tbl,.out-tbl{font-size:12.6px}
@@ -667,7 +764,9 @@ p{margin:0 0 12px}
   .hero{padding:10mm 0 6mm}
   .mode-card{break-inside:auto;box-shadow:none;border-color:#d9dee7}
   .mode-head,.when,.chips{break-after:avoid}
-  .flow-wrap,.rules,.example,.limits,.variant{break-inside:avoid}
+  .flow-wrap,.rules,.example,.limits,.variant,.pipeline-wrap{break-inside:avoid}
+  #floor{break-before:page}
+  #floor .box{break-inside:avoid}
   .family{break-before:page}
   .family:first-of-type{break-before:auto}
   a{color:#0f172a}
@@ -700,15 +799,16 @@ def build_html() -> str:
 <nav class="toc">
   <div class="toc-title">KiLo 模式審查</div>
   <a href="#overview">0　一頁看懂</a>
-  <a href="#pipeline">1　全局流程</a>
-  <a href="#common">2　共通規則</a>
-  <a href="#map">3　模式地圖</a>
-  <a href="#index">4　30 模式總表</a>
+  <a href="#floor">1　保底主體</a>
+  <a href="#pipeline">2　全局流程</a>
+  <a href="#common">3　共通規則</a>
+  <a href="#map">4　模式地圖</a>
+  <a href="#index">5　30 模式總表</a>
   <h5>家族</h5>
   {''.join(f'<a href="#fam-{k}">{E(v["title"])}</a>' for k, v in MS.FAMILIES.items())}
   <h5>審查</h5>
-  <a href="#findings">5　審查發現</a>
-  <a href="#appendix">6　附錄</a>
+  <a href="#findings">6　審查發現</a>
+  <a href="#appendix">7　附錄</a>
   <h5>模式索引</h5>
   {toc_modes}
 </nav>
@@ -733,13 +833,13 @@ def build_html() -> str:
 <p class="lede">30 個模式不是 30 套獨立算法，而是同一個五段式管線上的開關組合。先看管線，再看家族，最後才看單一模式，會比較容易發現「為甚麼這個模式會這樣做」。</p>
 <div class="pipeline-wrap">{svg_pipeline()}</div>
 <div class="grid3">
-  <div class="mini"><b>① 兩個保底主體</b><p style="margin:6px 0 0;font-size:12.8px;">Safety Stock（現行）或 Turnday（日銷速 × 日數）。Turnday 會把 Safety 欄換成計算值，其餘 30 個模式不變。</p></div>
+  <div class="mini"><b>① 兩個保底主體</b><p style="margin:6px 0 0;font-size:12.8px;">Safety Stock（現行）或 Turnday（日銷速 × 日數）。Turnday 會把 Safety 欄換成計算值，其餘 30 個模式不變（<a href="#floor">第 1 節有圖解</a>）。</p></div>
   <div class="mini"><b>② 兩種分組</b><p style="margin:6px 0 0;font-size:12.8px;">同 OM 模式按 Article + OM 分組；跨 OM 模式只按 Article 分組，所有 OM 一起競爭來源。</p></div>
   <div class="mini"><b>③ 三種需求</b><p style="margin:6px 0 0;font-size:12.8px;">缺貨（Safety）、補 0（total ≤ 1 或 0）、Target（指定追加量）。模式之間最大的差別是「只認哪一種需求」。</p></div>
 </div>
 <div class="box accent">
   <h4>如何使用本文件</h4>
-  <p style="margin:0;font-size:13.4px;">先用「模式地圖」定位你關心的模式 → 在家族比較表確認它與鄰近模式的分別 → 細讀該模式卡片的四段式流程與模擬範例 → 最後用「不能處理的情景」檢查你的營運場景是否踩到邊界。第 5 節列出 15 條審查發現，可直接當修正清單。</p>
+  <p style="margin:0;font-size:13.4px;">先用「模式地圖」定位你關心的模式 → 在家族比較表確認它與鄰近模式的分別 → 細讀該模式卡片的四段式流程與模擬範例 → 最後用「不能處理的情景」檢查你的營運場景是否踩到邊界。第 6 節列出 15 條審查發現，可直接當修正清單。</p>
 </div>
 <div class="box">
   <h4>核對方法與可信度</h4>
@@ -749,8 +849,42 @@ def build_html() -> str:
 </div>
 </section>
 
+<section id="floor">
+<h2>1　保底主體：Safety 與 Turnday</h2>
+<p class="lede">30 個模式共用同一個「保底」概念：低於保底要補，高於保底才可以轉出。分別只在這個數字從哪來 —— <b>Safety Stock</b> 是上載檔的固定值；<b>Turnday</b> 是按日銷速算出的浮動值。切換主體只換數字，不換任何配對邏輯。</p>
+<div class="chips">
+  <span class="chip chip-label">套用位置</span>
+  <span class="chip">前處理之後</span>
+  <span class="chip">分組／配對之前</span>
+  <span class="chip">只改 Safety Stock 欄</span>
+  <span class="chip">30 個模式共用</span>
+</div>
+<div class="box">
+  <h4>圖 1　Turnday 三步計算（數據日期 2026-08-15 為例）</h4>
+  <div class="pipeline-wrap" style="margin:12px 0 10px;">{svg_turnday_flow()}</div>
+  <div class="calc"><b>通式</b>覆蓋日數 = 上月日數 ＋ MTD 數據日期日號　｜　日銷速 = Effective Sold ÷ 覆蓋日數　｜　保底 = ceil(日銷速 × N)</div>
+  <p class="note" style="margin:10px 0 0;">三步只做一次，結果直接寫入 <code>Safety Stock</code> 欄；原值備份到 <code>Original Safety Stock</code>，另加 <code>Daily Sold Rate</code> 供核對。之後 30 個模式照常運行，配對規則完全不變。</p>
+</div>
+<div class="box">
+  <h4>圖 2　同一間店，兩種保底（N = 14 日）</h4>
+  <div class="pipeline-wrap" style="margin:12px 0 10px;">{svg_floor_compare()}</div>
+  <p style="margin:0;font-size:13.2px;">灰條是上載檔的 Safety 5；橙條是同一間店按銷速算出的 Turnday。快銷店被拉長（28 件 ≈ 2 週用量），慢銷店縮短（7 件），零銷量店歸零 —— 同一套模式，因為保底不同，補貨與轉出的力度也跟著不同。</p>
+</div>
+<div class="box">
+  <h4>表 1　哪些模式受影響</h4>
+  {floor_table()}
+  <p class="note" style="margin:12px 0 0;">固定保底不受主體影響：C1 淨存 &gt; 2、F3／NST 保留 2 件、NST 75% 上限、ND3／ND4 保留 3 件。</p>
+</div>
+<div class="grid3">
+  <div class="mini"><b>零銷量 → 保底 0</b><p style="margin:6px 0 0;font-size:12.8px;">該店該 SKU 的存貨可被全數轉出；清死貨利好，但要接受陳列可能歸零。</p></div>
+  <div class="mini"><b>快銷店保底更高</b><p style="margin:6px 0 0;font-size:12.8px;">28 件可能遠高於原 Safety 5，轉出量自然減少，屬預期而非 bug。</p></div>
+  <div class="mini"><b>日期錯，全部錯</b><p style="margin:6px 0 0;font-size:12.8px;">覆蓋日數依賴 MTD 數據日期；日期入錯，所有保底一併偏離，上載區會顯示核對行。</p></div>
+</div>
+<p class="note" style="margin:14px 0 0;">日數選擇：日常補貨 7–14 日；季節品或前置期長用 21–30 日。N 越大，保底越高、越保守。</p>
+</section>
+
 <section id="pipeline">
-<h2>1　全局流程</h2>
+<h2>2　全局流程</h2>
 <p>每次分析只跑一個模式。文件上載後，系統先做資料前處理與（可選）Turnday 換算，再按模式分組、識別來源與接收店、逐回合配對，最後做單件合併與優先級分組。</p>
 <div class="grid2">
   <div class="box"><h4>輸入前設</h4>
@@ -773,7 +907,7 @@ def build_html() -> str:
 </section>
 
 <section id="common">
-<h2>2　共通規則（所有模式都適用）</h2>
+<h2>3　共通規則（所有模式都適用）</h2>
 <div class="grid2">
   <div class="mini"><b>身份與角色</b>
     <ul style="margin:8px 0 0;padding-left:18px;font-size:12.8px;">
@@ -823,13 +957,13 @@ def build_html() -> str:
 </section>
 
 <section id="map">
-<h2>3　模式地圖：先問目的，再選模式</h2>
+<h2>4　模式地圖：先問目的，再選模式</h2>
 <p>同一個營運問題往往有 2–4 個模式可用。以下決策樹按「這批貨的目的」分流；如果同時符合多個分支，通常先處理強制（E）與 Target（F），再做補 0（C），最後才做常規加減（A／B）。</p>
 <div class="pipeline-wrap">{svg_decision_tree()}</div>
 <div class="box" style="margin-top:6px;">
   <h4>情境對照：同一個問題，通常有兩個模式可選</h4>
   {scenario_table()}
-  <p class="note" style="margin:10px 0 0;">「首選」是較常用的一方；「次選」是常見替代，兩者的實際差異（上限、跨 OM、接收限制）見對應卡片。最終仍要按第 5 節的發現與營運限制選擇。</p>
+  <p class="note" style="margin:10px 0 0;">「首選」是較常用的一方；「次選」是常見替代，兩者的實際差異（上限、跨 OM、接收限制）見對應卡片。最終仍要按第 6 節的發現與營運限制選擇。</p>
 </div>
 <div class="legend">
   <span><i class="dot" style="background:#dc2626"></i>E 強制</span>
@@ -843,7 +977,7 @@ def build_html() -> str:
 </section>
 
 <section id="index">
-<h2>4　30 模式總表</h2>
+<h2>5　30 模式總表</h2>
 <p>按家族排列；點擊模式代號可跳到該卡片。模式名稱按閱讀需要加上空格與全形括號，程式與側邊欄以 code（A、B2、ND3…）為準。風險等級是「對營運的潛在影響」，不是系統穩定性。</p>
 {summary_table()}
 </section>
@@ -851,7 +985,7 @@ def build_html() -> str:
 {families}
 
 <section id="findings">
-<h2>5　審查發現</h2>
+<h2>6　審查發現</h2>
 <p>以下 15 條是逐行核對與模擬過程中確認的落差、邊界與待確認項。嚴重度以「對營運判斷的影響」衡量，不代表系統會 crash。</p>
 <div class="kpi">{findings_summary}</div>
 {findings_table()}
@@ -866,7 +1000,7 @@ def build_html() -> str:
 </section>
 
 <section id="appendix">
-<h2>6　附錄</h2>
+<h2>7　附錄</h2>
 <h3 style="margin-top:22px;">6.1　公式與常數</h3>
 {formula_table()}
 <h3 style="margin-top:28px;">6.2　模式參數</h3>
@@ -908,7 +1042,31 @@ def build_md() -> str:
         "",
         "三種需求：缺貨（Safety）、補 0（total ≤ 1 或 0）、Target（指定追加量）。模式之間最大的差別是「只認哪一種需求」。",
         "",
-        "## 1　共通規則",
+        "## 1　保底主體：Safety vs Turnday",
+        "",
+        "30 個模式共用同一個保底概念：Safety 是上載檔固定值，Turnday 是按日銷速算出的浮動值。切換主體只改 `Safety Stock` 欄（原值備份至 `Original Safety Stock`，另加 `Daily Sold Rate`），配對邏輯不變。",
+        "",
+        "**Turnday 三步（數據日期 2026-08-15、N = 14 為例）**",
+        "",
+        "1. 覆蓋日數 = 7 月 31 日 + MTD 15 日 = **46 日**（上月日數 + MTD 數據日期日號）",
+        "2. 日銷速 = Effective Sold 92 件 ÷ 46 日 = **2.0 件/日**（Last Month 62 + MTD 30）",
+        "3. 保底 = ceil(2.0 × 14) = **28 件**（N 可選 3–60，預設 14；零銷量 → 0）",
+        "",
+        "**同一間店，兩種保底（N = 14）**",
+        "",
+        md_table(["店舖", "近 46 日銷量", "日銷速", "Safety", "Turnday", "效果"], [
+            ["快銷店", "92 件", "2.0 件/日", "5", "28", "更保守・防斷貨"],
+            ["慢銷店", "23 件", "0.5 件/日", "5", "7", "保底下降・釋放庫存"],
+            ["零銷量店", "0 件", "0 件/日", "5", "0", "存貨可全數轉出（清死貨）"],
+        ]),
+        "",
+        "**受影響模式**",
+        "",
+        md_table(["類別", "模式", "Turnday 下的變化"], [list(r) for r in FLOOR_ROWS]),
+        "",
+        "固定保底不受主體影響：C1 淨存 > 2、F3／NST 保留 2 件、NST 75% 上限、ND3／ND4 保留 3 件。",
+        "",
+        "## 2　共通規則",
         "",
         "- ND 預設只出不入；例外：ND1–ND4 互轉、F/F2/F3/NST 的 Target ND。",
         "- 同一 SKU 的來源店不可同時做接收店；RF 最高有效銷量店受保護（部分模式）。",
@@ -916,7 +1074,7 @@ def build_md() -> str:
         "- 所有可轉量以淨庫存封頂；總庫存 = 淨庫存 + 在途；MOQ 不參與計算。",
         "- 後處理只合併同一來源的多條 1 件線；D／D2 不做單件合併。",
         "",
-        "## 2　模式總表",
+        "## 3　模式總表",
         "",
         md_table(["模式", "名稱", "家族", "分組", "風險"], [
             [m["code"], m["name"], MS.FAMILIES[m["family"]]["title"], MS.FAMILIES[m["family"]]["group"], m["risk"]]
@@ -953,11 +1111,11 @@ def build_md() -> str:
                 lines += ["（此場景沒有產生任何調貨建議）", ""]
             lines += [f"**計算**：{m['calc']}", "", "**不能處理的情景**", ""]
             lines += [f"- 【{tag}】{text}" for tag, text in m["limits"]] + [""]
-    lines += ["## 3　審查發現", "",
+    lines += ["## 4　審查發現", "",
               md_table(["#", "嚴重度", "範圍", "發現", "依據 / 重現", "建議"],
                        [[i, sev, area, finding, evidence, action]
                         for i, (sev, area, finding, evidence, action) in enumerate(FINDINGS, 1)]), ""]
-    lines += ["## 4　附錄：公式", "",
+    lines += ["## 5　附錄：公式", "",
               md_table(["項目", "公式 / 規則", "適用"], [
                   ["總庫存", "SaSa Net Stock + Pending Received", "所有模式"],
                   ["有效銷量", "Last Month Sold Qty + MTD Sold Qty", "最高銷量保護、ND、Mix 保護"],
@@ -971,7 +1129,7 @@ def build_md() -> str:
                   ["Turnday", "ceil(有效銷量 ÷ 覆蓋日數 × N)；零銷量 = 0", "Turnday 主體"],
                   ["覆蓋日數", "上月日數 + MTD 日期日號", "Turnday 主體"],
               ]), "",
-              "## 5　名詞", "",
+              "## 6　名詞", "",
               md_table(["術語", "英文 / 全稱", "備註"], [
                   ["RF / ND", "Retail Floor / Non-Display", "ND 一般只出不入；ND1–4 例外"],
                   ["OM", "Operation Manager 區組", "同 OM／跨 OM 是主要分界"],
