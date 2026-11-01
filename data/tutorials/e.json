@@ -105,7 +105,7 @@
         ]
       ]
     },
-    "extra_notes": "E1 需要 Excel 中有「ALL」欄位。僅處理標記的商品行。HD 不能轉到 HA/HB/HC",
+    "extra_notes": "E1 需要 Excel 中有「ALL」欄位。僅處理標記的商品行。HD 不能轉到 HA/HB/HC ALL 只檢查非空，填 0 也會觸發；要保留請留空。",
     "diff_table": {
       "headers": [
         "對比項",
@@ -230,7 +230,7 @@
         ]
       ]
     },
-    "extra_notes": "E1b = E1 轉出 + B2 接收優先級。新品推廣重點放在遊客區店舖時使用",
+    "extra_notes": "E1b = E1 轉出 + B2 接收優先級。新品推廣重點放在遊客區店舖時使用 ALL 只檢查非空，填 0 也會觸發；要保留請留空。",
     "diff_table": null
   },
   {
@@ -311,7 +311,7 @@
         ]
       ]
     },
-    "extra_notes": "E2 三階段：同OM &#10132; 跨OM &#10132; C模式回退。HD 不能轉到 HA/HB/HC",
+    "extra_notes": "E2 三階段：同OM &#10132; 跨OM &#10132; C模式回退。HD 不能轉到 HA/HB/HC ALL 只檢查非空，填 0 也會觸發；要保留請留空。",
     "diff_table": null
   }
 ]

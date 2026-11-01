@@ -76,7 +76,7 @@ flowchart TD
         CheckType -- RF --> RF_Calc
         
         RF_Calc --> Logic_B[邏輯: 更深挖掘]
-        Logic_B --> Base_B[基準 = Total - (Safety * 0.5)]
+        Logic_B --> Base_B[基準 = Total - Safety]
         Base_B --> Limit_B[上限: Max(Total * 50%, 2)]
         Limit_B --> Final_Qty[最終數量]
         
@@ -101,7 +101,7 @@ flowchart TD
 ---
 
 ## 3. 模式 C: 重點補0 (Zero Stock Priority)
-此模式專注於解決 **極低庫存 (<=1)** 的店鋪問題。RF 轉出量介於 A 與 B 之間 (**30% 或 Max 3件**)。
+此模式專注於解決 **極低庫存 (<=1)** 的店鋪問題。RF 轉出量取 `min(Total×30%, 每店上限)`，每店上限可於側邊欄設 3–10 件（預設 3），最少 1 件。
 
 ```mermaid
 flowchart TD
@@ -116,29 +116,29 @@ flowchart TD
     
     subgraph Source_Selection_C [來源篩選 (微調)]
         RF_Source --> Calc_C[計算數量]
-        Calc_C --> Limit_C[上限: Min(Total*30%, 3件)]
+        Calc_C --> Limit_C[上限: Min(Total×30%, 可調 3–10 件)]
         Limit_C --> Note_C[特點: 小量多頻]
     end
     
     Source_Selection_C --> Match_C
     Dest_Selection_C --> Match_C
     
-    Match_C --> Priority_C[優先配對: 任何轉出 -> 重點補0]
+    Match_C --> Priority_C[優先配對: 重點補0 → 緊急缺貨 → 潛在缺貨]
 ```
 
 ---
 
 ## 4. 模式 D: 清貨轉貨 (Clearance Mode)
-此模式專門處理 **ND 店鋪** 的滯銷品 (Sales=0)，並包含特殊的 **防止餘 1 規則**。
+此模式清走 **所有 ND 店鋪**（有銷量亦以「ND轉出」全轉），RF 來源按 B 規則（50%）參與；包含特殊的 **防止餘 1 規則**。只有 D2 才限「Sales=0 的 ND」。
 
 ```mermaid
 flowchart TD
-    Start([開始 - 模式 D]) --> Check_ND[只針對 ND 來源]
+    Start([開始 - 模式 D]) --> Check_ND[ND 全轉 + RF 按 B 規則]
     
     subgraph ND_Clearance [ND 清貨邏輯]
-        Check_ND --> Check_Sales{過去30天+MTD 銷量 = 0?}
+        Check_ND --> Check_Sales{Last Month + MTD 銷量 = 0?}
         Check_Sales -- Yes --> Type_D[類型: ND清貨轉出]
-        Check_Sales -- No --> Type_N[類型: ND轉出 (普通)]
+        Check_Sales -- No --> Type_N[類型: ND轉出 (有銷量亦轉)]
     end
     
     subgraph Logic_No_One [防止餘 1 規則]
@@ -163,14 +163,13 @@ flowchart TD
         Check_All --> Marked{有標記?}
         Marked -- Yes --> Force_Transfer[強制轉出全部庫存]
         Force_Transfer --> Ign_Safe[忽略 Safety Stock]
-        Force_Transfer --> Ign_High[忽略 最高銷量保護]
+        Force_Transfer --> Ign_High[不看最高銷量保護（只處理 ALL 標記行）]
         Marked -- No --> Skip[不處理]
     end
     
     subgraph Dest_Force [E模式接收]
         IdentifyDest --> RF_Limit[RF 接收上限放寬]
-        RF_Limit --> Limit_E[上限: Safety Stock * 2]
-        Limit_E --> Min_E[最少接收 3 件]
+        RF_Limit --> Limit_E[上限: max(Safety Stock × 2, 3)]
     end
     
     Source_Force --> Match_E[高優先級配對]

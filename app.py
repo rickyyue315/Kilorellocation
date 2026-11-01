@@ -212,7 +212,8 @@ with tab_system:
                 invalid_rp_vals = processing_stats['processed_stats'].get('invalid_rp_types', [])
                 st.warning(
                     f"⚠️ 資料品質提示：發現 {invalid_rp_count} 行 RP Type 欄位值不是 ND 或 RF "
-                    f"（{', '.join(str(v) for v in invalid_rp_vals)}），已自動修正為 RF。請確認原始數據是否正確。"
+                    f"（{', '.join(str(v) for v in invalid_rp_vals)}）。系統只會把英文字母轉為大寫，"
+                    f"**不會自動修正為 RF**；這些行在按 RP Type 篩選的模式中會被忽略，請先修正原始數據。"
                 )
 
             if mode_code in ["F", "F2", "F3"]:
@@ -227,7 +228,7 @@ with tab_system:
 
                     st.warning(
                         f"⚠️ {mode_code}模式提示：偵測到 {len(f_mode_conflicts)} 行資料為 ND 且 Target>0。"
-                        f"此店因 ND 規則不會接收。"
+                        f"此模式下，有 Target 的 ND 店舖會作為接收方補貨（與「ND 不接收」的通用規則不同），請確認是否符合預期。"
                         f"受影響店舖：{site_text}"
                     )
 

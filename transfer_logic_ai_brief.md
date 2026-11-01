@@ -21,7 +21,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Type (optional, for B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1b modes)
 
 ## Global (all modes) rules
-1. ND store can only be SOURCE, never DESTINATION.
+1. ND store can only be SOURCE, never DESTINATION — exceptions: ND1/ND2/ND3/ND4 (ND mutual transfer) and F/F2/F3/NST (ND stores with Target > 0 can receive).
 2. Highest Effective Sold Qty RF store is protected from being a SOURCE.
 3. A site that is a SOURCE for a SKU cannot also be a DESTINATION for that SKU (no dual role).
 4. Same site cannot transfer to itself.
@@ -92,7 +92,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 # Mode Overview (30 Modes: A, A1, B, B2, B2a, B2L, B2La, B3, B3a, B3L, B3La, C, C1, C2, D, D2, E1, E1b, E2, F, F2, F3, NST, ND1, ND2, ND3, ND4, 精簡SKU(限同OM), 精簡SKU(跨OM), 精簡SKU(退D001))
 
 ## Mode A: Conservative
-- Source rules: RF only, Surplus Transfer
+- Source rules: RF Surplus Transfer, **plus ND stores (full net stock, no percentage cap)**
 - Transferable qty:
   - Base = Total Available - Safety Stock
   - Cap = max(20% of Total Available, 2)
@@ -110,13 +110,14 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Goal: conservative transfer while avoiding 1-piece tail at source
 
 ## Mode B: Enhanced
-- Source rules: RF Surplus + RF Enhanced
+- Source rules: RF Surplus + RF Enhanced, **plus ND stores (full net stock)**
 - Transferable qty:
   - Base = Total Available - Safety Stock
   - Cap = max(50% of Total Available, 2)
   - Actual = min(Base, Cap, SaSa Net Stock)
 - Destination rules: Emergency Replenishment, Potential Replenishment
-- Goal: aggressive transfers, allow below safety stock
+- `RF Enhanced` label only appears when Pending Received > 0; with pure net stock the base (`net - Safety`) always keeps Safety intact
+- Goal: aggressive transfers, allow below safety stock when there is inbound stock
 
 ## Mode B2: Enhanced Plus
 - Source rules:
@@ -127,11 +128,12 @@ Draw one logic image that lets users compare all current transfer modes and unde
      - Total sales = Last Month Sold Qty + MTD Sold Qty
 - Destination rules:
   - RF only; cap = Safety Stock * 2; track cumulative received
-  - Priority order:
+  - Priority order (labels 3–4 are computed but **never matched**; only P1→P1/P2 and P2→P1/P2 rounds run):
     1) Type T by highest sales
     2) Type M by highest sales
-    3) Type T by highest Safety Stock
-    4) Type M by highest Safety Stock
+    3) Type T by highest Safety Stock — currently never matched
+    4) Type M by highest Safety Stock — currently never matched
+  - Consequence: zero-sales T/M stores, Type=L and other types never receive, even at zero stock
 - Destination labels: Type T High Sales, Type M High Sales, Type T Safety, Type M Safety
 - Goal: stronger rebalancing with Type=L exception
 
@@ -145,7 +147,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Goal: cross-OM enhanced transfers with Type=L exception
 
 ## Mode C: Priority Zero Stock
-- Source rules: RF Surplus + RF Enhanced
+- Source rules: RF Surplus + RF Enhanced, **plus ND stores (full net stock)**
 - Special destination trigger: Total Available <= 1
   - Target Qty = max(Safety Stock * 0.5, 3)
   - Needed Qty = Target Qty - Total Available
@@ -184,9 +186,8 @@ Draw one logic image that lets users compare all current transfer modes and unde
 
 ## Mode D: Clearance
 - Source rules:
-  - ND with Last Month Sold Qty = 0 and MTD Sold Qty = 0: full transfer
-  - Source label: ND Clearance Transfer
-  - RF sources follow Mode A (RF Surplus, strict safety stock)
+  - **All ND stores: full net stock transfer** — label `ND Clearance Transfer` when Last Month + MTD = 0, otherwise `ND Transfer` (ND with sales is still cleared; only D2 skips it)
+  - RF sources follow **Mode B** (50% cap, min 2, can dip below safety), not Mode A
 - Special rule: avoid 1-piece remainder after transfer
   - If remaining stock would be 1, adjust transfer +/-1 to leave 0 or >=2
 - Destination rules: same as Mode A
@@ -257,6 +258,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Source rules:
   - ND: full transfer (unless Target > 0 set for that site — then site becomes receiver)
   - RF: can transfer (protect highest sales store)
+  - **Global Target protection**: if a store has Target > 0 on ANY article, all of its SKUs are excluded as sources
 - Destination priority:
   1. Sites with Target > 0: receive exactly Target Qty (cross-OM allowed; regardless of ND/RF type, regardless of current stock or pending received)
   2. Non-Target sites do not receive
@@ -274,6 +276,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Source rules:
   - ND: full transfer (unless Target > 0 set for that site — then site becomes receiver)
   - RF: can transfer (protect highest sales store)
+  - **Global Target protection**: if a store has Target > 0 on ANY article, all of its SKUs are excluded as sources
   - **RF retain 2 units**: transferable_qty = max(net_stock - 2, 0); net_stock > 2 required
   - **RF sort**: highest stock first → lowest sales second (different from F2)
 - Destination priority:
@@ -294,7 +297,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - Goal: Target-only allocation with RF minimum stock preservation and cross-OM fairness
 
 ## Mode NST: New Shop Target Transfer (New Shop Target調貨)
-- Inherits all F2 rules (Target-only reception, HD transfer option, Windy target priority)
+- Inherits all F2 rules (Target-only reception, HD transfer option, Windy target priority, global Target-store source protection)
 - Source rules:
   - ND: full transfer (unless Target > 0 set for that site)
   - RF: strict new constraints:
@@ -415,7 +418,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
 - RF highest sales protected
 - No dual role source/destination
 - Priority matching order list
-- Post-processing: eliminate single-piece (qty=1) transfer lines across all modes; size-increasing boosts (A1/ND4 avoid-1-remainder) are capped by the source transferable qty (v2.36.0)
+- Post-processing: eliminate single-piece (qty=1) transfer lines in all modes **except D/D2**; size-increasing boosts (A1/ND4 avoid-1-remainder) are capped by the source transferable qty (v2.36.0)
 - Special rules: 
   - B2/B2a/B2L/B2La/B3/B3a/B3L/B3La Type=L exception (full transfer or retain 2)
   - B2a/B2La/B3a/B3La Type=T no-source restriction
@@ -426,8 +429,8 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - E1 same OM only + ALL column force transfer
   - E1b same OM + priority type reception
   - E2 cross-OM + ALL column force transfer
-  - F Target priority (ND/RF can receive, Target Qty = needed_qty)
-  - F2 Target-only reception (ND/RF can receive, Target Qty = needed_qty)
+  - F Target priority (ND/RF can receive; Target Qty is ADDITIONAL, not top-up to target)
+  - F2/F3/NST Target-only reception (ND/RF can receive; Target Qty is ADDITIONAL; global Target-store source protection)
    - ND1/ND2 ND mutual transfer (breaks ND-no-receive rule)
     - ND3 ND same-OM zero-fill (retain 3, only 0-stock ND dest, like C1)
     - ND4 ND same-OM zero-fill with sales filter (like ND3 but only receive stores with sales history)
@@ -445,7 +448,8 @@ Draw one logic image that lets users compare all current transfer modes and unde
      - Transferable = min(Total Available - Cap, SaSa Net Stock)
      - Protect highest sales store
 - **No RF receive pairing**: all transferred quantities directly return to D001
-- **No minimum quantity limit for ND stores (even 1 piece can return to D001); RF stores: minimum 2 pieces (1 piece skipped for efficiency)**
+- **No store-to-store matching at all** (no cross-OM logic, no Windy/HD rule)
+- **Any source with exactly 1 transferable piece is skipped — both RF and ND** (the old "ND is exempt" statement was wrong)
 - supply_source 1/4 excluded from return
 - Source labels: 精簡SKU ND轉出, 精簡SKU RF轉出
 - Dest labels: 退回D001

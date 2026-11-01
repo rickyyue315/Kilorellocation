@@ -340,13 +340,13 @@ def build_overview_map_svg(groups: list) -> str:
 
 
 _GLOBAL_RULES = [
-    ("1", "ND 店舖限制", "只能做轉出方，不可接收（ND1–ND4 / 有 Target 的 F 系列 ND 除外）",
+    ("1", "ND 店舖限制", "只做轉出方，不可接收（ND1–ND4；F/F2/F3/NST 有 Target 的 ND 除外）",
      "#DC2626", "rgba(220,38,38,0.08)"),
     ("2", "最高動銷店保護", "RF 中有效銷量最高店不會被選為轉出方",
      "#7C3AED", "rgba(124,58,237,0.08)"),
     ("3", "避免雙重角色", "同一 SKU 的轉出店絕不能同時做接收店",
      "#DC2626", "rgba(220,38,38,0.08)"),
-    ("4", "單件後處理", "消除 Transfer Qty = 1（優先 Rebalance，其次 Merge）",
+    ("4", "單件後處理", "消除 Transfer Qty = 1（Rebalance→Merge）；D/D2 除外",
      "#D97706", "rgba(217,119,6,0.08)"),
 ]
 

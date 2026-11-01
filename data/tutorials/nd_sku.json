@@ -730,7 +730,7 @@
     "code": "精簡SKU(退D001)",
     "name": "精簡SKU全數退回D001",
     "risk": "低",
-    "scenario": "RF店舖存貨上限 = Max(Safety&#215;2, 過去2個月銷量&#215;2)，超出部分轉出；ND店舖全數可轉出。所有轉出的數量一律回退D001，RF僅1件不退回。不進行RF接收配對",
+    "scenario": "RF 超出 Cap、ND 全部直接回退 D001；完全不配對；只剩 1 件不退（RF 與 ND 相同）",
     "source_flow": [
       {
         "type": "row",
@@ -802,7 +802,7 @@
         ]
       ]
     },
-    "extra_notes": "RF僅1件不退回（避免浪費人力），ND不受此限。supply_source 為 1 或 4 的來源不參與退回 D001。不進行RF接收配對，每個來源店舖直接產出一行回退D001建議",
+    "extra_notes": "只剩 1 件時 RF 與 ND 都不退回；supply_source 為 1 或 4 亦不退。不進行任何店舖配對，每個來源店舖直接產出一行回退 D001 建議。",
     "diff_table": {
       "headers": [
         "項目",

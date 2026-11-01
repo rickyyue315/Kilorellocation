@@ -1,4 +1,4 @@
-"""教學分頁 — 30 種調貨模式圖例教學（圖片為主＋文字為輔版本）
+"""教學分頁 — 30 種調貨模式（預設嵌入完整邏輯審查 HTML，可切換舊版圖卡教學）
 """
 
 import json
@@ -6,12 +6,31 @@ import os
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from models.mode_registry import get_mode_def_by_code
 from ui import tutorial_diagrams as _td
 
 _TUTORIALS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "tutorials")
 _ASSETS_DIR = Path(__file__).resolve().parent.parent / 'static' / 'tutorials'
+_AUDIT_HTML_PATH = Path(__file__).resolve().parent.parent / 'docs' / 'KiLo_30模式邏輯審查.html'
+
+# 嵌入 iframe 時，視窗闊度通常 <1100px，原文件會隱藏左側目錄。
+# 這裡把目錄保留為窄版（186px），讓 30 張長卡片仍可一鍵跳轉；手機闊度才收起。
+_AUDIT_EMBED_CSS = """
+<style id="kilo-audit-embed">
+@media (max-width:1100px) and (min-width:761px){
+  .toc{display:block;width:186px;padding:20px 12px 40px;font-size:12px}
+  .toc a{padding:3px 5px}
+  .main{margin-left:186px}
+  .wrap{padding-left:20px;padding-right:20px}
+}
+@media (max-width:760px){
+  .toc{display:none}
+  .main{margin-left:0}
+}
+</style>
+"""
 
 _GROUP_DEFS = [
     ("basic", "基礎調貨模式（A / A1 / B）", "1"),
@@ -345,10 +364,12 @@ def _render_global_rules():
 
     st.markdown("""
 #### 全局規則說明
-1. **ND 店鋪限制**：ND 類型店鋪在所有模式下只能作為轉出方，不能作為接收方（ND1/ND2/ND3/ND4 及 F/F2/F3 模式下有 Target 的 ND 店舖除外）
-2. **最高動銷店保護**：RF 類型中有效銷量（Last Month + MTD）最高的店鋪不會被選為轉出方
-3. **避免雙重角色**：同一 SKU 的轉出店鋪絕對不能同時作為接收店鋪
-4. **單件後處理**：所有模式輸出前統一消除 Transfer Qty = 1 的記錄（Rebalance 取 1 件補上 &#10132; Merge 合併至高銷量目標店）
+1. **ND 店鋪限制**：ND 類型店鋪預設只能作為轉出方，不能作為接收方（ND1/ND2/ND3/ND4 的 ND 互轉，以及 F/F2/F3/NST 模式下有 Target 的 ND 店舖除外）。
+2. **最高動銷店保護**：RF 類型中有效銷量（Last Month + MTD）最高的店鋪不會被選為轉出方。
+3. **避免雙重角色**：同一 SKU 的轉出店鋪絕對不能同時作為接收店鋪。
+4. **單件後處理（D/D2 除外）**：除清貨模式外，輸出前統一消除 Transfer Qty = 1 的記錄（Rebalance 取 1 件補上 &#10132; Merge 合併至高銷量目標店）；D 家族刻意保留 1 件線。
+5. **MOQ 不參與計算**：MOQ 雖為必需欄位，但目前不會按 MOQ 取整或補貨。
+6. **ND 來源不受比例上限**：A/B/C 等模式的 20%／30%／50% 上限只適用於 RF；ND 來源一律淨庫存全轉。
 """)
 
 
@@ -470,7 +491,54 @@ def _render_decision_guide():
 """)
 
 
+@st.cache_data(show_spinner=False, max_entries=2)
+def _load_audit_html(path: str, mtime: float) -> str:
+    """讀取完整邏輯審查 HTML；mtime 用作 cache key，重建文件後即自動更新。"""
+    return Path(path).read_text(encoding="utf-8")
+
+
+def _render_audit_page():
+    """完整邏輯審查（docs/KiLo_30模式邏輯審查.html）以 iframe 嵌入。"""
+    if not _AUDIT_HTML_PATH.exists():
+        st.error("找不到 `docs/KiLo_30模式邏輯審查.html`。請先執行 `python audit/build_doc.py` 重建文件。")
+        return
+
+    mtime = _AUDIT_HTML_PATH.stat().st_mtime
+    raw_html = _load_audit_html(str(_AUDIT_HTML_PATH), mtime)
+    audit_html = raw_html
+    if "</head>" in audit_html:
+        audit_html = audit_html.replace("</head>", _AUDIT_EMBED_CSS + "</head>", 1)
+
+    info_col, dl_col = st.columns([3.4, 1])
+    with info_col:
+        st.caption(
+            "完整版：全局流程 → 保底主體 → 模式地圖 → 30 張模式卡（流程圖／可重跑範例／不能處理的情景）"
+            " → 審查發現 → 附錄。文件內有目錄可跳轉；如需全螢幕或列印（A4 橫向），請先下載。"
+        )
+    with dl_col:
+        st.download_button(
+            "⬇️ 下載完整 HTML",
+            data=raw_html.encode("utf-8"),
+            file_name="KiLo_30模式邏輯審查.html",
+            mime="text/html",
+            help="下載後以瀏覽器開啟，可用目錄跳轉、全螢幕閱讀或列印為 PDF。",
+        )
+
+    components.html(audit_html, height=1250, scrolling=True)
+
+
 def render_tutorial_page():
+    view = st.radio(
+        "模式教學版本",
+        ["📘 完整邏輯審查（新版）", "🖼️ 圖卡教學（舊版）"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="tutorial_view",
+    )
+    if view.startswith("📘"):
+        _render_audit_page()
+        return
+
     _render_global_rules()
 
     st.markdown("---")

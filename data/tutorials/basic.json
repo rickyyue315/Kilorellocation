@@ -10,6 +10,11 @@
         "items": [
           {
             "type": "node",
+            "text": "ND 店舖<br>淨庫存全轉<br>(不受 % 上限)",
+            "color": "purple"
+          },
+          {
+            "type": "node",
             "text": "RF 店舖<br>庫存 > Safety Stock",
             "color": "green"
           }
@@ -129,7 +134,7 @@
         ],
         [
           "安全庫存保護",
-          "嚴格（不可低於）",
+          "嚴格（單件上調可低 1 件）",
           "可下探"
         ],
         [
@@ -311,6 +316,11 @@
       {
         "type": "row",
         "items": [
+          {
+            "type": "node",
+            "text": "ND 店舖<br>淨庫存全轉<br>(不受 % 上限)",
+            "color": "purple"
+          },
           {
             "type": "node",
             "text": "RF 店舖<br>庫存 > Safety Stock",

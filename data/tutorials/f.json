@@ -109,7 +109,7 @@
         ]
       ]
     },
-    "extra_notes": "F 模式打破 ND 不可接收限制（僅限有 Target 的 ND 店舖）。Target 數量直接作為接收量。跨 OM 允許。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。",
+    "extra_notes": "F 模式打破 ND 不可接收限制（僅限有 Target 的 ND 店舖）。Target 是追加接收量（現有 2、Target 6 → 再收 6）。跨 OM 允許。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。",
     "diff_table": {
       "headers": [
         "對比項",
@@ -238,7 +238,7 @@
         ]
       ]
     },
-    "extra_notes": "F2 = 僅 Target 店接收。Windy 目標店優先從同 OM 無 Target Windy 店提取。可設定 HD 可轉出（最後優先）。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。",
+    "extra_notes": "F2 = 僅 Target 店接收。Windy 目標店優先從同 OM 無 Target Windy 店提取。可設定 HD 可轉出（最後優先）。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。 Target 店全 SKU 全域保護：只要該店任何一個 SKU 有 Target，全部 SKU 都不可作來源。",
     "diff_table": null
   },
   {
@@ -357,7 +357,7 @@
         ]
       ]
     },
-    "extra_notes": "F3 = F2 + RF轉出保留2件 + RF最高庫存優先轉出 + RF跨OM不降級。HD轉出選項、Windy目標優先同F2。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。",
+    "extra_notes": "F3 = F2 + RF轉出保留2件 + RF最高庫存優先轉出 + RF跨OM不降級。HD轉出選項、Windy目標優先、Target 店全 SKU 全域保護同F2。可在側邊欄勾選「優先滿足小型目標」使 Priority-1 目標店按 needed_qty 升序排序。配對後剩餘來源會自動填補尚未滿足的目標。Excel 新增 Target達成分析工作表。 Target 店全 SKU 全域保護：只要該店任何一個 SKU 有 Target，全部 SKU 都不可作來源。",
     "diff_table": {
       "headers": [
         "對比項",
@@ -513,7 +513,7 @@
         ]
       ]
     },
-    "extra_notes": "NST = F2 + RF轉出保留≥2件 + RF轉出上限75%庫存 + 庫存<3不轉出 + 可設定同一SKU轉出店數上限(10/20/不限)。因RF轉出限制，目標可能未達100%。HD轉出選項、Windy目標優先、優先滿足小型目標、配對後缺口填補同F2。v2.36.0：Target達成分析只計使用者設定Target的接收點；系統自動重點補0目標以調貨缺口分析為準。",
+    "extra_notes": "NST = F2 + RF轉出保留≥2件 + RF轉出上限75%庫存 + 庫存<3不轉出 + 可設定同一SKU轉出店數上限(10/20/不限)。因RF轉出限制，目標可能未達100%。HD轉出選項、Windy目標優先、優先滿足小型目標、配對後缺口填補同F2。v2.36.0：Target達成分析只計使用者設定Target的接收點；系統自動重點補0目標以調貨缺口分析為準。 Target 店全 SKU 全域保護：只要該店任何一個 SKU 有 Target，全部 SKU 都不可作來源。",
     "diff_table": {
       "headers": [
         "對比項",
