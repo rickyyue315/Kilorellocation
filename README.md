@@ -41,7 +41,7 @@ KiLo 是基於 Streamlit 的庫存調貨建議系統，依據庫存、在途、�
 
 - **保底主體（Safety / Turnday，v2.32.0 新增）**：側邊欄二選一，與全部 30 個模式任意組合（2 主體 × 30 模式）。
   - `Safety Stock（現行版本）`：沿用上載檔案的 Safety Stock 做保底（預設，行為與以往完全一致）。
-  - `Turnday（日銷速×日數）`：保底 = ceil(日銷速 × 自選日數 N，3–60 日，預設 14）；日銷速 = Effective Sold Qty ÷ 覆蓋日數；覆蓋日數 = 上月日數 + MTD 數據日期日號（數據日期於上載區輸入，通常 T-1，例：8月15日 = 7月31日 + 15日 = 46日）。所有 Safety 觸點（轉出保底、緊急/潛在缺貨目標、補0目標 Safety×0.5、接收上限 Safety×2、精簡SKU Cap）自動切換至 Turnday 基準；零銷量 SKU 保底為 0（可全數轉出）；原 Safety 值備份於 `Original Safety Stock`。
+  - `Turnday（日均銷量×日數）`：保底 = ceil(日均銷量 × 自選日數 N，3–60 日，預設 14）；日均銷量 = Effective Sold Qty ÷ 覆蓋日數；覆蓋日數 = 上月日數 + MTD 數據日期日號（數據日期於上載區輸入，通常 T-1，例：8月15日 = 7月31日 + 15日 = 46日）。所有 Safety 觸點（轉出保底、緊急/潛在缺貨目標、補0目標 Safety×0.5、接收上限 Safety×2、精簡SKU Cap）自動切換至 Turnday 基準；零銷量 SKU 保底為 0（可全數轉出）；原 Safety 值備份於 `Original Safety Stock`。
   - 不受主體影響的固定保底：C1（淨存>2）、F3/NST（保留2件、75%上限）、ND3/ND4（保留3件）維持原狀；Turnday 只改變各模式中讀取 Safety Stock 的公式。
 - ND 店舖預設只可轉出、不可接收；例外：**ND1/ND2/ND3/ND4**（ND 互轉）、**F/F2/F3/NST**（有 Target 的 ND 店可接收）。ND 來源在所有模式均為「淨庫存全轉」，不受 A/B/C 的百分比上限限制。
 - RF 最高有效銷量店舖受保護，不會被選為轉出方。
@@ -78,7 +78,7 @@ KiLo 是基於 Streamlit 的庫存調貨建議系統，依據庫存、在途、�
 ## 功能重點
 
 - 三十模式調貨策略。
-- **保底主體 × 模式矩陣（v2.32.0）**：Safety Stock（現行版本）或 Turnday（日銷速×自選日數）兩種保底主體，可與全部 30 個調貨模式任意組合；Turnday 主體下上載區需輸入 MTD 數據日期（通常 T-1）以計算日銷速，並顯示覆蓋日數核對。
+- **保底主體 × 模式矩陣（v2.32.0）**：Safety Stock（現行版本）或 Turnday（日均銷量×自選日數）兩種保底主體，可與全部 30 個調貨模式任意組合；Turnday 主體下上載區需輸入 MTD 數據日期（通常 T-1）以計算日均銷量，並顯示覆蓋日數核對。
 - **模式教學分頁**：嵌入「30 模式邏輯審查」完整文件（流程圖、可重跑範例、不能處理的情景、審查發現），涵蓋全部 30 種模式。
 - **C/C1/C2 模式新增 UI 選擇鍵**：可在側邊欄設定每店轉出件數上限（3~10件，預設 3），調整 C/C1/C2 模式的源店分散程度。提高每店轉出上限可減少調出店舖總數量。
 - **D2 模式新增 UI 選擇鍵（3 選 1）**：可在側邊欄切換「不限店舖數量（原有設定）」、「限制2間店舖接收（原有設定）」或「限制2間店舖接收（優化版）」。其中限制版限制同一 SKU 各 ND 轉出源最多配對 2 間 RF 接收店；優化版另將接收量放大至 200%，原有設定版維持正常接收量。
@@ -165,16 +165,16 @@ streamlit run app.py
    - 若 App 已是「建置失敗」狀態，**不需要刪除 App**：push 修正後於 App 右上角 **Manage app → Reboot** 即會重新安裝依賴。
 2. **依賴安裝**：`requirements.txt` 版本已鎖定並通過測試（`streamlit==1.52.2`、`pyarrow==22.0.0`、`altair==5.5.0`）；無需 `packages.txt`（全部套件皆有 Linux wheel，無需 apt 套件、無需 cmake）。
 3. **設定覆寫**：Community Cloud 會強制覆寫 `showErrorDetails`、`fastReruns`、`runOnSave`、`enableXsrfProtection`、`gatherUsageStats`；其餘 `.streamlit/config.toml` 設定（主題、`maxUploadSize = 50`）照常生效。
-4. **上傳大小**：`maxUploadSize` 已對齊應用層 50MB 上限，避免大型暫存造成容器記憶體壓力。
+4. **上載大小**：`maxUploadSize` 已對齊應用層 50MB 上限，避免大型暫存造成容器記憶體壓力。
 5. **雲端效能模式**：偵測到雲端環境（`/mount/src` 掛載路徑、`STREAMLIT_CLOUD` 或 Zeabur 舊環境變數）時，**所有大型表格**（調貨建議表、優先級分組表、缺口分析表）預設只渲染前 1,000 列並提供「載入完整…」勾選項；統計與 Excel 匯出仍使用全量資料。
 6. **雲端資源防護（免費方案約 1GB RAM、共享 CPU）**：
 
    | 機制 | 雲端預設 | 本機 | 說明 |
    | --- | --- | --- | --- |
-   | 單檔上傳上限 | **8MB** | 50MB | 讀檔前即擋下；由 `KILO_CLOUD_MAX_UPLOAD_MB` 調整 |
+   | 單檔上載上限 | **8MB** | 50MB | 讀檔前即擋下；由 `KILO_CLOUD_MAX_UPLOAD_MB` 調整 |
    | 列數上限 | **120,000 行** | 無限制 | 讀檔後立即檢查並顯示明確訊息；由 `KILO_CLOUD_MAX_ROWS` 調整（`0` = 不限制） |
    | 結果表預覽 | 1,000 列 | 全量 | 由 `KILO_CLOUD_RESULT_PREVIEW_LIMIT` 調整 |
-   | 快取上限 | `max_entries=2` | 同 | 避免多次上傳的 DataFrame 累積佔用記憶體 |
+   | 快取上限 | `max_entries=2` | 同 | 避免多次上載的 DataFrame 累積佔用記憶體 |
 
    實測參考（純 Python、未含 Streamlit server 開銷）：2 萬行 ≈ 172MB 峰值、20 萬行 ≈ 748MB 峰值。實務上「1MB 以下／2 萬行內」的檔案在雲端非常安全；超過 12 萬行建議先縮小匯出範圍或改用本機執行。
 7. **環境變數 / Secrets**（全部選用）：
@@ -182,7 +182,7 @@ streamlit run app.py
    | 變數 | 預設 | 說明 |
    | --- | --- | --- |
    | `KILO_LOG_LEVEL` | `WARNING`（雲端）/ `INFO`（本機） | 日誌層級 |
-   | `KILO_CLOUD_MAX_UPLOAD_MB` | `8` | 雲端單檔上傳上限（MB） |
+   | `KILO_CLOUD_MAX_UPLOAD_MB` | `8` | 雲端單檔上載上限（MB） |
    | `KILO_CLOUD_MAX_ROWS` | `120000` | 雲端列數上限（`0` = 不限制，風險自負） |
    | `KILO_CLOUD_RESULT_PREVIEW_LIMIT` | `1000` | 雲端結果表預覽行數上限（`0` = 不限制；舊名 `KILO_ZEABUR_RESULT_PREVIEW_LIMIT` 仍相容） |
    | `KILO_FIX_MOJIBAKE` | `0` | 啟用亂碼修補（Windows 上載亂碼時用；Linux 雲端環境不需要） |
@@ -224,7 +224,7 @@ streamlit run app.py
 
 - `Effective Sold Qty = Last Month Sold Qty + MTD Sold Qty`
 - `Total Available = SaSa Net Stock + Pending Received`
-- Turnday 主體額外衍生：`Original Safety Stock`（上載檔案原值備份）、`Daily Sold Rate`（日銷速，Effective Sold Qty ÷ 覆蓋日數）；`Safety Stock` 欄位值此時為 Turnday 保底 ceil(日銷速 × N)
+- Turnday 主體額外衍生：`Original Safety Stock`（上載檔案原值備份）、`Daily Sold Rate`（日均銷量，Effective Sold Qty ÷ 覆蓋日數）；`Safety Stock` 欄位值此時為 Turnday 保底 ceil(日均銷量 × N)
 
 ## 模式對照
 
@@ -264,10 +264,10 @@ streamlit run app.py
 
 ## 介面操作流程
 
-1. 上傳 Excel（上載區可一併設定 MTD 數據日期，通常 T-1；僅 Turnday 主體用於計算日銷速；未上傳時顯示 3 步空狀態指引）。
+1. 上載 Excel（上載區可一併設定 MTD 數據日期，通常 T-1；僅 Turnday 主體用於計算日均銷量；未上載時顯示 3 步空狀態指引）。
 2. 選擇保底主體（步驟 1：Safety Stock / Turnday＋日數），再於「步驟 2 選擇轉貨模式」一次選取全部 30 個調貨模式（不分類；長選單內部捲動；側邊欄即時顯示必填欄位提示、目前選擇總結與目前模式詳解）。
 3. 若為 B2/B2a/B2L/B2La/B3/B3a/B3L/B3La/E1/E1b/E2/ND1/ND2/ND3/ND4，可於「步驟 3 模式參數」設定接收店數限制。若為 NST，可設定 HD 轉出選項及同一 SKU 轉出店數上限。
-4. 點擊「生成調貨建議」（頂部 4 步進度條：上傳→生成→檢視→下載；分析進度以狀態面板逐步顯示：演算法 → 品質檢查 → 統計與缺口分析；當前配置條顯示模式＋保底＋參數摘要）。
+4. 點擊「生成調貨建議」（頂部 4 步進度條：上載→生成→檢視→下載；分析進度以狀態面板逐步顯示：演算法 → 品質檢查 → 統計與缺口分析；當前配置條顯示模式＋保底＋參數摘要）。
 5. 檢視 KPI（新增 ND/RF 行數）、「📈 圖表概覽」（類型分佈／OM 對比／Top 10 商品）、調貨建議（關鍵字篩選 Article/店舖，不影響匯出）與統計（「📊 調貨缺口分析」：達成率／轉出率以進度條呈現，模式／角色／狀態三篩選並排，可排序；KPI 改以店×SKU 計數並新增件數滿足率，來源附「未轉出可轉量」「轉後店內庫存」，超量轉出會顯示警告）。
 6. 點擊「📤 準備 Excel 報表」生成文件後，再點擊下載按鈕取得報表。
 

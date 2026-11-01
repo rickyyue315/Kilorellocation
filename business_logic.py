@@ -1,6 +1,6 @@
 """
 業務邏輯模組 v2.30.0
-實現調貨規則、源/目的地識別和匹配算法
+實現調貨規則、源/目的地識別和匹配演算法
 支持三十模式系統：A(保守轉貨)/A1(保守轉貨-轉出店舖不餘存貨1件)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/NST(New Shop Target調貨)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/ND4(ND限同OM轉貨補0及有銷售記錄)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 """
 
@@ -599,7 +599,7 @@ class TransferLogic:
                 rec['Product Hierarchy'] = product_brand
                 rec['Brand'] = product_brand
 
-            # 更新安全庫存信息（使用迴圈外預建索引，O(1) 查詢）
+            # 更新安全庫存資訊（使用迴圈外預建索引，O(1) 查詢）
             if recommendations and not article_site_index.empty:
                 for rec in recommendations:
                     transfer_key = (rec['Article'], str(rec['Transfer Site']).strip().upper())
@@ -643,7 +643,7 @@ class TransferLogic:
     
     def perform_quality_checks(self, df: pd.DataFrame, mode: str = '') -> bool:
         from services.quality_checks import run_quality_checks
-        logger.info("開始執行質量檢查")
+        logger.info("開始執行品質檢查")
         skip_nd_check = self._is_nd_transfer_mode(mode) or mode in (self.mode_f, self.mode_f_target_only, self.mode_f3, self.mode_nst)
         passed, errors = run_quality_checks(
             self.transfer_recommendations, df, skip_nd_check,
@@ -652,9 +652,9 @@ class TransferLogic:
         self.quality_check_passed = passed
         self.quality_errors = errors
         if passed:
-            logger.info("質量檢查通過")
+            logger.info("品質檢查通過")
         else:
-            logger.error(f"質量檢查失敗，發現 {len(errors)} 個錯誤")
+            logger.error(f"品質檢查失敗，發現 {len(errors)} 個錯誤")
             for error in errors:
                 logger.error(error)
         return passed

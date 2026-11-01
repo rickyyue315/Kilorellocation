@@ -1,8 +1,8 @@
 """
 數據預處理模組 v2.15.0
-處理Excel文件讀取、數據清理和驗證
+處理Excel檔案讀取、數據清理和驗證
 支持二十九模式系統：A(保守轉貨)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/NST(New Shop Target調貨)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/ND4(ND限同OM轉貨補0及有銷售記錄)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
-新增：預設店舖資料（OM、Type等），當用戶上傳的Excel缺少這些資料時自動填充
+新增：預設店舖資料（OM、Type等），當用戶上載的Excel缺少這些資料時自動填充
 """
 
 import pandas as pd
@@ -52,7 +52,7 @@ class DataProcessor:
         """
         使用預設資料填充缺失的 OM 和 Type 欄位
         
-        當用戶上傳的 Excel 缺少 OM 或 Type 資料時，
+        當用戶上載的 Excel 缺少 OM 或 Type 資料時，
         系統會根據 Site 欄位自動從 DEFAULT_STORE_DATA 中填充對應的預設值。
         
         Args:
@@ -118,10 +118,10 @@ class DataProcessor:
     
     def read_excel_file(self, file_path_or_buffer) -> pd.DataFrame:
         """
-        讀取Excel文件，確保Article欄位為12位文本格式，並標記*ALL*欄位（不分大小寫）
+        讀取Excel檔案，確保Article欄位為12位文本格式，並標記*ALL*欄位（不分大小寫）
         
         Args:
-            file_path_or_buffer: Excel文件路徑或 BytesIO 緩衝區
+            file_path_or_buffer: Excel檔案路徑或 BytesIO 緩衝區
             
         Returns:
             處理後的DataFrame
@@ -207,13 +207,13 @@ class DataProcessor:
                 logger.info("使用'Article Long Text (60 Chars)'作為商品描述")
             elif 'Article Description' not in df.columns and 'Article Long Text (60 Chars)' not in df.columns:
                 df['Article Description'] = "N/A"
-                logger.warning("未找到商品描述欄位，設置為'N/A'")
+                logger.warning("未找到商品描述欄位，設定為'N/A'")
             
-            logger.info(f"成功讀取Excel文件，共有 {len(df)} 行數據")
+            logger.info(f"成功讀取Excel檔案，共有 {len(df)} 行數據")
             return df
             
         except Exception as e:
-            logger.error(f"讀取Excel文件失敗: {str(e)}")
+            logger.error(f"讀取Excel檔案失敗: {str(e)}")
             raise
     
     def validate_columns(self, df: pd.DataFrame) -> bool:
@@ -239,26 +239,26 @@ class DataProcessor:
     
     def validate_file_format(self, uploaded_file) -> Tuple[bool, str]:
         """
-        驗證上傳文件格式
+        驗證上載檔案格式
         
         Args:
-            uploaded_file: 上傳的文件對象
+            uploaded_file: 上載的檔案對象
             
         Returns:
             驗證結果和錯誤消息
         """
-        # 檢查文件名是否為空
+        # 檢查檔案名是否為空
         if uploaded_file.name == '':
-            return False, "文件名不能為空"
+            return False, "檔案名不能為空"
         
-        # 檢查文件擴展名（不區分大小寫）
+        # 檢查檔案擴展名（不區分大小寫）
         file_name = uploaded_file.name.lower()
         if not (file_name.endswith('.xlsx') or file_name.endswith('.xls')):
-            return False, "文件格式不正確，請上傳.xlsx或.xls格式的Excel文件"
+            return False, "檔案格式不正確，請上載.xlsx或.xls格式的Excel檔案"
         
-        # 檢查文件大小（本機 50MB；雲端容器採較保守上限，見 config.MAX_UPLOAD_MB）
+        # 檢查檔案大小（本機 50MB；雲端容器採較保守上限，見 config.MAX_UPLOAD_MB）
         if hasattr(uploaded_file, 'size') and uploaded_file.size > FILE_SIZE_LIMIT_BYTES:
-            return False, f"文件大小超過限制（最大 {MAX_UPLOAD_MB}MB）"
+            return False, f"檔案大小超過限制（最大 {MAX_UPLOAD_MB}MB）"
         
         return True, ""
     
@@ -450,14 +450,14 @@ class DataProcessor:
         完整的數據預處理流程
         
         Args:
-            file_path_or_buffer: Excel文件路徑或 BytesIO 緩衝區
+            file_path_or_buffer: Excel檔案路徑或 BytesIO 緩衝區
             
         Returns:
-            處理後的DataFrame和處理統計信息
+            處理後的DataFrame和處理統計資料
         """
         logger.info("開始數據預處理")
         
-        # 讀取Excel文件
+        # 讀取Excel檔案
         df = self.read_excel_file(file_path_or_buffer)
 
         # 雲端行數守衛（本機不啟用）
@@ -515,7 +515,7 @@ class DataProcessor:
             'columns': [str(c) for c in df.columns],
             'data_types': {str(k): str(v) for k, v in df.dtypes.items()},
             'fill_stats': fill_stats,
-            # 無效 RP Type 修正資訊（供界面顯示警告）
+            # 無效 RP Type 修正資訊（供介面顯示警告）
             'invalid_rp_types': [str(v) for v in getattr(self, '_invalid_rp_type_values', [])],
             'invalid_rp_type_count': int(getattr(self, '_invalid_rp_type_count', 0)),
             'blank_rp_type_count': int(getattr(self, '_blank_rp_type_count', 0)),

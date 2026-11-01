@@ -33,8 +33,8 @@ from services.turnday import apply_turnday_floor, compute_coverage_days, describ
 
 
 def _render_workflow_steps(stage: int):
-    """主流程步驟條（顯示層用，stage=1上傳/2分析/3結果/4下載）。"""
-    steps = ["📂 上傳資料", "🚀 生成建議", "📈 檢視結果", "📥 下載報表"]
+    """主流程步驟條（顯示層用，stage=1上載/2分析/3結果/4下載）。"""
+    steps = ["📂 上載資料", "🚀 生成建議", "📈 檢視結果", "📥 下載報表"]
     html = '<div class="steps">'
     for i, label in enumerate(steps, 1):
         if i < stage:
@@ -136,12 +136,12 @@ with tab_system:
         _render_workflow_steps(1)
 
     with st.container():
-        st.markdown('<div class="section-title"><span class="section-title__badge">STEP 1</span>📂 資料上傳</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title"><span class="section-title__badge">STEP 1</span>📂 資料上載</div>', unsafe_allow_html=True)
 
         render_upload_requirements(mode_code)
 
         uploaded_file = st.file_uploader(
-            "拖放或點擊上傳 Excel 文件",
+            "拖放或點擊上載 Excel 檔案",
             type=["xlsx", "xls"],
             help="支援 .xlsx 和 .xls 格式",
         )
@@ -152,7 +152,7 @@ with tab_system:
                 "MTD數據日期（數據覆蓋至該日，通常T-1）",
                 value=(datetime.now() - timedelta(days=1)).date(),
                 key='mtd_as_of_date',
-                help="Turnday 保底主體用以計算日銷速的數據截止日期：覆蓋日數 = 上月日數 + 該日日號（例：8月15日 = 7月31日 + 15日 = 46日）。Safety 主體不使用此日期。"
+                help="Turnday 保底主體用以計算日均銷量的數據截止日期：覆蓋日數 = 上月日數 + 該日日號（例：8月15日 = 7月31日 + 15日 = 46日）。Safety 主體不使用此日期。"
             )
         with hint_col:
             if floor_body == FLOOR_BODY_TURNDAY:
@@ -164,23 +164,23 @@ with tab_system:
         st.markdown(
             '<div class="empty-state"><strong>👋 開始使用（3 步完成）：</strong>'
             '<ol><li>左側邊欄確認 <strong>步驟 1 保底主體</strong> 與 <strong>步驟 2 轉貨模式</strong>（已預設 Safety＋A 模式可直接試跑）</li>'
-            '<li>上方拖放 Excel 文件（需含 Article / OM / RP Type / Site / 庫存 / 銷量 / MOQ 等基本欄位）</li>'
+            '<li>上方拖放 Excel 檔案（需含 Article / OM / RP Type / Site / 庫存 / 銷量 / MOQ 等基本欄位）</li>'
             '<li>點擊「🎯 生成調貨建議」，再按「📤 準備 Excel 報表」下載</li></ol>'
             '💡 不確定選哪個模式？先到「📖 模式教學」分頁看模式地圖與情境對照。</div>',
             unsafe_allow_html=True,
         )
 
     if uploaded_file is not None:
-        progress_bar = st.progress(0, text="準備開始處理文件...")
+        progress_bar = st.progress(0, text="準備開始處理檔案...")
         try:
-            progress_bar.progress(10, text="正在驗證文件格式...")
+            progress_bar.progress(10, text="正在驗證檔案格式...")
 
-            progress_bar.progress(25, text="文件讀取成功!正在進行數據預處理...")
+            progress_bar.progress(25, text="檔案讀取成功!正在進行數據預處理...")
             processor = DataProcessor()
 
             file_valid, error_msg = processor.validate_file_format(uploaded_file)
             if not file_valid:
-                st.error(f"文件格式驗證失敗: {error_msg}")
+                st.error(f"檔案格式驗證失敗: {error_msg}")
                 st.stop()
 
             try:
@@ -194,18 +194,18 @@ with tab_system:
                 original_columns = processing_stats['original_stats'].get('columns', [])
                 has_type_column = any(col.upper() == 'TYPE' for col in original_columns)
                 if not has_type_column:
-                    st.error("❌ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上傳。")
+                    st.error("❌ B2/B2a/B2L/B2La/B3/B3a/B3L/B3La模式必須包含Type欄位(不分大小寫)。請確認Excel欄位後再上載。")
                     st.stop()
 
             if floor_body == FLOOR_BODY_TURNDAY:
                 df = apply_turnday_floor(df, mtd_as_of_date, int(turnday_days))
                 st.info(
-                    f"🛡️ Turnday 保底主體已套用：保底 = 日銷速 × {int(turnday_days)}日"
+                    f"🛡️ Turnday 保底主體已套用：保底 = 日均銷量 × {int(turnday_days)}日"
                     f"（數據日期 {mtd_as_of_date.isoformat()}，覆蓋日數 {compute_coverage_days(mtd_as_of_date)}日）。"
                     f"Safety Stock 欄已換成 Turnday 保底值，原值保留於 Original Safety Stock。"
                 )
 
-            st.success("檔案上傳與數據預處理成功!")
+            st.success("檔案上載與數據預處理成功!")
 
             invalid_rp_count = processing_stats['processed_stats'].get('invalid_rp_type_count', 0)
             if invalid_rp_count > 0:
@@ -248,7 +248,7 @@ with tab_system:
 
                 floor_body_label = (
                     "Safety Stock（現行版本）" if floor_body == FLOOR_BODY_SAFETY
-                    else f"Turnday（日銷速×{int(turnday_days)}日，數據日期 {mtd_as_of_date.isoformat()}）"
+                    else f"Turnday（日均銷量×{int(turnday_days)}日，數據日期 {mtd_as_of_date.isoformat()}）"
                 )
                 _extra_params = _describe_extra_params(sidebar_result)
                 _extra_html = f"<br>⚙️ 參數 · {_extra_params}" if _extra_params else ""
@@ -307,11 +307,11 @@ with tab_system:
 
             if quality_passed is not None:
                 if quality_passed:
-                    st.success("質量檢查通過!")
+                    st.success("品質檢查通過!")
                 else:
-                    st.error("質量檢查失敗,請查看錯誤信息")
+                    st.error("品質檢查失敗,請查看錯誤訊息")
 
-                    with st.expander("質量檢查錯誤詳情"):
+                    with st.expander("品質檢查錯誤詳情"):
                         for error in st.session_state.get('quality_errors', []):
                             st.error(error)
 
@@ -345,9 +345,9 @@ with tab_system:
                     if st.button(
                         "📤 準備 Excel 報表",
                         width="stretch",
-                        help="按下後才生成 Excel 文件；生成完成會出現下載按鈕。大型結果可節省等待時間。",
+                        help="按下後才生成 Excel 檔案；生成完成會出現下載按鈕。大型結果可節省等待時間。",
                     ):
-                        with st.spinner("生成 Excel 文件..."):
+                        with st.spinner("生成 Excel 檔案..."):
                             excel_generator = ExcelGenerator()
                             st.session_state['excel_data'] = excel_generator.generate_excel_file(
                                 recommendations,
@@ -369,7 +369,7 @@ with tab_system:
                 st.info("根據當前規則，沒有生成任何調貨建議。")
 
         except Exception as e:
-            st.error(f"處理文件時發生錯誤: {e}")
+            st.error(f"處理檔案時發生錯誤: {e}")
             with st.expander("顯示詳細錯誤追蹤"):
                 st.exception(e)
             if 'progress_bar' in locals():

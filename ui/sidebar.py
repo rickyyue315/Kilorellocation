@@ -119,7 +119,7 @@ def render_sidebar() -> Dict:
 **完整操作流程:**
 
 1. **設定保底主體（步驟 1）**
-   - Safety Stock（現行版本）或 Turnday（日銷速×日數）二選一
+   - Safety Stock（現行版本）或 Turnday（日均銷量×日數）二選一
 
 2. **選擇轉貨模式（步驟 2）**
    - 在「選擇轉貨模式」中選擇適合的轉貨模式（全部 30 個模式一次列出，不分類）
@@ -131,8 +131,8 @@ def render_sidebar() -> Dict:
    - 若選擇 NST，可設定「同一SKU轉出店舖數量上限：10間/20間/不限制」
    - 若選擇 D2，可設定「接收店舖數量限制」三選一；若選擇 C1，可設定補0門檻；C/C1/C2 可設定每店轉出件數上限
 
-4. **上傳 Excel 並啟動分析**
-   - 主頁上傳 Excel，核對 MTD 數據日期（僅 Turnday 主體使用）
+4. **上載 Excel 並啟動分析**
+   - 主頁上載 Excel，核對 MTD 數據日期（僅 Turnday 主體使用）
    - 點擊「生成調貨建議」按鈕開始處理
 
 5. **查看結果**
@@ -141,7 +141,7 @@ def render_sidebar() -> Dict:
 
 6. **下載報告**
    - 點擊「準備 Excel 報表」生成文件後，再點擊下載按鈕獲取報告
-   - 報告包含完整的調貨建議和統計信息
+   - 報告包含完整的調貨建議和統計資料
             """)
 
         st.markdown("---")
@@ -150,19 +150,19 @@ def render_sidebar() -> Dict:
         st.markdown('<div class="side-hint">與下方調貨模式可任意組合（2 主體 × 30 模式）</div>', unsafe_allow_html=True)
         floor_body_option = st.radio(
             "保底主體（與下方調貨模式可任意組合）",
-            ["Safety Stock（現行版本）", "Turnday（日銷速×日數）"],
+            ["Safety Stock（現行版本）", "Turnday（日均銷量×日數）"],
             index=0,
             key='floor_body_option',
-            help="Safety Stock：沿用上載檔案的 Safety Stock 做保底（現行版本，行為不變）。Turnday：以日銷速×自選日數計算保底值取代 Safety Stock，全部模式的 Safety 觸點（轉出保底、缺貨目標、接收上限等）自動切換至 Turnday 基準。"
+            help="Safety Stock：沿用上載檔案的 Safety Stock 做保底（現行版本，行為不變）。Turnday：以日均銷量×自選日數計算保底值取代 Safety Stock，全部模式的 Safety 觸點（轉出保底、缺貨目標、接收上限等）自動切換至 Turnday 基準。"
         )
-        if floor_body_option == "Turnday（日銷速×日數）":
+        if floor_body_option == "Turnday（日均銷量×日數）":
             floor_body = FLOOR_BODY_TURNDAY
             turnday_days = st.number_input(
-                "Turnday 日數（保底 = 日銷速 × N日）",
+                "Turnday 日數（保底 = 日均銷量 × N日）",
                 min_value=TURNDAY_MIN_DAYS, max_value=TURNDAY_MAX_DAYS,
                 value=TURNDAY_DEFAULT_DAYS, step=1,
                 key='turnday_days',
-                help="保底庫存 = ceil(日銷速 × 此日數)。日銷速 = (Last Month Sold + MTD Sold) ÷ 覆蓋日數，覆蓋日數由主頁面的「MTD數據日期」計算。零銷量 SKU 保底為 0（可全數轉出）。"
+                help="保底庫存 = ceil(日均銷量 × 此日數)。日均銷量 = (Last Month Sold + MTD Sold) ÷ 覆蓋日數，覆蓋日數由主頁面的「MTD數據日期」計算。零銷量 SKU 保底為 0（可全數轉出）。"
             )
         else:
             floor_body = FLOOR_BODY_SAFETY
@@ -189,7 +189,7 @@ def render_sidebar() -> Dict:
         st.info(f"📌 必填欄位：{_required_columns_hint(mode_code)}", icon="🧾")
 
         st.markdown('<div class="side-step"><span class="side-step__num">3</span>🧩 模式參數</div>', unsafe_allow_html=True)
-        st.markdown('<div class="side-hint">只顯示目前模式可用的參數；無參數的模式可直接到主頁上傳分析</div>', unsafe_allow_html=True)
+        st.markdown('<div class="side-hint">只顯示目前模式可用的參數；無參數的模式可直接到主頁上載分析</div>', unsafe_allow_html=True)
 
         b_special_max_receive_sites_per_source: Optional[int] = None
         b_special_receive_site_limit_option = "最多 2 間"
@@ -308,7 +308,7 @@ def render_sidebar() -> Dict:
             st.session_state.pop('c1_ceiling', None)
 
         if not _has_mode_params:
-            st.caption("此模式無額外參數，可直接到主頁上傳分析。")
+            st.caption("此模式無額外參數，可直接到主頁上載分析。")
 
         _floor_label = "Safety Stock" if floor_body == FLOOR_BODY_SAFETY else f"Turnday×{turnday_days}日"
         _mode_def = get_mode_def_by_code(mode_code)

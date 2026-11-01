@@ -10,17 +10,17 @@
 
 ## 1　保底主體：Safety vs Turnday
 
-30 個模式共用同一個保底概念：Safety 是上載檔固定值，Turnday 是按日銷速算出的浮動值。切換主體只改 `Safety Stock` 欄（原值備份至 `Original Safety Stock`，另加 `Daily Sold Rate`），配對邏輯不變。
+30 個模式共用同一個保底概念：Safety 是上載檔固定值，Turnday 是按日均銷量算出的浮動值。切換主體只改 `Safety Stock` 欄（原值備份至 `Original Safety Stock`，另加 `Daily Sold Rate`），配對邏輯不變。
 
 **Turnday 三步（數據日期 2026-08-15、N = 14 為例）**
 
 1. 覆蓋日數 = 7 月 31 日 + MTD 15 日 = **46 日**（上月日數 + MTD 數據日期日號）
-2. 日銷速 = Effective Sold 92 件 ÷ 46 日 = **2.0 件/日**（Last Month 62 + MTD 30）
+2. 日均銷量 = Effective Sold 92 件 ÷ 46 日 = **2.0 件/日**（Last Month 62 + MTD 30）
 3. 保底 = ceil(2.0 × 14) = **28 件**（N 可選 3–60，預設 14；零銷量 → 0）
 
 **同一間店，兩種保底（N = 14）**
 
-| 店舖 | 近 46 日銷量 | 日銷速 | Safety | Turnday | 效果 |
+| 店舖 | 近 46 日銷量 | 日均銷量 | Safety | Turnday | 效果 |
 |---|---|---|---|---|---|
 | 高銷量店 | 92 件 | 2.0 件/日 | 5 | 28 | 更保守・防斷貨 |
 | 低銷量店 | 23 件 | 0.5 件/日 | 5 | 7 | 保底下降・釋放庫存 |
@@ -1932,7 +1932,7 @@
 | 8 | 低 | 精簡SKU(退D001) | 原文件說「允許跨 OM 配對」，實際全數退 D001；原文件又說 ND 不受 1 件限制，程式 ND 1 件同樣不退。 | SimplifiedSKUReturnD001Strategy.match 只建 D001 建議；return 迴圈對 RF/ND 的 remaining==1 一律 continue。 | 文件已校正（不配對、ND 1 件亦不退）；確認 ND 1 件是否應退 D001。 |
 | 9 | 低 | 備註顯示 | 所有 RF 備註的 Safety 顯示為 0（例如「剩8件>Safety(0)」）。 | refresh_recommendation_fields 的 source_info 未帶 safety_stock。 | 補回 safety_stock 欄位。 |
 | 10 | 低 | 備註顯示 | ND 備註的「近2月銷／上限」、精簡 SKU 的「近2月銷」永遠顯示 0。 | dest_info 未帶 total_sales／max_receive_qty；source_info 未帶 last_2_month_sold_qty。 | 補欄位或改用 rec 上的原始值。 |
-| 11 | 低 | 資料驗證 | RP Type 無效值（非 ND／RF）沒有被修正為 RF，但 UI 訊息說「已自動修正為 RF」。 | convert_data_types 只正規化大寫，無效值原樣保留；後續 == 'RF' 篩選會漏掉該行。 | 界面訊息已改為「不會修正，會被忽略」；如要真正修正，需改資料層。 |
+| 11 | 低 | 資料驗證 | RP Type 無效值（非 ND／RF）沒有被修正為 RF，但 UI 訊息說「已自動修正為 RF」。 | convert_data_types 只正規化大寫，無效值原樣保留；後續 == 'RF' 篩選會漏掉該行。 | 介面訊息已改為「不會修正，會被忽略」；如要真正修正，需改資料層。 |
 | 12 | 低 | C1 | 強制最少 2 件可令最終庫存超出 target 1 件；品質檢查只比較「累收 ≤ target」，捕捉不到。 | 例：現有 2、target 3、needed 1 → 強制 2，最終 4。 | 在 QC 加入「現有 + 累收 ≤ target」檢查。 |
 | 13 | 低 | ND4 | 後處理 fallback 在找不到合規 Target 時，可能超 target 1 件。 | optimize_nd4_avoid_one_remainder 的 fallback 候選未檢查 target。 | fallback 亦套用 target 上限。 |
 | 14 | 低 | B 模式 | 「RF加強轉出」只在 Pending Received > 0 時出現；純淨庫存不會低於 Safety。 | base = 總庫存 − Safety，數學上保留 Safety。 | 文件已補上「只在有在途時出現」；教學亦可加註。 |

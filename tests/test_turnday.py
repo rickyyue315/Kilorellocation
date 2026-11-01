@@ -104,7 +104,7 @@ class TestApplyTurndayFloor:
     def test_replaces_safety_stock(self):
         df = _make_df([_make_row(Site="S1", **{"Effective Sold Qty": 92})])
         result = apply_turnday_floor(df, self.AS_OF, days=14)
-        # 日銷速 = 92/46 = 2.0 → 保底 = ceil(2.0 × 14) = 28
+        # 日均銷量 = 92/46 = 2.0 → 保底 = ceil(2.0 × 14) = 28
         assert result.loc[0, "Safety Stock"] == 28
 
     def test_ceils_fractional_result(self):

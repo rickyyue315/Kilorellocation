@@ -1,5 +1,5 @@
 """
-後處理模組 — 單件調貨優化、欄位刷新、銷量計算
+後處理模組 — 單件調貨優化、欄位更新、銷量計算
 """
 
 from typing import Any, Dict, List, Tuple

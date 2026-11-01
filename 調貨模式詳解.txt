@@ -66,11 +66,11 @@
 - **概念**：保底主體與 30 個調貨模式**正交組合**（2 主體 × 30 模式 = 60 種組合），側邊欄先選保底主體、再選調貨模式
 - **主體一：Safety Stock（現行版本，預設）**
   - 沿用上載檔 `Safety Stock` 欄位做保底，行為與 v2.31 完全一致
-- **主體二：Turnday（日銷速×日數）**
+- **主體二：Turnday（日均銷量×日數）**
   - **公式**：
     - 覆蓋日數 = 上月日數 + MTD數據日期日號（數據日期於上載區輸入，通常 T-1；例：8月15日 = 7月31日 + 15日 = 46日）
-    - 日銷速 = Effective Sold Qty ÷ 覆蓋日數（Effective Sold Qty = Last Month Sold Qty + MTD Sold Qty）
-    - Turnday 保底 = ceil(日銷速 × 自選日數 N)（N 可選 3–60 日，預設 14；零銷量 → 保底 0）
+    - 日均銷量 = Effective Sold Qty ÷ 覆蓋日數（Effective Sold Qty = Last Month Sold Qty + MTD Sold Qty）
+    - Turnday 保底 = ceil(日均銷量 × 自選日數 N)（N 可選 3–60 日，預設 14；零銷量 → 保底 0）
   - **套用方式**：preprocess 後把 `Safety Stock` 欄位值換成 Turnday 保底（原值備份至 `Original Safety Stock`，並新增 `Daily Sold Rate` 欄），全部模式邏輯不變、自動運行於新基準
   - **切換的 Safety 觸點**：
     - 轉出保底：transferable = total_available − S → total_available − T
@@ -93,15 +93,15 @@
 - **原因**：ND店鋪為特殊類型，不適合接收調貨
 - **代碼位置**：`business_logic.py` 第 189-190, 386-388 行
 
-### **2. 最高動銷店保護**
+### **2. 最高銷量店保護**
 - **規則**：RF類型中有效銷量最高的店鋪不會被選為轉出方
-- **原因**：保護動銷最好的店鋪，確保其庫存充足
+- **原因**：保護銷量最好的店鋪，確保其庫存充足
 - **代碼位置**：`business_logic.py` 第 62, 73-76 行
 - **邏輯**：
 ```python
 # 找出該Article+OM組合中的最高有效銷量
 max_sold_qty = rf_sources['Effective Sold Qty'].max()
-# 條件2：不是最高銷量店鋪（保護最高動銷店）
+# 條件2：不是最高銷量店鋪（保護最高銷量店）
 is_not_highest_sold = effective_sold < max_sold_qty
 ```
 
@@ -113,7 +113,7 @@ is_not_highest_sold = effective_sold < max_sold_qty
   - 在匹配階段嚴格檢查：`if dest['site'] in transfer_sites: continue`
   - E模式Phase 3回退時特別強化此檢查
 - **代碼位置**：`business_logic.py` 第 392, 420, 448 行（匹配階段多處檢查）
-- **質量檢查**：系統在最終輸出前會執行專門的質量檢查（檢查6）驗證此規則
+- **品質檢查**：系統在最終輸出前會執行專門的品質檢查（檢查6）驗證此規則
 
 ### **4. 避免單筆調貨 1 件（後處理優化）⭐ D/D2 除外**
 - **規則**：除 D（清貨轉貨）與 D2（清貨轉貨 ND 限定）外，所有模式的輸出結果在最終返回前統一套用後處理，消除「單筆 Transfer Qty = 1」的調貨記錄。D 家族刻意跳過此後處理，以保留「清空或剩 ≥2」的餘貨邏輯。
@@ -845,7 +845,7 @@ recommendation = {
     'Receive Site Last Month Sold Qty': int,  # 接收店鋪上月銷量
     'Receive Site MTD Sold Qty': int,           # 接收店鋪本月銷量
     'Receive Original Stock': int,          # 接收店鋪原始庫存
-    # 新增累計接收數量信息
+    # 新增累計接收數量資訊
     'Target Qty': int,                 # 目標數量 (C模式)
     'Cumulative Received Qty': int,    # 累計接收數量
 }
@@ -867,7 +867,7 @@ statistics = {
 }
 ```
 
-### **6. 質量檢查機制**
+### **6. 品質檢查機制**
 
 **檢查項目：**
 1. Article欄位完整性
@@ -906,7 +906,7 @@ statistics = {
 18. Receive Site Safety Stock (22列寬) - 接收店舖安全庫存
 19. Transfer Qty (10列寬) - 調貨件數
 20. **Remark** (25列寬) - 轉出分類→接收分類映射
-21. Notes (75列寬) - 詳細分類信息
+21. Notes (75列寬) - 詳細分類資訊
 
 > **Type 欄說明**：`Type=T` 為遊客區店舖、`Type=M` 為混合型店舖、`Type=L` 為本地店舖；B2/B2a/B2L/B2La/B3/B3a/B3L/B3La 接收優先級依此排序。非 B 系模式如輸入檔無 Type 資料，此兩欄為空白。
 > `精簡SKU(退D001)` 模式會在最後追加 `D001 Receive Qty` 欄。
@@ -1491,7 +1491,7 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 #### 優先級2：RF類型轉出
 - **條件1**：RP Type 為 "RF"
 - **條件2**：`(SaSa Net Stock + Pending Received) > Max(Safety Stock × 2, Last 2 Month Sold Qty × 2)`
-- **條件3**：該店鋪不是最高銷量店鋪（保護最高動銷店）
+- **條件3**：該店鋪不是最高銷量店鋪（保護最高銷量店）
 - **可轉數量**：`min(total_available - cap, SaSa Net Stock)`
 - **轉出類型**：`精簡SKU RF轉出`
 
@@ -1570,7 +1570,7 @@ Phase 3：C模式回退（當其他OM未有店鋪涉及強制轉出時）
 #### 優先級2：RF類型轉出
 - **條件1**：RP Type 為 "RF"
 - **條件2**：`(SaSa Net Stock + Pending Received) > Max(Safety Stock × 2, Last 2 Month Sold Qty × 2)`
-- **條件3**：該店鋪不是最高銷量店鋪（保護最高動銷店）
+- **條件3**：該店鋪不是最高銷量店鋪（保護最高銷量店）
 - **可轉數量**：`min(total_available - cap, SaSa Net Stock)`
 - **例外**：RF 僅 1 件不回退 D001（避免浪費人力）
 - **轉出類型**：`精簡SKU RF轉出`

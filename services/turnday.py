@@ -1,5 +1,5 @@
 """
-保底主體 Turnday 計算 — 以日銷速 × 自選日數取代 Safety Stock 保底值。
+保底主體 Turnday 計算 — 以日均銷量 × 自選日數取代 Safety Stock 保底值。
 
 在 preprocess 之後、進入 TransferLogic 之前呼叫 apply_turnday_floor()，
 把 Safety Stock 欄位值換成 Turnday 保底值（原值備份至 Original Safety Stock），
@@ -7,8 +7,8 @@
 
 公式：
     覆蓋日數 = 上月日數 + 數據日期日號(MTD日數)
-    日銷速   = Effective Sold Qty ÷ 覆蓋日數
-    保底     = ceil(日銷速 × 自選日數 N)   （零銷量 → 0）
+    日均銷量   = Effective Sold Qty ÷ 覆蓋日數
+    保底     = ceil(日均銷量 × 自選日數 N)   （零銷量 → 0）
 """
 
 import calendar

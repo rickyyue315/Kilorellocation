@@ -19,7 +19,7 @@ from services.statistics import (
     compute_nd_clearance_stats,
 )
 
-# 設置日誌
+# 設定日誌
 logger = logging.getLogger(__name__)
 
 # 調貨建議工作表統一欄位順序（全模式適用）
@@ -210,7 +210,7 @@ class ExcelGenerator:
                 else:
                     worksheet.write(row_idx, col_idx, value, cell_hl_format)
 
-        # 設置標題行高度與預設行高（避免逐行設定）
+        # 設定標題行高度與預設行高（避免逐行設定）
         worksheet.set_row(0, 40)
         worksheet.set_default_row(22)
     
@@ -221,7 +221,7 @@ class ExcelGenerator:
 
         Args:
             writer: ExcelWriter對象
-            statistics: 統計信息字典
+            statistics: 統計資料字典
             floor_body_label: optional 保底主體標示（Safety Stock / Turnday 設定）
         """
         logger.info("創建統計摘要工作表")
@@ -229,7 +229,7 @@ class ExcelGenerator:
         workbook = writer.book
         worksheet = workbook.add_worksheet('統計摘要 (Summary Dashboard)')
         
-        # 設置格式
+        # 設定格式
         title_format = workbook.add_format({
             'bold': True,
             'font_size': 16,
@@ -362,14 +362,14 @@ class ExcelGenerator:
             worksheet.write(f'B{row}', stats['count'], data_format)
             worksheet.write(f'C{row}', stats['qty'], data_format)
         
-        # 設置列寬（優化為適中寬度）
+        # 設定列寬（優化為適中寬度）
         worksheet.set_column('A:A', 18)
         worksheet.set_column('B:B', 12)
         worksheet.set_column('C:C', 12)
         worksheet.set_column('D:D', 12)
         worksheet.set_column('E:E', 12)
         
-        # 設置行高
+        # 設定行高
         worksheet.set_row(0, 25)  # 標題行
         worksheet.set_row(2, 20)  # KPI標題行
         worksheet.set_row(3, 20)  # KPI值行
@@ -388,7 +388,7 @@ class ExcelGenerator:
 
         Args:
             recommendations: 調貨建議列表
-            statistics: 統計信息字典
+            statistics: 統計資料字典
             output_path: 保留參數（已棄用，不再使用）
             mode: 調貨模式名稱
             df: optional raw DataFrame for computing full target fulfillment stats
