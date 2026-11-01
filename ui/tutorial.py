@@ -15,20 +15,13 @@ _TUTORIALS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data"
 _ASSETS_DIR = Path(__file__).resolve().parent.parent / 'static' / 'tutorials'
 _AUDIT_HTML_PATH = Path(__file__).resolve().parent.parent / 'docs' / 'KiLo_30模式邏輯審查.html'
 
-# 嵌入 iframe 時，視窗闊度通常 <1100px，原文件會隱藏左側目錄。
-# 這裡把目錄保留為窄版（186px），讓 30 張長卡片仍可一鍵跳轉；手機闊度才收起。
+# 嵌入 iframe 時隱藏文件內置目錄：它與 hero 標題重複，亦會與 Streamlit 側邊欄爭位。
+# 下載的 HTML 仍保留完整目錄，不受此 CSS 影響。
 _AUDIT_EMBED_CSS = """
 <style id="kilo-audit-embed">
-@media (max-width:1100px) and (min-width:761px){
-  .toc{display:block;width:186px;padding:20px 12px 40px;font-size:12px}
-  .toc a{padding:3px 5px}
-  .main{margin-left:186px}
-  .wrap{padding-left:20px;padding-right:20px}
-}
-@media (max-width:760px){
-  .toc{display:none}
-  .main{margin-left:0}
-}
+  .toc{display:none!important}
+  .main{margin-left:0!important}
+  .hero{padding:32px 0 26px;margin-bottom:24px}
 </style>
 """
 
@@ -511,10 +504,7 @@ def _render_audit_page():
 
     info_col, dl_col = st.columns([3.4, 1])
     with info_col:
-        st.caption(
-            "完整版：全局流程 → 保底主體 → 模式地圖 → 30 張模式卡（流程圖／可重跑範例／不能處理的情景）"
-            " → 審查發現 → 附錄。文件內有目錄可跳轉；如需全螢幕或列印（A4 橫向），請先下載。"
-        )
+        st.caption("需要目錄跳轉、全螢幕閱讀或列印（A4 橫向）？請下載 HTML。")
     with dl_col:
         st.download_button(
             "⬇️ 下載完整 HTML",
