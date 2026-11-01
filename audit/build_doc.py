@@ -153,11 +153,11 @@ def svg_turnday_flow() -> str:
 def svg_floor_compare() -> str:
     """同一批店舖：Safety 固定保底 vs Turnday 隨銷速調節。"""
     rows = [
-        ("快銷店", "RF・高動銷", "近 46 日 92 件・2.0 件/日", 5, 28,
+        ("高銷量店", "RF・銷情理想", "近 46 日 92 件・2.0 件/日", 5, 28,
          "Turnday 28 ≈ 2 週用量（更保守・防斷貨）", "#92400e", True, False),
-        ("慢銷店", "RF・低動銷", "近 46 日 23 件・0.5 件/日", 5, 7,
+        ("低銷量店", "RF・銷情平淡", "近 46 日 23 件・0.5 件/日", 5, 7,
          "Turnday 7 — 保底下降・釋放庫存", "#92400e", False, False),
-        ("零銷量店", "RF・近期無售出", "近 46 日 0 件・0 件/日", 5, 0,
+        ("零銷量店", "RF・期內無售出", "近 46 日 0 件・0 件/日", 5, 0,
          "Turnday 0 — 存貨可全數轉出（清走死貨）", "#b91c1c", False, True),
     ]
     x0, x1 = 270.0, 1040.0
@@ -196,7 +196,7 @@ def svg_floor_compare() -> str:
                 parts.append(svg_text([note], x0 + tw - 10, top + 85, 11, 0, 700, note_color, "end"))
             else:
                 parts.append(svg_text([note], x0 + tw + 8, top + 85, 11, 0, 700, note_color))
-    parts.append(svg_text(["Turnday 讓保底隨實際銷速自動調節：快銷更高（防斷貨）、慢銷更低（釋放庫存）、零銷量歸零（清死貨）；Safety 主體一律沿用上載檔的固定值。"], 24, 468, 11, 0, 400, "#64748b"))
+    parts.append(svg_text(["Turnday 保底隨銷速調節：高銷量店更高（防斷貨）、低銷量店更低（釋放庫存）、零銷量店歸零（清死貨）；Safety 沿用上載檔固定值。"], 24, 468, 11, 0, 400, "#64748b"))
     parts.append("</svg>")
     return "".join(parts)
 
@@ -868,7 +868,7 @@ def build_html() -> str:
 <div class="box">
   <h4>圖 2　同一間店，兩種保底（N = 14 日）</h4>
   <div class="pipeline-wrap" style="margin:12px 0 10px;">{svg_floor_compare()}</div>
-  <p style="margin:0;font-size:13.2px;">灰條是上載檔的 Safety 5；橙條是同一間店按銷速算出的 Turnday。快銷店被拉長（28 件 ≈ 2 週用量），慢銷店縮短（7 件），零銷量店歸零 —— 同一套模式，因為保底不同，補貨與轉出的力度也跟著不同。</p>
+  <p style="margin:0;font-size:13.2px;">灰條是上載檔的 Safety 5；橙條是同一間店按銷速算出的 Turnday。高銷量店被拉長（28 件 ≈ 2 週用量），低銷量店縮短（7 件），零銷量店歸零 —— 同一套模式，因為保底不同，補貨與轉出的力度也跟著不同。</p>
 </div>
 <div class="box">
   <h4>表 1　哪些模式受影響</h4>
@@ -877,7 +877,7 @@ def build_html() -> str:
 </div>
 <div class="grid3">
   <div class="mini"><b>零銷量 → 保底 0</b><p style="margin:6px 0 0;font-size:12.8px;">該店該 SKU 的存貨可被全數轉出；清死貨利好，但要接受陳列可能歸零。</p></div>
-  <div class="mini"><b>快銷店保底更高</b><p style="margin:6px 0 0;font-size:12.8px;">28 件可能遠高於原 Safety 5，轉出量自然減少，屬預期而非 bug。</p></div>
+  <div class="mini"><b>高銷量店保底更高</b><p style="margin:6px 0 0;font-size:12.8px;">28 件可能遠高於原 Safety 5，轉出量自然減少，屬預期而非 bug。</p></div>
   <div class="mini"><b>日期錯，全部錯</b><p style="margin:6px 0 0;font-size:12.8px;">覆蓋日數依賴 MTD 數據日期；日期入錯，所有保底一併偏離，上載區會顯示核對行。</p></div>
 </div>
 <p class="note" style="margin:14px 0 0;">日數選擇：日常補貨 7–14 日；季節品或前置期長用 21–30 日。N 越大，保底越高、越保守。</p>
@@ -1055,8 +1055,8 @@ def build_md() -> str:
         "**同一間店，兩種保底（N = 14）**",
         "",
         md_table(["店舖", "近 46 日銷量", "日銷速", "Safety", "Turnday", "效果"], [
-            ["快銷店", "92 件", "2.0 件/日", "5", "28", "更保守・防斷貨"],
-            ["慢銷店", "23 件", "0.5 件/日", "5", "7", "保底下降・釋放庫存"],
+            ["高銷量店", "92 件", "2.0 件/日", "5", "28", "更保守・防斷貨"],
+            ["低銷量店", "23 件", "0.5 件/日", "5", "7", "保底下降・釋放庫存"],
             ["零銷量店", "0 件", "0 件/日", "5", "0", "存貨可全數轉出（清死貨）"],
         ]),
         "",
