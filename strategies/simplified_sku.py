@@ -73,6 +73,14 @@ def identify_destinations_simplified_sku(group_df: pd.DataFrame) -> List[Dict]:
 
 
 class SimplifiedSKUStrategy(BaseMatchStrategy):
+    def __init__(self, return_d001: bool = True):
+        """return_d001：精簡SKU(限同OM) 是否把配對後剩餘庫存退回 D001。
+
+        只有「精簡SKU(限同OM)」受此選項影響；跨OM 與退D001 模式維持原有行為。
+        """
+        super().__init__()
+        self.return_d001 = return_d001
+
     def identify_sources(
         self,
         group_df: pd.DataFrame,
@@ -148,6 +156,11 @@ class SimplifiedSKUStrategy(BaseMatchStrategy):
         for source in temp_sources:
             remaining = source['transferable_qty']
             if remaining <= 0:
+                continue
+
+            # 「精簡SKU(限同OM)」可選擇不退 D001：剩餘庫存留在來源店舖。
+            # 跨OM 及退D001 模式不受此選項影響，維持原有退回行為。
+            if mode == "精簡SKU(限同OM)" and not self.return_d001:
                 continue
 
             supply_source = source.get('supply_source')

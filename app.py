@@ -1,5 +1,5 @@
 """
-庫存調貨建議系統 v2.38.5 - Streamlit應用程序
+庫存調貨建議系統 v2.38.6 - Streamlit應用程序
 支持三十模式系統：A(保守轉貨)/A1(保守轉貨-轉出店舖不餘存貨1件)/B(加強轉貨)/B2(附加B特別模式)/B2a(附加B2a特別模式)/B2L(附加B2L特別模式)/B2La(附加B2La特別模式)/B3(附加B跨OM特別模式)/B3a(附加B3a跨OM特別模式)/B3L(附加B3L跨OM特別模式)/B3La(附加B3La跨OM特別模式)/C(重點補0)/C1(重點補0-只補0/1(或自選數量))/C2(附加C跨OM重點補0)/D(清貨轉貨)/D2(清貨轉貨ND限定)/E1(強制轉出)/E1b(強制轉出優先類型接收)/E2(強制轉出跨OM)/F(目標優化)/F2(F指定模式)/F3(目標性補0)/NST(New Shop Target調貨)/ND1(ND同OM轉貨)/ND2(ND混合OM轉貨)/ND3(ND限同OM轉貨補0)/ND4(ND限同OM轉貨補0及有銷售記錄)/精簡SKU(限同OM)/精簡SKU(跨OM)/精簡SKU(退D001)
 含模式教學分頁：30 模式邏輯審查（流程圖、可重跑範例、審查發現）
 """
@@ -69,6 +69,8 @@ def _describe_extra_params(sidebar_result: dict) -> str:
         parts.append(f"門檻≤{sidebar_result.get('c1_threshold')}")
     if sidebar_result.get('mode_code') in ("C", "C1", "C2"):
         parts.append(f"每店上限{sidebar_result.get('c1_ceiling')}件")
+    if sidebar_result.get('mode_code') == "精簡SKU(限同OM)":
+        parts.append("退D001" if sidebar_result.get('sku_return_d001', True) else "不退D001")
     return " · ".join(p for p in parts if p)
 
 
@@ -109,6 +111,7 @@ d2_site_limit_mode = sidebar_result['d2_site_limit_mode']
 c1_threshold = sidebar_result['c1_threshold']
 c1_ceiling = sidebar_result['c1_ceiling']
 f_fulfill_small_first = sidebar_result['f_fulfill_small_first']
+sku_return_d001 = sidebar_result['sku_return_d001']
 
 st.markdown(f"""
 <div class="app-header fade-in">
@@ -260,7 +263,7 @@ with tab_system:
                 """, unsafe_allow_html=True)
 
             nst_max_source_shops = sidebar_result.get('nst_max_source_shops')
-            current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{d2_site_limit_mode}_{c1_threshold}_{c1_ceiling}_{f_fulfill_small_first}_{nst_max_source_shops}_{floor_body}_{turnday_days}_{mtd_as_of_date.isoformat()}_{uploaded_file.name}_{uploaded_file.size}"
+            current_run_key = f"{mode_code}_{b_special_receive_site_limit_option}_{f2_allow_hd_transfer}_{d2_site_limit_mode}_{c1_threshold}_{c1_ceiling}_{f_fulfill_small_first}_{nst_max_source_shops}_{sku_return_d001}_{floor_body}_{turnday_days}_{mtd_as_of_date.isoformat()}_{uploaded_file.name}_{uploaded_file.size}"
             if st.session_state.get('_run_key') != current_run_key:
                 for k in ['recommendations', 'statistics', 'gap_report', 'quality_passed', 'quality_errors', 'excel_data', 'excel_filename', 'excel_run_key', 'active_mode_name']:
                     st.session_state.pop(k, None)
@@ -281,6 +284,7 @@ with tab_system:
                         c1_ceiling=c1_ceiling,
                         f_fulfill_small_first=f_fulfill_small_first,
                         nst_max_source_shops=nst_max_source_shops,
+                        sku_return_d001=sku_return_d001,
                     )
 
                     recommendations = transfer_logic.generate_transfer_recommendations(df, mode_name)

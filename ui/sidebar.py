@@ -84,7 +84,7 @@ def render_sidebar() -> Dict:
             - ✅ E1模式(強制轉出) / E1b模式(強制轉出優先類型接收) / E2模式(強制轉出跨OM)
             - ✅ F模式(目標優化) / F2模式(F指定模式) / F3模式(目標性補0) / NST模式(New Shop Target調貨)
             - ✅ ND1模式(ND同OM轉貨) / ND2模式(ND混合OM轉貨) / ND3模式(ND限同OM轉貨-補0) / ND4模式(ND限同OM轉貨-補0及有銷售記錄)
-            - ✅ 精簡SKU(限同OM) / 精簡SKU(跨OM) / 精簡SKU(退D001)
+            - ✅ 精簡SKU(限同OM)（可選剩餘庫存退D001／不退D001） / 精簡SKU(跨OM) / 精簡SKU(退D001)
 
             **類型識別與匹配:**
             - ✅ ND/RF類型智慧識別
@@ -130,6 +130,7 @@ def render_sidebar() -> Dict:
    - 若選擇 F2/F3/NST，可設定「HD店舖轉出」；F/F2/F3/NST 可勾選「優先滿足小型目標」
    - 若選擇 NST，可設定「同一SKU轉出店舖數量上限：10間/20間/不限制」
    - 若選擇 D2，可設定「接收店舖數量限制」三選一；若選擇 C1，可設定補0門檻；C/C1/C2 可設定每店轉出件數上限
+   - 若選擇 精簡SKU(限同OM)，可設定剩餘庫存「退回 D001（預設）」或「不退 D001（留在店舖）」
 
 4. **上載 Excel 並啟動分析**
    - 主頁上載 Excel，核對 MTD 數據日期（僅 Turnday 主體使用）
@@ -193,6 +194,7 @@ def render_sidebar() -> Dict:
 
         b_special_max_receive_sites_per_source: Optional[int] = None
         b_special_receive_site_limit_option = "最多 2 間"
+        sku_return_d001 = True
         _has_mode_params = False
 
         if mode_code in get_receive_limit_codes():
@@ -254,6 +256,23 @@ def render_sidebar() -> Dict:
                 nst_max_source_shops = 20
         else:
             st.session_state.pop('nst_shop_limit_option', None)
+
+        # ── 精簡SKU(限同OM) 剩餘庫存處理（2選1）───────────────────────
+        if mode_code == "精簡SKU(限同OM)":
+            _has_mode_params = True
+            sku_return_option = st.radio(
+                "剩餘庫存處理",
+                ["退回 D001（預設）", "不退 D001（留在店舖）"],
+                index=0,
+                key='sku_return_d001_option',
+                help="精簡SKU(限同OM) 配對後仍有剩餘時：\n"
+                     "- 退回 D001（預設）：配不完的庫存建議退回中央倉 D001，維持原有行為。\n"
+                     "- 不退 D001：只輸出店與店之間的調貨建議，剩餘庫存留在來源店舖，不產生退回 D001 的建議。\n"
+                     "備註：只剩 1 件及 Supply source 為 1／4 的來源本來就不退 D001。"
+            )
+            sku_return_d001 = (sku_return_option == "退回 D001（預設）")
+        else:
+            st.session_state.pop('sku_return_d001_option', None)
 
         # ── D2 模式接收店舖數量限制（3選1）─────────────────────────────
         # 選項1「不限店舖數量（原有設定）」：無限制，target_qty 為正常值
@@ -347,4 +366,5 @@ def render_sidebar() -> Dict:
         'c1_ceiling': c1_ceiling,
         'f_fulfill_small_first': f_fulfill_small_first,
         'nst_max_source_shops': nst_max_source_shops,
+        'sku_return_d001': sku_return_d001,
     }

@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import mode_spec as MS  # noqa: E402
 import scenarios as SC  # noqa: E402
 
-VERSION = "v2.38.5"
-TODAY = date(2026, 11, 1).isoformat()
+VERSION = "v2.38.6"
+TODAY = date(2026, 11, 4).isoformat()
 OUT_DIR = Path(__file__).resolve().parents[1] / "docs"
 OUT_HTML = OUT_DIR / "KiLo_30模式邏輯審查.html"
 OUT_MD = OUT_DIR / "KiLo_30模式邏輯審查.md"
@@ -387,6 +387,12 @@ def mode_card(mode, runs, extra="") -> str:
     result = runs[0]
     params = result["params"]
     params_txt = fmt_params(params) if params else "—"
+    mode_params = mode.get("params") or []
+    mode_params_txt = "；".join(mode_params)
+    mode_params_chip = (
+        f'<span class="chip chip-param">參數：{E(mode_params_txt)}</span>'
+        if mode_params else ""
+    )
     tag_map = {"設計": ("design", "設計"), "邊界": ("edge", "邊界"), "資料": ("data", "資料"),
                "風險": ("risk", "風險"), "高": ("risk", "風險"), "中": ("risk", "風險")}
     limits = "".join(
@@ -399,7 +405,7 @@ def mode_card(mode, runs, extra="") -> str:
     dest = "".join(f"<li>{E(x)}</li>" for x in mode["dest"])
     post = "".join(f"<li>{E(x)}</li>" for x in mode["post"])
     inputs = "".join(f'<span class="chip">{E(x)}</span>' for x in mode["inputs"])
-    params_chip = f'<span class="chip chip-param">{E(params_txt)}</span>' if params else ""
+    params_chip = f'<span class="chip chip-param">範例：{E(params_txt)}</span>' if params else ""
     return f'''
 <article class="mode-card" id="mode-{E(mode["code"])}" style="--accent:{color}">
   <header class="mode-head">
@@ -414,7 +420,7 @@ def mode_card(mode, runs, extra="") -> str:
     </div>
   </header>
   <p class="when"><b>何時用</b>　{E(mode["when"])}</p>
-  <div class="chips"><span class="chip chip-label">輸入</span>{inputs}{params_chip}</div>
+  <div class="chips"><span class="chip chip-label">輸入</span>{inputs}{mode_params_chip}{params_chip}</div>
   <div class="flow-wrap">{mode_flow_svg(mode)}</div>
   <div class="rules">
     <div class="rule"><h4>① 來源</h4><ul>{src}</ul></div>
@@ -490,7 +496,7 @@ def scenario_table():
         ("指定貨品必須離開來源", "E1", "E2（可跨 OM）"),
         ("新店／重點店有 Target", "NST", "F2（較進取）"),
         ("ND 店之間互相補貨", "ND3", "ND4（只補有銷量）"),
-        ("整體壓存貨、設上限", "精簡SKU(限同OM)", "跨 OM／退 D001"),
+        ("整體壓存貨、設上限", "精簡SKU(限同OM)", "跨 OM／不退 D001"),
         ("Type=L 要保留 2 件", "B2L", "B3L（跨 OM）"),
         ("遊客鋪不可出貨", "B2a", "B3a（跨 OM）"),
     ]
@@ -538,7 +544,9 @@ def field_matrix():
             "e": "ALL 空白 → 0 建議，不報錯",
             "f": "Target 非數字會被忽略",
         }.get(m["family"], "")
-        if code == "精簡SKU(限同OM)" or code == "精簡SKU(跨OM)":
+        if code == "精簡SKU(限同OM)":
+            note = "Last 2 Month Sold Qty 可選；剩餘可選退 D001／不退"
+        if code == "精簡SKU(跨OM)":
             note = "Last 2 Month Sold Qty 可選；缺失回落 Last Month"
         if code == "精簡SKU(退D001)":
             note = "同上；Supply source 1/4 不退"
@@ -1088,9 +1096,11 @@ def build_md() -> str:
                   md_table(fam["compare"][0], fam["compare"][1:]), ""]
         for m in modes:
             res = RESULTS[m["code"]][0]
+            mode_params_txt = "；".join(m.get("params") or []) or "—"
+            example_params_txt = fmt_params(res["params"]) or "—"
             lines += [f"### {m['code']}　{m['name']}", "", f"*{m['tagline']}*", "",
                       f"**何時用**：{m['when']}", "",
-                      f"**輸入**：{'、'.join(m['inputs'])}　**參數**：{fmt_params(res['params'])}", "",
+                      f"**輸入**：{'、'.join(m['inputs'])}　**模式參數**：{mode_params_txt}　**範例參數**：{example_params_txt}", "",
                       "**來源**", ""] + [f"- {x}" for x in m["source"]] + [""] + \
                      ["**可轉量**", ""] + [f"- {x}" for x in m["qty"]] + [""] + \
                      ["**接收**", ""] + [f"- {x}" for x in m["dest"]] + [""] + \

@@ -195,6 +195,7 @@ def main():
     ]
     for m in ["精簡SKU(限同OM)", "精簡SKU(跨OM)", "精簡SKU(退D001)"]:
         run("SKU-family", sku, m)
+    run("SKU-family(不退D001)", sku, "精簡SKU(限同OM)", sku_return_d001=False)
 
 
 if __name__ == "__main__":

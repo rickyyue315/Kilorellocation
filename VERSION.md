@@ -1,5 +1,31 @@
 # 版本更新記錄
 
+## v2.38.6 (2026-11-04)
+
+### 精簡SKU(限同OM) 新增「剩餘庫存退回 D001／不退 D001」選項
+
+#### 問題現象
+精簡SKU(限同OM) 以往配對後剩餘庫存一律建議退回 D001；若只想做同 OM 店與店調撥、不想產生退倉工作，無法關閉退回建議。
+
+#### 變更說明
+- 側邊欄「步驟 3 模式參數」新增「剩餘庫存處理」二選一：
+  - `退回 D001（預設）`：維持原有行為，配不完的剩餘庫存建議退回 D001。
+  - `不退 D001（留在店舖）`：只輸出店與店之間的調貨建議，剩餘庫存留在來源店舖，不建立退回 D001 建議。
+- 選項只作用於「精簡SKU(限同OM)」；「精簡SKU(跨OM)」與「精簡SKU(退D001)」行為不變。
+- 原有「只剩 1 件不退 D001」及「`Supply source` 為 1／4 不退」規則維持不變。
+- 選項已納入執行快取鍵；切換後重新生成，不會沿用舊模式結果。
+- 新增 `tests/test_simplified_sku_return_option.py`（4 項），覆蓋預設退回、關閉退回、跨OM不受影響、退D001模式不受影響。
+
+#### 修改檔案
+- 邏輯：`strategies/simplified_sku.py`、`business_logic.py`、`models/mode_registry.py`
+- 介面：`ui/sidebar.py`、`app.py`、`ui/mode_docs.py`
+- 文件：`README.md`、`VERSION.md`、`config.py`、`app.py` docstring、`調貨模式詳解.txt`、`transfer_logic_ai_brief.md`
+- 教學：`audit/mode_spec.py`、`audit/build_doc.py`、`docs/KiLo_30模式邏輯審查.html`、`docs/KiLo_30模式邏輯審查.md`
+
+#### 驗證
+`python -m pytest tests/test_simplified_sku_return_option.py -q` → 4 passed。
+其餘模式與 Excel 輸出格式不變。
+
 ## v2.38.5 (2026-10-27)
 
 ### 全面遷移 `use_container_width` → `width="stretch"`（消除雲端日誌洪水）

@@ -42,7 +42,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
    - **C mode**: RF Enhanced source -> Priority Zero Replenishment
    - (Mode C/C2) RF source -> Priority Zero Replenishment (legacy fallback)
    - (Mode F/F2) Target priority matching (ND/RF can receive)
-   - (Mode 精簡SKU) RF-to-RF matching (min 2 pieces) -> D001 fallback
+   - (Mode 精簡SKU) RF-to-RF matching (min 2 pieces) -> optional D001 fallback (same-OM mode; default on)
    - **Key changes v2.11.3**: 
      - C mode: Priority Zero Replenishment now served at EACH source priority level (before Emergency/Potential)
      - B Special: RF Surplus matched BEFORE Local Full Transfer (was reversed)
@@ -385,7 +385,11 @@ Draw one logic image that lets users compare all current transfer modes and unde
   - RF stores only
   - Receive Cap = Max(Safety Stock × 2, Last 2 Month Sold Qty × 2)
   - Minimum 2 pieces per transfer (reference C1 mode)
-- Leftover: all unmatched surplus returns to D001 (no quantity limit)
+- Leftover: configurable in the sidebar (default returns to D001)
+  - `退回 D001（預設）`: all unmatched surplus returns to D001 (no quantity limit)
+  - `不退 D001（留在店舖）`: no D001 recommendations are generated; leftover stays in the source store
+  - Does not apply to 精簡SKU(跨OM) or 精簡SKU(退D001)
+  - In both options, a remainder of 1 and sources with Supply source = 1/4 never return to D001
 - Grouping: by Article + OM (same OM only)
 - Source labels: 精簡SKU ND轉出, 精簡SKU RF轉出
 - Dest labels: 精簡SKU接收, 退回D001
@@ -434,7 +438,7 @@ Draw one logic image that lets users compare all current transfer modes and unde
    - ND1/ND2 ND mutual transfer (breaks ND-no-receive rule)
     - ND3 ND same-OM zero-fill (retain 3, only 0-stock ND dest, like C1)
     - ND4 ND same-OM zero-fill with sales filter (like ND3 but only receive stores with sales history)
-   - 精簡SKU(限同OM) surplus beyond Cap + D001 fallback
+   - 精簡SKU(限同OM) surplus beyond Cap + optional D001 fallback (default on)
    - 精簡SKU(跨OM) cross-OM + HD/Windy + D001 fallback
    - 精簡SKU(退D001) all surplus directly returns to D001, no RF receive pairing
 
